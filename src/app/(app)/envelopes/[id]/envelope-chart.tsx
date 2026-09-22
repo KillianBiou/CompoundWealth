@@ -14,9 +14,7 @@ import {
 } from "recharts";
 import {
   buildEnvelopeSeries,
-  buildCompoundInterestSeries,
   investedSeries,
-  type CompoundInterestPoint,
   type PeriodKey,
   type ValuationPoint,
 } from "@/lib/portfolio/series";
@@ -38,23 +36,16 @@ interface ChartPoint {
   date: number;
   value: number | null;
   invested: number | null;
-  compoundInterest: number | null;
-  interestOnInterest: number | null;
 }
 
 function mergeSeries(
   valuations: ValuationPoint[],
   investedPoints: ValuationPoint[],
-  compound: CompoundInterestPoint[],
 ): ChartPoint[] {
-  const compoundByTime = new Map(
-    compound.map((c) => [c.date.getTime(), c]),
-  );
   const times = [
     ...new Set([
       ...valuations.map((v) => v.date.getTime()),
       ...investedPoints.map((v) => v.date.getTime()),
-      ...compound.map((c) => c.date.getTime()),
     ]),
   ].sort((a, b) => a - b);
 
@@ -68,13 +59,10 @@ function mergeSeries(
   };
 
   return times.map((time) => {
-    const compoundPoint = compoundByTime.get(time);
     return {
       date: time,
       value: valueAt(valuations, time) === null ? null : valueAt(valuations, time)! / 100,
       invested: valueAt(investedPoints, time) === null ? null : valueAt(investedPoints, time)! / 100,
-      compoundInterest: compoundPoint ? compoundPoint.compoundInterestCents / 100 : null,
-      interestOnInterest: compoundPoint ? compoundPoint.interestOnInterestCents / 100 : null,
     };
   });
 }
@@ -93,8 +81,6 @@ function ChartTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   const invested = point.invested;
-  const compoundInterest = point.compoundInterest;
-  const interestOnInterest = point.interestOnInterest;
   const value = point.value;
 
   return (
@@ -116,33 +102,7 @@ function ChartTooltip({
           </span>
         </p>
       ) : null}
-      {compoundInterest !== null ? (
-        <p className="tabular-nums">
-          Grâce aux intérêts composés&nbsp;:{" "}
-          <span
-            className={cn(
-              "font-medium",
-              compoundInterest >= 0 ? "text-positive" : "text-negative",
-            )}
-          >
-            {compoundInterest >= 0 ? "+" : "−"}
-            {formatMoneyCents(Math.abs(compoundInterest * 100), currency, locale)}
-            {interestOnInterest !== null && interestOnInterest > 0 ? (
-              <span className="font-normal text-text-secondary">
-                {" "}
-                (dont {formatMoneyCents(interestOnInterest * 100, currency, locale)}
-                d&apos;intérêts sur intérêts)
-              </span>
-            ) : null}
-          </span>
-        </p>
-      ) : null}
-      {invested !== null && compoundInterest !== null ? (
-        <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
-          Valeur totale&nbsp;:{" "}
-          <strong>{formatMoneyCents((invested + compoundInterest) * 100, currency, locale)}</strong>
-        </p>
-      ) : value !== null ? (
+      {value !== null ? (
         <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
           Valeur totale&nbsp;:{" "}
           <strong>{formatMoneyCents(value * 100, currency, locale)}</strong>
@@ -167,15 +127,14 @@ export function EnvelopeChart({
 }) {
   const [period, setPeriod] = useState<PeriodKey>("all");
 
-  const { data, hasCompound } = useMemo(() => {
+  const data = useMemo(() => {
     const investedPoints = investedSeries(investments);
-    const compound = buildCompoundInterestSeries(valuations, investments);
-    const merged = mergeSeries(valuations, investedPoints, compound);
+    const merged = mergeSeries(valuations, investedPoints);
     const series = buildEnvelopeSeries(valuations, investedCents, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
     const filtered = merged.filter((p) => p.date >= startBoundary);
-    return { data: filtered, hasCompound: compound.length > 0 };
+    return filtered;
   }, [valuations, investedCents, investments, period]);
 
   if (valuations.length === 0) {
@@ -269,26 +228,9 @@ export function EnvelopeChart({
               dot={false}
               connectNulls
             />
-            {hasCompound ? (
-              <Line
-                type="monotone"
-                dataKey="compoundInterest"
-                name="Intérêts composés"
-                stroke="var(--positive)"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                dot={false}
-                connectNulls
-              />
-            ) : null}
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-3 text-xs text-text-muted">
-        La courbe « Intérêts composés » cumule les gains de chaque versement au taux annualisé
-        effectif du portefeuille : versement × ((1+r)^t − 1). La part « intérêts sur intérêts »
-        (effet boule de neige) s&apos;accélère avec le temps.
-      </p>
     </div>
   );
 }
