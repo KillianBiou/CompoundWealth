@@ -9,6 +9,9 @@ export interface EtfCatalogEntry {
     | "Nasdaq-100"
     | "Europe"
     | "Zone euro"
+    | "France"
+    | "Défense Europe"
+    | "Technologie Europe"
     | "Émergents";
   ter: number;
 }
@@ -102,6 +105,30 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
     indexCategory: "Émergents",
     ter: 0.003,
   },
+  {
+    ticker: "IFRE",
+    isin: "IE00BP3QZJ36",
+    name: "iShares MSCI France UCITS ETF",
+    issuer: "iShares",
+    indexCategory: "France",
+    ter: 0.0025,
+  },
+  {
+    ticker: "BJL8",
+    isin: "LU3047998896",
+    name: "BNP Paribas Easy Bloomberg Europe Defense UCITS ETF",
+    issuer: "BNP Paribas",
+    indexCategory: "Défense Europe",
+    ter: 0.0035,
+  },
+  {
+    ticker: "ESIT",
+    isin: "IE00BMW42413",
+    name: "iShares MSCI Europe Information Technology Sector UCITS ETF",
+    issuer: "iShares",
+    indexCategory: "Technologie Europe",
+    ter: 0.0018,
+  },
 ];
 
 export const ETF_CATEGORIES = [
@@ -110,6 +137,9 @@ export const ETF_CATEGORIES = [
   "Nasdaq-100",
   "Europe",
   "Zone euro",
+  "France",
+  "Défense Europe",
+  "Technologie Europe",
   "Émergents",
 ] as const;
 

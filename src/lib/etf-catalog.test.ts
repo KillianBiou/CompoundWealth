@@ -37,6 +37,17 @@ describe("searchEtfCatalog", () => {
     const r = searchEtfCatalog("monde");
     expect(r.length).toBeGreaterThanOrEqual(3);
   });
+  it("trouve les nouvelles entrées par ISIN", () => {
+    expect(getEtfByIsin("IE00BP3QZJ36")?.ticker).toBe("IFRE");
+    expect(getEtfByIsin("LU3047998896")?.ticker).toBe("BJL8");
+    expect(getEtfByIsin("IE00BMW42413")?.ticker).toBe("ESIT");
+  });
+  it("trouve les nouvelles entrées par nom (accents ignorés)", () => {
+    const r = searchEtfCatalog("defense");
+    expect(r.map((e) => e.ticker)).toContain("BJL8");
+    const r2 = searchEtfCatalog("technologie");
+    expect(r2.map((e) => e.ticker)).toContain("ESIT");
+  });
   it("ne renvoie rien pour une requête vide", () => {
     expect(searchEtfCatalog("  ")).toEqual([]);
   });
