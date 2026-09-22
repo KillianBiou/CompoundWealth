@@ -9,6 +9,7 @@ import { AddPositionForm } from "./add-position-form";
 import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 import { EnvelopeDangerZone } from "./danger-zone";
+import { RefreshPricesButton } from "./refresh-prices-button";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -124,18 +125,24 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         />
         <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
         {gainCents !== null && gainRatio !== null ? (
-          <Kpi
-            label="Gain / perte"
-            value={formatEurCents(Math.abs(gainCents))}
-            sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
-            subTone={gainCents >= 0 ? "positive" : "negative"}
-          />
+          <div className="flex items-start justify-between gap-3">
+            <Kpi
+              label={gainCents >= 0 ? "Gain" : "Perte"}
+              value={formatEurCents(Math.abs(gainCents))}
+              sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
+              subTone={gainCents >= 0 ? "positive" : "negative"}
+            />
+            <RefreshPricesButton envelopeId={envelope.id} />
+          </div>
         ) : (
-          <Kpi
-            label="Gain / perte"
-            value="—"
-            sub="Complétez les montants investis pour calculer le gain"
-          />
+          <div className="flex items-start justify-between gap-3">
+            <Kpi
+              label="Gain / perte"
+              value="—"
+              sub="Complétez les montants investis pour calculer le gain"
+            />
+            <RefreshPricesButton envelopeId={envelope.id} />
+          </div>
         )}
       </Card>
 

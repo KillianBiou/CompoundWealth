@@ -32,6 +32,7 @@ model Envelope {
   closedAt      DateTime?
   depositsCents Int?
   createdAt   DateTime           @default(now())
+  lastPriceRefreshAt DateTime?
   positions   Position[]
   valuations  EnvelopeValuation[]
 
