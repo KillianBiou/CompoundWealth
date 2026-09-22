@@ -18,7 +18,15 @@ export interface PositionRow {
   investedCents: number | null;
   currentValueCents: number | null;
   boughtAt: Date;
+  valuationDate: Date | null;
+  valuationSource: string | null;
 }
+
+const sourceLabels: Record<string, string> = {
+  yahoo: "Yahoo Finance",
+  import: "Import",
+  manuel: "Saisie manuelle",
+};
 
 export function PositionsTable({
   envelopeId,
@@ -71,7 +79,15 @@ export function PositionsTable({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.currentValueCents !== null ? (
-                      formatEurCents(p.currentValueCents)
+                      <span>
+                        {formatEurCents(p.currentValueCents)}
+                        {p.valuationDate ? (
+                          <span className="block text-xs font-normal text-text-muted">
+                            {p.valuationDate.toLocaleDateString("fr-FR")}
+                            {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
+                          </span>
+                        ) : null}
+                      </span>
                     ) : (
                       <span className="text-text-muted">—</span>
                     )}

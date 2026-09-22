@@ -88,6 +88,7 @@ model PositionValuation {
   position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
   date       DateTime
   valueCents Int
+  source     String?
 
   @@unique([positionId, date])
   @@index([positionId])
