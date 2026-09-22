@@ -504,7 +504,7 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
       failures.push(`${position.name} (quantité manquante)`);
       continue;
     }
-    if (index > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
     const quote = await fetchMarketQuote(symbol);
     if (!quote.ok) {
       failures.push(`${position.name} (${quote.reason})`);

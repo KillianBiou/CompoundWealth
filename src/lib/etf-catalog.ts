@@ -1,6 +1,8 @@
 export interface EtfCatalogEntry {
   ticker: string;
   isin: string;
+  /** symbole Yahoo Finance exact (suffixe de place inclus) */
+  yahooSymbol: string | null;
   name: string;
   issuer: string;
   indexCategory:
@@ -20,6 +22,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "CW8",
     isin: "LU1681043599",
+    yahooSymbol: "CW8.PA",
     name: "Lyxor/Amundi MSCI World UCITS ETF",
     issuer: "Amundi",
     indexCategory: "Monde",
@@ -28,6 +31,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "WPEA",
     isin: "IE0002XZSHO1",
+    yahooSymbol: "WPEA.PA",
     name: "iShares MSCI World Swap PEA UCITS ETF",
     issuer: "iShares",
     indexCategory: "Monde",
@@ -36,6 +40,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "DCAM",
     isin: "FR001400U5Q4",
+    yahooSymbol: "DCAM.PA",
     name: "Amundi PEA Monde UCITS ETF",
     issuer: "Amundi",
     indexCategory: "Monde",
@@ -44,6 +49,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PE500",
     isin: "FR0011552624",
+    yahooSymbol: null,
     name: "Amundi PEA S&P 500 UCITS ETF",
     issuer: "Amundi",
     indexCategory: "S&P 500",
@@ -52,6 +58,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PSP5",
     isin: "FR0011871128",
+    yahooSymbol: "PSP5.PA",
     name: "Amundi PEA S&P 500 UCITS ETF",
     issuer: "Amundi",
     indexCategory: "S&P 500",
@@ -60,6 +67,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "ESE",
     isin: "FR0011550185",
+    yahooSymbol: "ESE.PA",
     name: "BNP Paribas Easy S&P 500 UCITS ETF",
     issuer: "BNP Paribas",
     indexCategory: "S&P 500",
@@ -68,6 +76,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PUST",
     isin: "FR0011871110",
+    yahooSymbol: "PUST.PA",
     name: "Amundi PEA Nasdaq-100 UCITS ETF",
     issuer: "Amundi",
     indexCategory: "Nasdaq-100",
@@ -76,6 +85,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PCEU",
     isin: "FR0013412038",
+    yahooSymbol: "PCEU.PA",
     name: "Amundi PEA MSCI Europe UCITS ETF",
     issuer: "Amundi",
     indexCategory: "Europe",
@@ -84,6 +94,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "ETZ",
     isin: "FR0011550193",
+    yahooSymbol: "ETZ.PA",
     name: "BNP Paribas Easy STOXX Europe 600 UCITS ETF",
     issuer: "BNP Paribas",
     indexCategory: "Europe",
@@ -92,6 +103,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PRAZ",
     isin: "LU2089238112",
+    yahooSymbol: "PRAZ.DE",
     name: "Amundi Prime Eurozone UCITS ETF DR",
     issuer: "Amundi",
     indexCategory: "Zone euro",
@@ -100,6 +112,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "PAEEM",
     isin: "FR0013412020",
+    yahooSymbol: "PAEEM.PA",
     name: "Amundi PEA Émergent MSCI EM ESG Screened UCITS ETF",
     issuer: "Amundi",
     indexCategory: "Émergents",
@@ -108,6 +121,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "IFRE",
     isin: "IE00BP3QZJ36",
+    yahooSymbol: "IS3U.DE",
     name: "iShares MSCI France UCITS ETF",
     issuer: "iShares",
     indexCategory: "France",
@@ -116,6 +130,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "BJL8",
     isin: "LU3047998896",
+    yahooSymbol: "BJL8.DE",
     name: "BNP Paribas Easy Bloomberg Europe Defense UCITS ETF",
     issuer: "BNP Paribas",
     indexCategory: "Défense Europe",
@@ -124,6 +139,7 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
   {
     ticker: "ESIT",
     isin: "IE00BMW42413",
+    yahooSymbol: "ESIT.DE",
     name: "iShares MSCI Europe Information Technology Sector UCITS ETF",
     issuer: "iShares",
     indexCategory: "Technologie Europe",
