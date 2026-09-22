@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
+import { fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
@@ -18,6 +19,7 @@ import {
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
 import { createSession, destroySession, getSession } from "./session";
+import { requireUserId } from "./auth";
 
 export type ActionState = {
   errors?: Record<string, string[]>;
@@ -468,4 +470,71 @@ export async function deleteAccountAction(): Promise<void> {
   await prisma.user.delete({ where: { id: session.userId } });
   await destroySession();
   redirect("/login");
+}
+
+const PRICE_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
+
+export async function refreshPricesAction(envelopeId: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId },
+    include: { positions: { include: { valuations: { orderBy: { date: "desc" }, take: 1 } } } },
+  });
+  if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
+
+  if (
+    envelope.lastPriceRefreshAt &&
+    Date.now() - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS
+  ) {
+    return { errors: { form: ["Les prix viennent d'être actualisés, réessayez dans quelques minutes"] } };
+  }
+
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { lastPriceRefreshAt: new Date() },
+  });
+
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  let updated = 0;
+  const failures: string[] = [];
+  for (const [index, position] of envelope.positions.entries()) {
+    const symbol = position.symbol?.trim();
+    if (!symbol) continue;
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+    const quote = await fetchMarketQuote(symbol);
+    if (!quote) {
+      failures.push(position.name);
+      continue;
+    }
+    const valueCents = Math.round((position.quantity ?? 0) * quote.priceCents);
+    await prisma.positionValuation.upsert({
+      where: { positionId_date: { positionId: position.id, date: new Date(todayKey) } },
+      create: { positionId: position.id, date: new Date(todayKey), valueCents },
+      update: { valueCents },
+    });
+    updated += 1;
+  }
+
+  if (updated === 0 && failures.length > 0) {
+    return {
+      errors: {
+        form: [
+          `Aucun prix récupéré (${failures.length} position${failures.length > 1 ? "s" : ""}). Vérifiez les symboles.`,
+        ],
+      },
+    };
+  }
+
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+
+  if (failures.length > 0) {
+    return {
+      message: `${updated} prix actualisé${updated > 1 ? "s" : ""} ; échec pour : ${failures.join(", ")}`,
+    };
+  }
+  return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
 }
