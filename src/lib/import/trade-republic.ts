@@ -74,6 +74,8 @@ interface PositionAccumulator {
   lastPriceCents: number | null;
   /** achats triés par date, pour reconstruire l'historique au prix du CSV */
   buyDates: { date: string; quantityDelta: number; priceCents: number }[];
+  /** versements individuels (montant investi par achat) */
+  investments: { date: string; amountCents: number }[];
 }
 
 interface EnvelopeAccumulator {
@@ -177,6 +179,7 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
           firstBoughtAt: date,
           lastPriceCents: null,
           buyDates: [],
+          investments: [],
         };
         envelope.positions.set(key, position);
       }
@@ -185,6 +188,7 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
       position.investedCents += Math.abs(amountCents) + Math.abs(feeCents);
       position.lastPriceCents = priceCents;
       position.buyDates.push({ date, quantityDelta: shares, priceCents });
+      position.investments.push({ date, amountCents: Math.abs(amountCents) + Math.abs(feeCents) });
 
       const invested = Math.abs(amountCents) + Math.abs(feeCents);
       envelope.depositsCents += invested;
@@ -207,6 +211,7 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
           unitPriceCents: p.lastPriceCents ?? 0,
           firstBoughtAt: p.firstBoughtAt,
           valuations: buildValuations(p),
+          investments: [...p.investments].sort((a, b) => a.date.localeCompare(b.date)),
         }),
       ),
     }));

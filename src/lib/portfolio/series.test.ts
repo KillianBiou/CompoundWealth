@@ -118,3 +118,63 @@ describe("buildEnvelopeValuations", () => {
     expect(buildEnvelopeValuations([{ valuations: [] }])).toEqual([]);
   });
 });
+
+import { annualizedGrowthRate, buildCompoundInterestSeries, investedSeries } from "./series";
+
+describe("investedSeries", () => {
+  it("cumule les versements par date", () => {
+    const points = investedSeries([
+      { date: d("2026-02-01"), amountCents: 10_000 },
+      { date: d("2026-01-01"), amountCents: 5_000 },
+      { date: d("2026-02-01"), amountCents: 3_000 },
+    ]);
+    expect(points).toEqual([
+      { date: d("2026-01-01"), valueCents: 5_000 },
+      { date: d("2026-02-01"), valueCents: 18_000 },
+    ]);
+  });
+});
+
+describe("annualizedGrowthRate", () => {
+  it("trouve le taux composé qui reproduit la valeur finale", () => {
+    const investments = [{ date: d("2025-01-01"), amountCents: 100_000 }];
+    const finalDate = d("2026-01-01");
+    const rate = annualizedGrowthRate(investments, 110_000, finalDate);
+    expect(rate).not.toBeNull();
+    expect(rate!).toBeCloseTo(0.10, 3);
+  });
+
+  it("retourne null sans versement ni valeur", () => {
+    expect(annualizedGrowthRate([], 100, d("2026-01-01"))).toBeNull();
+    expect(annualizedGrowthRate([{ date: d("2026-01-01"), amountCents: 100 }], 0, d("2026-01-01"))).toBeNull();
+  });
+});
+
+describe("buildCompoundInterestSeries", () => {
+  it("décompose en croissance simple et composée, intérêts nuls au départ", () => {
+    const valuations = [
+      { date: d("2025-01-01"), valueCents: 100_000 },
+      { date: d("2027-01-01"), valueCents: 121_000 },
+    ];
+    const investments = [{ date: d("2025-01-01"), amountCents: 100_000 }];
+    const series = buildCompoundInterestSeries(valuations, investments);
+    expect(series).toHaveLength(2);
+    expect(series[0].compoundInterestCents).toBe(0);
+    const last = series[series.length - 1];
+    expect(Math.abs(last.compoundGrowthCents - 121_000)).toBeLessThanOrEqual(2);
+    expect(Math.abs(last.simpleGrowthCents - 120_000)).toBeLessThanOrEqual(2);
+    expect(last.compoundInterestCents).toBeGreaterThan(900);
+    expect(last.compoundInterestCents).toBeLessThan(1_100);
+  });
+
+  it("retourne une série vide sans versements ou avec un taux négatif", () => {
+    expect(buildCompoundInterestSeries([], [])).toHaveLength(0);
+    const valuations = [
+      { date: d("2025-01-01"), valueCents: 100_000 },
+      { date: d("2026-01-01"), valueCents: 80_000 },
+    ];
+    expect(
+      buildCompoundInterestSeries(valuations, [{ date: d("2025-01-01"), amountCents: 100_000 }]),
+    ).toHaveLength(0);
+  });
+});

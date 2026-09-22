@@ -414,6 +414,15 @@ export async function confirmImportAction(
             })),
           });
         }
+        if (p.investments.length > 0) {
+          await tx.positionInvestment.createMany({
+            data: p.investments.map((inv) => ({
+              positionId: position.id,
+              date: new Date(inv.date),
+              amountCents: inv.amountCents,
+            })),
+          });
+        }
       }
       names.push(name);
     }

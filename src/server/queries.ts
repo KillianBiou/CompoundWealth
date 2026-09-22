@@ -75,7 +75,10 @@ export const getEnvelope = cache(async (envelopeId: string) => {
     where: { id: envelopeId, userId },
     include: {
       positions: {
-        include: { valuations: { orderBy: { date: "asc" } } },
+        include: {
+          valuations: { orderBy: { date: "asc" } },
+          investments: { orderBy: { date: "asc" } },
+        },
         orderBy: { boughtAt: "desc" },
       },
       valuations: { orderBy: { date: "asc" } },

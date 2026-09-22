@@ -16,6 +16,8 @@ export interface ImportedPosition {
   unitPriceCents: number;
   firstBoughtAt: string;
   valuations: ImportedValuation[];
+  /** achats individuels reconstruits depuis l'historique */
+  investments: { date: string; amountCents: number }[];
 }
 
 export interface ImportedEnvelope {
