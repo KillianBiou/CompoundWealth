@@ -49,6 +49,16 @@ Chaque champ peut être renseigné séparément et modifié ou effacé à tout m
 
 Pour un PEA, l'app affiche ensuite en permanence : **Versements : X / 150 000 €** — cliquez sur le badge pour ouvrir une petite modale et renseigner vos versements cumulés (avec texte explicatif) — et **Antériorité fiscale : X ans restants**.
 
+### Importer un export bancaire
+
+Plutôt que de tout saisir à la main, la page Enveloppes propose **Importer un export** :
+
+1. Déposez le **CSV des transactions** de votre courtier (ex. Trade Republic : « Compte → Historique → Exporter »).
+2. **Analysez** : le courtier est détecté automatiquement, rien n'est enregistré. L'aperçu liste les enveloppes détectées (PEA/CTO), leurs positions avec nombre de parts et montant investi, la valeur actuelle et le nombre de points d'historique reconstruits. Les lignes ignorées (dividendes, mouvements d'espèces) sont comptées et affichées.
+3. **Importez** : les enveloppes sont créées automatiquement avec — le type (PEA ou CTO selon les lignes du fichier), la date d'ouverture (premier achat), les **versements cumulés** (total investi, alimentant le compteur Versements / 150 000 € du PEA), les positions avec parts, montant investi et prix unitaire (dernier prix connu du fichier, statique pour l'instant), et le graphique d'évolution reconstruit point par point depuis l'historique des achats.
+
+> Le prix « actuel » d'une position est pour l'instant le dernier prix présent dans le fichier — une valeur statique. La connexion à des cours en temps réel viendra plus tard. Ajouter un nouvel export d'une autre banque ne demande que d'écrire un nouvel adaptateur au format du courtier.
+
 ## 3. Positions — la composition
 
 ### Ajouter une position

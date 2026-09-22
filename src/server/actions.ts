@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
+import { parseBrokerImport } from "@/lib/import";
+import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
   envelopeSchema,
   loginSchema,
@@ -238,6 +240,177 @@ export async function updateDepositsAction(
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
   return { message: "Versements mis à jour" };
+}
+
+export interface ImportPreviewPosition {
+  isin: string | null;
+  name: string;
+  category: string;
+  quantity: number;
+  investedCents: number;
+  currentValueCents: number;
+  historyPoints: number;
+}
+
+export interface ImportPreviewEnvelope {
+  type: "PEA" | "CTO";
+  name: string;
+  broker: string | null;
+  openedAt: string | null;
+  depositsCents: number;
+  positions: ImportPreviewPosition[];
+}
+
+export type ImportActionState = ActionState & {
+  preview?: ImportPreviewEnvelope[];
+  broker?: string;
+  skippedRows?: number;
+};
+
+const MAX_IMPORT_BYTES = 5_000_000;
+
+async function readImportFile(
+  formData: FormData,
+): Promise<{ content: string } | { errors: Record<string, string[]> }> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { errors: { file: ["Sélectionnez un fichier d'export"] } };
+  }
+  if (file.size > MAX_IMPORT_BYTES) {
+    return { errors: { file: ["Fichier trop volumineux (5 Mo maximum)"] } };
+  }
+  const content = await file.text();
+  if (content.trim() === "") {
+    return { errors: { file: ["Le fichier est vide"] } };
+  }
+  return { content };
+}
+
+function parseImportContent(content: string):
+  | { parsed: BrokerImport }
+  | { errors: Record<string, string[]> } {
+  try {
+    const parsed = parseBrokerImport(content);
+    if (parsed.envelopes.length === 0 || parsed.envelopes.every((e) => e.positions.length === 0)) {
+      return { errors: { file: ["Aucune transaction d'achat exploitable dans ce fichier"] } };
+    }
+    return { parsed };
+  } catch {
+    return {
+      errors: {
+        file: [
+          "Format de fichier non reconnu. Export supporté : Trade Republic (CSV des transactions).",
+        ],
+      },
+    };
+  }
+}
+
+function toPreview(parsed: BrokerImport): ImportPreviewEnvelope[] {
+  return parsed.envelopes.map((e: ImportedEnvelope) => ({
+    type: e.type,
+    name: e.name,
+    broker: e.broker,
+    openedAt: e.openedAt,
+    depositsCents: e.depositsCents,
+    positions: e.positions.map((p: ImportedPosition) => ({
+      isin: p.isin,
+      name: p.name,
+      category: p.category,
+      quantity: p.quantity,
+      investedCents: p.investedCents,
+      currentValueCents:
+        p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].valueCents : 0,
+      historyPoints: p.valuations.length,
+    })),
+  }));
+}
+
+export async function analyzeImportAction(
+  _state: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const file = await readImportFile(formData);
+  if ("errors" in file) return { errors: file.errors };
+
+  const result = parseImportContent(file.content);
+  if ("errors" in result) return { errors: result.errors };
+
+  return {
+    message: "Export analysé — vérifiez l'aperçu puis lancez l'import",
+    broker: result.parsed.broker,
+    skippedRows: result.parsed.skippedRows,
+    preview: toPreview(result.parsed),
+  };
+}
+
+export async function confirmImportAction(
+  _state: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const file = await readImportFile(formData);
+  if ("errors" in file) return { errors: file.errors };
+
+  const result = parseImportContent(file.content);
+  if ("errors" in result) return { errors: result.errors };
+
+  const created = await prisma.$transaction(async (tx) => {
+    const names: string[] = [];
+    for (const env of result.parsed.envelopes) {
+      let name = env.name;
+      let suffix = 2;
+      while (await tx.envelope.findFirst({ where: { userId: session.userId, name } })) {
+        name = `${env.name} (${suffix})`;
+        suffix += 1;
+      }
+      const envelope = await tx.envelope.create({
+        data: {
+          userId: session.userId,
+          type: env.type,
+          name,
+          broker: env.broker,
+          openedAt: env.openedAt ? new Date(env.openedAt) : null,
+          depositsCents: env.depositsCents,
+        },
+      });
+      for (const p of env.positions) {
+        const etf = p.isin ? getEtfByIsin(p.isin) : null;
+        const position = await tx.position.create({
+          data: {
+            envelopeId: envelope.id,
+            name: etf ? `${etf.ticker} — ${etf.name}` : p.name,
+            symbol: etf?.ticker ?? p.symbol,
+            category: p.category,
+            quantity: p.quantity,
+            investedCents: p.investedCents,
+            unitPriceCents: p.unitPriceCents,
+            boughtAt: new Date(p.firstBoughtAt),
+          },
+        });
+        if (p.valuations.length > 0) {
+          await tx.positionValuation.createMany({
+            data: p.valuations.map((v) => ({
+              positionId: position.id,
+              date: new Date(v.date),
+              valueCents: v.valueCents,
+            })),
+          });
+        }
+      }
+      names.push(name);
+    }
+    return names;
+  });
+
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+  redirect(`/envelopes?imported=${encodeURIComponent(created.join(", "))}`);
 }
 
 export async function deleteAccountAction(): Promise<void> {
