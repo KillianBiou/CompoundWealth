@@ -506,8 +506,8 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
     }
     if (index > 0) await new Promise((resolve) => setTimeout(resolve, 300));
     const quote = await fetchMarketQuote(symbol);
-    if (!quote) {
-      failures.push(position.name);
+    if (!quote.ok) {
+      failures.push(`${position.name} (${quote.reason})`);
       continue;
     }
     const valueCents = Math.round(position.quantity * quote.priceCents);
