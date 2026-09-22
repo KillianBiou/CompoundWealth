@@ -38,6 +38,13 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const investments = envelope.positions.flatMap((p) =>
     p.investments.map((i) => ({ date: i.date, amountCents: i.amountCents })),
   );
+  const lastValuationDates = envelope.positions.flatMap((p) =>
+    p.valuations.length > 0 ? [p.valuations[p.valuations.length - 1].date] : [],
+  );
+  const lastValuationDate =
+    lastValuationDates.length > 0
+      ? new Date(Math.max(...lastValuationDates.map((d) => d.getTime())))
+      : null;
   const gainCents = hasUnknownInvested ? null : valueCents - investedCents;
   const gainRatio =
     investedCents > 0 && gainCents !== null ? gainCents / investedCents : null;
@@ -123,7 +130,11 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           label="Total investi"
           value={hasUnknownInvested ? `${formatEurCents(investedCents)} + ?` : formatEurCents(investedCents)}
         />
-        <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
+        <Kpi
+          label="Valeur actuelle"
+          value={formatEurCents(valueCents)}
+          sub={lastValuationDate ? `Actualisée le ${lastValuationDate.toLocaleDateString("fr-FR")}` : undefined}
+        />
         {gainCents !== null && gainRatio !== null ? (
           <div className="flex items-start justify-between gap-3">
             <Kpi
@@ -176,6 +187,8 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               ? p.valuations[p.valuations.length - 1].valueCents
               : (p.investedCents ?? null),
           boughtAt: p.boughtAt,
+          valuationDate: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].date : null,
+          valuationSource: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].source : null,
         }))}
       />
       <EnvelopeDangerZone envelopeId={envelope.id} envelopeName={envelope.name} />

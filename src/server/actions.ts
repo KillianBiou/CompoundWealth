@@ -237,6 +237,7 @@ export async function createPositionAction(
       positionId: position.id,
       date,
       valueCents,
+      source: "manuel",
     },
   });
 
@@ -441,6 +442,7 @@ export async function confirmImportAction(
               positionId: position.id,
               date: new Date(v.date),
               valueCents: v.valueCents,
+              source: "import",
             })),
           });
         }
@@ -489,43 +491,48 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
     return { errors: { form: ["Les prix viennent d'être actualisés, réessayez dans quelques minutes"] } };
   }
 
-  await prisma.envelope.update({
-    where: { id: envelopeId },
-    data: { lastPriceRefreshAt: new Date() },
-  });
-
-  const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-
+  const now = new Date();
   let updated = 0;
   const failures: string[] = [];
   for (const [index, position] of envelope.positions.entries()) {
     const symbol = position.symbol?.trim();
-    if (!symbol) continue;
+    if (!symbol) {
+      failures.push(`${position.name} (symbole manquant)`);
+      continue;
+    }
+    if (position.quantity === null) {
+      failures.push(`${position.name} (quantité manquante)`);
+      continue;
+    }
     if (index > 0) await new Promise((resolve) => setTimeout(resolve, 300));
     const quote = await fetchMarketQuote(symbol);
     if (!quote) {
       failures.push(position.name);
       continue;
     }
-    const valueCents = Math.round((position.quantity ?? 0) * quote.priceCents);
+    const valueCents = Math.round(position.quantity * quote.priceCents);
     await prisma.positionValuation.upsert({
-      where: { positionId_date: { positionId: position.id, date: new Date(todayKey) } },
-      create: { positionId: position.id, date: new Date(todayKey), valueCents },
-      update: { valueCents },
+      where: { positionId_date: { positionId: position.id, date: now } },
+      create: { positionId: position.id, date: now, valueCents, source: "yahoo" },
+      update: { valueCents, source: "yahoo" },
     });
     updated += 1;
   }
 
-  if (updated === 0 && failures.length > 0) {
+  if (updated === 0) {
     return {
       errors: {
         form: [
-          `Aucun prix récupéré (${failures.length} position${failures.length > 1 ? "s" : ""}). Vérifiez les symboles.`,
+          `Aucun prix récupéré${failures.length > 0 ? ` : ${failures.join(", ")}` : ""}`,
         ],
       },
     };
   }
+
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { lastPriceRefreshAt: now },
+  });
 
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/envelopes");
