@@ -8,6 +8,7 @@ import { EnvelopeChart } from "./envelope-chart";
 import { AddPositionForm } from "./add-position-form";
 import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
+import { EnvelopeDangerZone } from "./danger-zone";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -163,6 +164,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           boughtAt: p.boughtAt,
         }))}
       />
+      <EnvelopeDangerZone envelopeId={envelope.id} envelopeName={envelope.name} />
     </div>
   );
 }

@@ -139,6 +139,18 @@ export async function createEnvelopeAction(
   redirect(`/envelopes/${envelope.id}`);
 }
 
+export async function deleteEnvelopeAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  await prisma.envelope.deleteMany({
+    where: { id: envelopeId, userId: session.userId },
+  });
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+  redirect("/envelopes");
+}
+
 export async function closeEnvelopeAction(formData: FormData): Promise<void> {
   const session = await getSession();
   if (!session) redirect("/login");
