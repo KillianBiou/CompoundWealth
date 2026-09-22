@@ -1,4 +1,4 @@
-import { getEtfByTicker } from "@/lib/etf-catalog";
+import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const YAHOO_CHART_PATH = "/v8/finance/chart";
@@ -7,7 +7,6 @@ const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 8000;
 const SESSION_TTL_MS = 60 * 60 * 1000;
-const TICKER_EXCHANGE_SUFFIXES = [".PA", ".DE", "", ".AS", ".MI", ".BR", ".L"];
 const RESOLUTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const symbolResolutionCache = new Map<string, { symbol: string; fetchedAt: number }>();
@@ -138,10 +137,20 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuoteResul
   if (!trimmed) return { ok: false, reason: "symbole manquant" };
 
   if (ISIN_PATTERN.test(trimmed)) {
+    const catalogEntry = getEtfByIsin(trimmed);
+    if (catalogEntry?.yahooSymbol) {
+      const result = await yahooQuote(catalogEntry.yahooSymbol);
+      if (result.ok) return result;
+    }
     const candidates = [...(await resolveViaSearch(trimmed)), `${trimmed}.SG`];
+    let rateLimited = false;
     for (const candidate of candidates) {
       const result = await yahooQuote(candidate);
       if (result.ok) return result;
+      if (result.reason.startsWith("HTTP 429")) rateLimited = true;
+    }
+    if (rateLimited) {
+      return { ok: false, reason: "Yahoo limite les requêtes (429), réessayez dans quelques minutes" };
     }
     return { ok: false, reason: "aucune cotation trouvée pour cet ISIN" };
   }
@@ -153,13 +162,25 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuoteResul
   }
 
   const catalogEntry = getEtfByTicker(trimmed);
-  const searchCandidates = await resolveViaSearch(trimmed);
+  if (catalogEntry?.yahooSymbol) {
+    const result = await yahooQuote(catalogEntry.yahooSymbol);
+    if (result.ok) {
+      symbolResolutionCache.set(trimmed, { symbol: result.symbol, fetchedAt: Date.now() });
+      return result;
+    }
+    if (result.reason.startsWith("HTTP 429")) {
+      return { ok: false, reason: "Yahoo limite les requêtes (429), réessayez dans quelques minutes" };
+    }
+  }
+
   const candidates = [
     ...(catalogEntry ? [catalogEntry.isin] : []),
-    ...searchCandidates,
-    ...TICKER_EXCHANGE_SUFFIXES.map((suffix) => `${trimmed}${suffix}`),
+    ...(await resolveViaSearch(trimmed)),
+    `${trimmed}.PA`,
+    `${trimmed}.DE`,
   ];
   const tried = new Set<string>();
+  let rateLimited = false;
   for (const candidate of candidates) {
     if (tried.has(candidate)) continue;
     tried.add(candidate);
@@ -170,6 +191,10 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuoteResul
       symbolResolutionCache.set(trimmed, { symbol: result.symbol, fetchedAt: Date.now() });
       return result;
     }
+    if (result.reason.startsWith("HTTP 429")) rateLimited = true;
+  }
+  if (rateLimited) {
+    return { ok: false, reason: "Yahoo limite les requêtes (429), réessayez dans quelques minutes" };
   }
   return { ok: false, reason: "aucune cotation trouvée pour ce symbole" };
 }
