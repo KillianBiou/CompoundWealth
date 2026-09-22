@@ -46,3 +46,4 @@ db/*.db-journal
 # prisma sqlite db
 prisma/db/*.db
 prisma/db/*.db-journal
+example/TradeRepublicExportExample.csv
