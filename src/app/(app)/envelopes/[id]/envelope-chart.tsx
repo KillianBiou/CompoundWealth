@@ -21,8 +21,12 @@ import { formatEurCents, formatEurCentsCompact } from "@/lib/money";
 import { cn } from "@/components/ui";
 
 const periods: { key: PeriodKey; label: string }[] = [
+  { key: "1w", label: "1 sem" },
+  { key: "1m", label: "1 mois" },
+  { key: "3m", label: "3 mois" },
   { key: "6m", label: "6 mois" },
   { key: "1y", label: "1 an" },
+  { key: "2y", label: "2 ans" },
   { key: "all", label: "Tout" },
 ];
 
