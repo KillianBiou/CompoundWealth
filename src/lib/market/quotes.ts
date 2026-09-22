@@ -1,3 +1,5 @@
+import { getEtfByTicker } from "@/lib/etf-catalog";
+
 const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const YAHOO_CHART_PATH = "/v8/finance/chart";
 const YAHOO_SEARCH_PATH = "/v1/finance/search";
@@ -5,6 +7,10 @@ const USER_AGENT =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 8000;
 const SESSION_TTL_MS = 60 * 60 * 1000;
+const TICKER_EXCHANGE_SUFFIXES = [".PA", ".DE", "", ".AS", ".MI", ".BR", ".L"];
+const RESOLUTION_TTL_MS = 24 * 60 * 60 * 1000;
+
+const symbolResolutionCache = new Map<string, { symbol: string; fetchedAt: number }>();
 
 export interface MarketQuote {
   symbol: string;
@@ -88,15 +94,15 @@ async function fetchJson(
 
 async function yahooQuote(symbol: string): Promise<MarketQuoteResult> {
   const { status, json } = await fetchJson(
-    YAHOO_CHART_PATH,
-    `symbol=${encodeURIComponent(symbol)}&interval=1d&range=1d`,
+    `${YAHOO_CHART_PATH}/${encodeURIComponent(symbol)}`,
+    "interval=1d&range=1d",
   );
   if (status === 0) return { ok: false, reason: "injoignable" };
   if (status !== 200) return { ok: false, reason: `HTTP ${status}` };
   const meta = (json as { chart?: { result?: { meta?: YahooChartMeta }[] } })
     ?.chart?.result?.[0]?.meta;
   if (!meta?.regularMarketPrice || !meta.currency) {
-    return { ok: false, reason: "symbole inconnu" };
+    return { ok: false, reason: `pas de cotation ${symbol}` };
   }
   return {
     ok: true,
@@ -106,10 +112,10 @@ async function yahooQuote(symbol: string): Promise<MarketQuoteResult> {
   };
 }
 
-async function resolveIsin(symbol: string): Promise<string[]> {
+async function resolveViaSearch(query: string): Promise<string[]> {
   const { json } = await fetchJson(
     YAHOO_SEARCH_PATH,
-    `q=${encodeURIComponent(symbol)}&quotesCount=5&newsCount=0`,
+    `q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`,
   );
   const quotes =
     (json as { quotes?: { symbol: string; quoteType: string }[] })?.quotes ?? [];
@@ -122,15 +128,17 @@ async function resolveIsin(symbol: string): Promise<string[]> {
 
 /**
  * Récupère le prix actuel d'une position depuis Yahoo Finance (source ouverte).
- * Le symbole peut être un ticker (ex. CW8, WPEA, complété en .PA sur Euronext
- * Paris) ou un ISIN (résolu via la recherche Yahoo, avec fallback .SG).
+ * Les ETF européens ne cotent pas tous à Paris : un ticker nu (ex. BJL8) peut
+ * coter à Francfort (.DE), Amsterdam (.AS) ou n'être qu'un code Euronext sans
+ * symbole Yahoo (ex. IFRE → résolu via son ISIN). On essaie dans l'ordre :
+ * recherche Yahoo par ticker, ISIN du catalogue, suffixes de place usuels.
  */
 export async function fetchMarketQuote(symbol: string): Promise<MarketQuoteResult> {
   const trimmed = symbol.trim().toUpperCase();
   if (!trimmed) return { ok: false, reason: "symbole manquant" };
 
   if (ISIN_PATTERN.test(trimmed)) {
-    const candidates = [...(await resolveIsin(trimmed)), `${trimmed}.SG`];
+    const candidates = [...(await resolveViaSearch(trimmed)), `${trimmed}.SG`];
     for (const candidate of candidates) {
       const result = await yahooQuote(candidate);
       if (result.ok) return result;
@@ -138,9 +146,30 @@ export async function fetchMarketQuote(symbol: string): Promise<MarketQuoteResul
     return { ok: false, reason: "aucune cotation trouvée pour cet ISIN" };
   }
 
-  for (const suffix of [".PA", ""]) {
-    const result = await yahooQuote(`${trimmed}${suffix}`);
+  const cached = symbolResolutionCache.get(trimmed);
+  if (cached && Date.now() - cached.fetchedAt < RESOLUTION_TTL_MS) {
+    const result = await yahooQuote(cached.symbol);
     if (result.ok) return result;
+  }
+
+  const catalogEntry = getEtfByTicker(trimmed);
+  const searchCandidates = await resolveViaSearch(trimmed);
+  const candidates = [
+    ...(catalogEntry ? [catalogEntry.isin] : []),
+    ...searchCandidates,
+    ...TICKER_EXCHANGE_SUFFIXES.map((suffix) => `${trimmed}${suffix}`),
+  ];
+  const tried = new Set<string>();
+  for (const candidate of candidates) {
+    if (tried.has(candidate)) continue;
+    tried.add(candidate);
+    const result = ISIN_PATTERN.test(candidate)
+      ? await fetchMarketQuote(candidate)
+      : await yahooQuote(candidate);
+    if (result.ok) {
+      symbolResolutionCache.set(trimmed, { symbol: result.symbol, fetchedAt: Date.now() });
+      return result;
+    }
   }
   return { ok: false, reason: "aucune cotation trouvée pour ce symbole" };
 }

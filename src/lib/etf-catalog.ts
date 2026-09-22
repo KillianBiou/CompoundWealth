@@ -175,3 +175,8 @@ export function getEtfByIsin(isin: string): EtfCatalogEntry | null {
   const normalized = normalize(isin);
   return ETF_CATALOG.find((etf) => normalize(etf.isin) === normalized) ?? null;
 }
+
+export function getEtfByTicker(ticker: string): EtfCatalogEntry | null {
+  const normalized = normalize(ticker);
+  return ETF_CATALOG.find((etf) => normalize(etf.ticker) === normalized) ?? null;
+}
