@@ -56,6 +56,11 @@ export const positionSchema = z
     boughtAt: notFuture,
   });
 
+export const preferencesSchema = z.object({
+  currency: z.enum(["EUR", "USD", "GBP", "CHF"]),
+  numberLocale: z.enum(["fr", "en"]),
+});
+
 export const depositsSchema = z.object({
   depositsEur: z.coerce
     .number()
@@ -69,3 +74,4 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 export type EnvelopeInput = z.infer<typeof envelopeSchema>;
 export type PositionInput = z.infer<typeof positionSchema>;
 export type DepositsInput = z.infer<typeof depositsSchema>;
+export type PreferencesInput = z.infer<typeof preferencesSchema>;

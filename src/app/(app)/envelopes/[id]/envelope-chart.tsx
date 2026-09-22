@@ -20,7 +20,8 @@ import {
   type PeriodKey,
   type ValuationPoint,
 } from "@/lib/portfolio/series";
-import { formatEurCentsCompact } from "@/lib/money";
+import { formatMoneyCents, formatMoneyCentsCompact } from "@/lib/money";
+import type { NumberLocale } from "@/lib/money";
 import { cn } from "@/components/ui";
 
 const periods: { key: PeriodKey; label: string }[] = [
@@ -37,7 +38,7 @@ interface ChartPoint {
   date: number;
   value: number | null;
   invested: number | null;
-  compound: number | null;
+  compoundInterest: number | null;
 }
 
 function mergeSeries(
@@ -45,6 +46,9 @@ function mergeSeries(
   investedPoints: ValuationPoint[],
   compound: CompoundInterestPoint[],
 ): ChartPoint[] {
+  const compoundByTime = new Map(
+    compound.map((c) => [c.date.getTime(), c]),
+  );
   const times = [
     ...new Set([
       ...valuations.map((v) => v.date.getTime()),
@@ -63,27 +67,93 @@ function mergeSeries(
   };
 
   return times.map((time) => {
-    const compoundPoint = compound.find((c) => c.date.getTime() === time);
+    const compoundPoint = compoundByTime.get(time);
     return {
       date: time,
       value: valueAt(valuations, time) === null ? null : valueAt(valuations, time)! / 100,
       invested: valueAt(investedPoints, time) === null ? null : valueAt(investedPoints, time)! / 100,
-      compound:
-        compoundPoint === undefined
-          ? null
-          : (compoundPoint.investedCents + compoundPoint.compoundInterestCents) / 100,
+      compoundInterest: compoundPoint ? compoundPoint.compoundInterestCents / 100 : null,
     };
   });
+}
+
+function ChartTooltip({
+  active,
+  payload,
+  currency,
+  locale,
+}: {
+  active?: boolean;
+  payload?: { payload: ChartPoint }[];
+  currency: string;
+  locale: NumberLocale;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const point = payload[0].payload;
+  const invested = point.invested;
+  const compoundInterest = point.compoundInterest;
+  const value = point.value;
+
+  return (
+    <div
+      className="rounded-lg border border-border-cw bg-bg-subtle p-3 text-xs shadow-lg"
+      style={{ color: "var(--text-secondary)" }}
+    >
+      <p className="mb-2 font-medium text-text-primary">
+        {new Date(point.date).toLocaleDateString(
+          locale === "en" ? "en-US" : "fr-FR",
+          { day: "numeric", month: "long", year: "numeric" },
+        )}
+      </p>
+      {invested !== null ? (
+        <p className="tabular-nums">
+          Investi&nbsp;:{" "}
+          <span className="font-medium text-text-primary">
+            {formatMoneyCents(invested * 100, currency, locale)}
+          </span>
+        </p>
+      ) : null}
+      {compoundInterest !== null ? (
+        <p className="tabular-nums">
+          Grâce aux intérêts composés&nbsp;:{" "}
+          <span
+            className={cn(
+              "font-medium",
+              compoundInterest >= 0 ? "text-positive" : "text-negative",
+            )}
+          >
+            {compoundInterest >= 0 ? "+" : "−"}
+            {formatMoneyCents(Math.abs(compoundInterest * 100), currency, locale)}
+          </span>
+        </p>
+      ) : null}
+      {invested !== null && compoundInterest !== null ? (
+        <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
+          Valeur totale&nbsp;:{" "}
+          <strong>{formatMoneyCents((invested + compoundInterest) * 100, currency, locale)}</strong>
+        </p>
+      ) : value !== null ? (
+        <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
+          Valeur totale&nbsp;:{" "}
+          <strong>{formatMoneyCents(value * 100, currency, locale)}</strong>
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function EnvelopeChart({
   valuations,
   investedCents,
   investments,
+  currency = "EUR",
+  numberLocale = "fr",
 }: {
   valuations: ValuationPoint[];
   investedCents: number;
   investments: { date: Date; amountCents: number }[];
+  currency?: string;
+  numberLocale?: NumberLocale;
 }) {
   const [period, setPeriod] = useState<PeriodKey>("all");
 
@@ -91,17 +161,10 @@ export function EnvelopeChart({
     const investedPoints = investedSeries(investments);
     const compound = buildCompoundInterestSeries(valuations, investments);
     const merged = mergeSeries(valuations, investedPoints, compound);
-    const series = buildEnvelopeSeries(
-      valuations,
-      investedCents,
-      null,
-      new Date(),
-      period,
-    );
-    const seriesTimes = new Set(series.map((p) => p.date.getTime()));
+    const series = buildEnvelopeSeries(valuations, investedCents, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
-    const filtered = merged.filter((p) => p.date >= startBoundary || seriesTimes.has(p.date));
+    const filtered = merged.filter((p) => p.date >= startBoundary);
     return { data: filtered, hasCompound: compound.length > 0 };
   }, [valuations, investedCents, investments, period]);
 
@@ -135,7 +198,7 @@ export function EnvelopeChart({
       </div>
       <div
         className="h-64"
-        aria-label="Évolution de la valeur de l'enveloppe en euros"
+        aria-label="Évolution de la valeur de l'enveloppe"
       >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -152,7 +215,10 @@ export function EnvelopeChart({
               scale="time"
               domain={["dataMin", "dataMax"]}
               tickFormatter={(v: number) =>
-                new Date(v).toLocaleDateString("fr-FR", { month: "short", year: "2-digit" })
+                new Date(v).toLocaleDateString(
+                  numberLocale === "en" ? "en-US" : "fr-FR",
+                  { month: "short", year: "2-digit" },
+                )
               }
               stroke="var(--text-muted)"
               fontSize={12}
@@ -160,7 +226,7 @@ export function EnvelopeChart({
               axisLine={false}
             />
             <YAxis
-              tickFormatter={(v: number) => formatEurCentsCompact(v * 100)}
+              tickFormatter={(v: number) => formatMoneyCentsCompact(v * 100, currency, numberLocale)}
               stroke="var(--text-muted)"
               fontSize={12}
               tickLine={false}
@@ -168,19 +234,8 @@ export function EnvelopeChart({
               width={64}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "var(--bg-subtle)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "var(--text-secondary)" }}
-              labelFormatter={(label) =>
-                new Date(label as number).toLocaleDateString("fr-FR", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })
+              content={
+                <ChartTooltip currency={currency} locale={numberLocale} />
               }
             />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
@@ -207,8 +262,8 @@ export function EnvelopeChart({
             {hasCompound ? (
               <Line
                 type="monotone"
-                dataKey="compound"
-                name="Investi + intérêts composés"
+                dataKey="compoundInterest"
+                name="Intérêts composés"
                 stroke="var(--positive)"
                 strokeWidth={2}
                 strokeDasharray="6 4"

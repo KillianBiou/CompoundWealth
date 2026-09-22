@@ -13,6 +13,7 @@ import {
   profileSchema,
   signupSchema,
   depositsSchema,
+  preferencesSchema,
 } from "@/lib/validations";
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
@@ -137,6 +138,33 @@ export async function createEnvelopeAction(
   revalidatePath("/envelopes");
   revalidatePath("/dashboard");
   redirect(`/envelopes/${envelope.id}`);
+}
+
+export async function updatePreferencesAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const parsed = preferencesSchema.safeParse({
+    currency: str(formData, "currency"),
+    numberLocale: str(formData, "numberLocale"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: {
+      currency: parsed.data.currency,
+      numberLocale: parsed.data.numberLocale,
+    },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  return { message: "Préférences enregistrées" };
 }
 
 export async function deleteEnvelopeAction(formData: FormData): Promise<void> {

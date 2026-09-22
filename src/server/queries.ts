@@ -90,6 +90,15 @@ export const getCurrentUser = cache(async () => {
   const userId = await requireUserId();
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, age: true, job: true, salaryCents: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      age: true,
+      job: true,
+      salaryCents: true,
+      currency: true,
+      numberLocale: true,
+    },
   });
 });
