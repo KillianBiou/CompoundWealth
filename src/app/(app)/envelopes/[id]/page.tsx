@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import { getEnvelope } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
+import { buildEnvelopeValuations } from "@/lib/portfolio/series";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { AddPositionForm } from "./add-position-form";
-import { AddValuationForm } from "./add-valuation-form";
+import { DepositsBadgeForm } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,11 +14,15 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const envelope = await getEnvelope(id);
   if (!envelope || envelope.closedAt) notFound();
 
-  const investedCents = envelope.positions.reduce(
+  const positionsInvestedCents = envelope.positions.reduce(
     (s, p) => s + (p.investedCents ?? 0),
     0,
   );
-  const hasUnknownInvested = envelope.positions.some((p) => p.investedCents === null);
+  const depositsCents = envelope.depositsCents ?? positionsInvestedCents;
+  const investedCents = depositsCents;
+  const hasUnknownInvested =
+    envelope.depositsCents === null &&
+    envelope.positions.some((p) => p.investedCents === null);
   const positionsValue = envelope.positions.reduce(
     (s, p) =>
       s +
@@ -26,7 +31,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         : (p.investedCents ?? 0)),
     0,
   );
-  const valuations = envelope.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents }));
+  const valuations = buildEnvelopeValuations(envelope.positions);
   const valueCents = valuations.length > 0 ? valuations[valuations.length - 1].valueCents : positionsValue;
   const gainCents = hasUnknownInvested ? null : valueCents - investedCents;
   const gainRatio =
@@ -90,10 +95,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       </Card>
 
       {envelope.type === "PEA" ? (
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="accent">
-            Versements : {formatEurCents(investedCents)} / {rules.depositCapLabel}
-          </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="accent">Versements / {rules.depositCapLabel}</Badge>
+          <DepositsBadgeForm
+            envelopeId={envelope.id}
+            depositsEur={(depositsCents / 100).toFixed(2)}
+          />
           {antiquity ? (
             <Badge tone={antiquity.acquired ? "positive" : "neutral"}>
               {antiquity.acquired
@@ -136,16 +143,10 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         />
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une valorisation</h2>
-          <AddValuationForm envelopeId={envelope.id} />
-        </Card>
-        <Card>
-          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
-          <AddPositionForm envelopeId={envelope.id} />
-        </Card>
-      </div>
+      <Card>
+        <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
+        <AddPositionForm envelopeId={envelope.id} />
+      </Card>
 
       <PositionsTable
         envelopeId={envelope.id}

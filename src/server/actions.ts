@@ -10,7 +10,7 @@ import {
   positionSchema,
   profileSchema,
   signupSchema,
-  valuationSchema,
+  depositsSchema,
 } from "@/lib/validations";
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
@@ -213,7 +213,7 @@ export async function deletePositionAction(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
-export async function addEnvelopeValuationAction(
+export async function updateDepositsAction(
   _state: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -226,21 +226,18 @@ export async function addEnvelopeValuationAction(
   });
   if (!envelope) return { message: "Enveloppe introuvable" };
 
-  const parsed = valuationSchema.safeParse({
-    date: str(formData, "date"),
-    valueEur: str(formData, "valueEur"),
+  const parsed = depositsSchema.safeParse({
+    depositsEur: str(formData, "depositsEur"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const date = new Date(parsed.data.date);
-  await prisma.envelopeValuation.upsert({
-    where: { envelopeId_date: { envelopeId, date } },
-    create: { envelopeId, date, valueCents: eurosToCents(parsed.data.valueEur) },
-    update: { valueCents: eurosToCents(parsed.data.valueEur) },
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { depositsCents: eurosToCents(parsed.data.depositsEur) },
   });
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
-  return { message: "Valorisation enregistrée" };
+  return { message: "Versements mis à jour" };
 }
 
 export async function deleteAccountAction(): Promise<void> {

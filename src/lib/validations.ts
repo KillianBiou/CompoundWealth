@@ -56,12 +56,11 @@ export const positionSchema = z
     boughtAt: notFuture,
   });
 
-export const valuationSchema = z.object({
-  date: notFuture,
-  valueEur: z.coerce
+export const depositsSchema = z.object({
+  depositsEur: z.coerce
     .number()
-    .min(0, "La valeur doit être positive")
-    .max(100_000_000, "Valeur trop élevée"),
+    .min(0, "Les versements doivent être positifs")
+    .max(500_000, "Montant trop élevé"),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
@@ -69,4 +68,4 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type EnvelopeInput = z.infer<typeof envelopeSchema>;
 export type PositionInput = z.infer<typeof positionSchema>;
-export type ValuationInput = z.infer<typeof valuationSchema>;
+export type DepositsInput = z.infer<typeof depositsSchema>;

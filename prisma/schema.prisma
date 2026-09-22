@@ -20,14 +20,15 @@ model User {
 }
 
 model Envelope {
-  id          String             @id @default(cuid())
-  userId      String
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        EnvelopeType
-  name        String
-  broker      String?
-  openedAt    DateTime?
-  closedAt    DateTime?
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          EnvelopeType
+  name          String
+  broker        String?
+  openedAt      DateTime?
+  closedAt      DateTime?
+  depositsCents Int?
   createdAt   DateTime           @default(now())
   positions   Position[]
   valuations  EnvelopeValuation[]

@@ -47,7 +47,7 @@ Chaque champ peut être renseigné séparément et modifié ou effacé à tout m
 3. Renseigner : nom (ex. « PEA Bourse »), courtier (optionnel), date d'ouverture (recommandée pour le PEA : elle déclenche le compte à rebours des 5 ans).
 4. Enregistrer → l'enveloppe apparaît sur le dashboard.
 
-Pour un PEA, l'app affiche ensuite en permanence : **Versements cumulés / 150 000 €** et **Antériorité fiscale : X ans restants**.
+Pour un PEA, l'app affiche ensuite en permanence : **Versements / 150 000 €** — un champ éditable directement à côté du badge pour renseigner manuellement vos versements cumulés — et **Antériorité fiscale : X ans restants**.
 
 ## 3. Positions — la composition
 
@@ -71,15 +71,12 @@ Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portef
 
 L'important est de pouvoir **commencer à suivre la valeur dès aujourd'hui** sans devoir reconstituer tout l'historique fiscal.
 
-### Suivre la valeur — les valorisations
+### Suivre la valeur — le graphique d'évolution
 
-C'est **l'action clé de l'app** : elle alimente le graphique d'évolution.
+Le graphique se construit **automatiquement** à partir des états des lieux de vos positions : chaque fois que vous ajoutez ou mettez à jour une position avec sa valeur actuelle, la courbe de l'enveloppe s'agrège tous les points.
 
-1. Enveloppe → **Ajouter une valorisation** (ou sur une position précise).
-2. Renseigner : date + valeur actuelle.
-3. Une valorisation par date : en re-saisir une à la même date remplace l'ancienne.
-
-**Rythme conseillé** : une fois par mois (ex. le 1er du mois), 30 secondes suffisent. Chaque point de la courbe vient d'une valorisation réelle — l'app n'invente jamais de valeur entre deux points.
+- Plus besoin de saisir une valorisation d'enveloppe : la valeur de l'enveloppe est la somme des dernières valeurs connues de chaque position.
+- Chaque point de la courbe vient d'une valeur réelle saisie — l'app n'invente jamais de valeur entre deux points.
 
 ## 4. Le graphique d'évolution
 
@@ -91,8 +88,8 @@ Sur chaque enveloppe (et en global sur le dashboard) :
 - **Ligne de référence** : total investi, pour visualiser d'un coup d'œil le gain cumulé.
 
 États particuliers :
-- Aucune valorisation → message « Ajoutez une première valorisation pour voir la courbe ».
-- Une seule valorisation → point unique + invitation à en ajouter d'autres.
+- Aucune position valorisée → message invitant à ajouter une première position.
+- Une seule valeur → point unique + invitation à suivre la valeur plus tard.
 
 ## 5. Dashboard — la vue d'ensemble
 
@@ -104,7 +101,7 @@ Sur chaque enveloppe (et en global sur le dashboard) :
 
 **Dois-je connecter ma banque ?** Non. CompoundWealth est volontairement manuel : aucune synchronisation, aucune donnée bancaire.
 
-**Que se passe-t-il si je me trompe sur un montant ?** Éditez la position ou la valorisation ; l'historique se recalcule.
+**Que se passe-t-il si je me trompe sur un montant ?** Supprimez et re-créez la position, ou corrigez les versements ; l'historique se recalcule.
 
 **Puis-je supprimer une enveloppe ?** Oui, avec confirmation ; elle est archivée et reste consultable, l'historique n'est jamais perdu silencieusement.
 

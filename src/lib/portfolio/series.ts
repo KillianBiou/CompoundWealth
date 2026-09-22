@@ -78,6 +78,30 @@ export function currentValueCents(
   return sorted[sorted.length - 1].valueCents;
 }
 
+export function buildEnvelopeValuations(
+  positions: { valuations: ValuationPoint[] }[],
+): ValuationPoint[] {
+  const sortedPositions = positions.map((p) =>
+    [...p.valuations].sort((a, b) => a.date.getTime() - b.date.getTime()),
+  );
+  const times = [
+    ...new Set(
+      sortedPositions.flatMap((valuations) => valuations.map((v) => v.date.getTime())),
+    ),
+  ].sort((a, b) => a - b);
+  return times.map((t) => ({
+    date: new Date(t),
+    valueCents: sortedPositions.reduce((sum, valuations) => {
+      let current = 0;
+      for (const point of valuations) {
+        if (point.date.getTime() <= t) current = point.valueCents;
+        else break;
+      }
+      return sum + current;
+    }, 0),
+  }));
+}
+
 export function investedBefore(
   positions: { investedCents: number; boughtAt: Date }[],
   date: Date,

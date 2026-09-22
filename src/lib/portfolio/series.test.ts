@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEnvelopeSeries,
+  buildEnvelopeValuations,
   currentValueCents,
   investedBefore,
   valueAt,
@@ -67,5 +68,35 @@ describe("investedBefore", () => {
     ];
     expect(investedBefore(positions, d("2026-03-01"))).toBe(10_000);
     expect(investedBefore(positions, d("2026-12-31"))).toBe(15_000);
+  });
+});
+
+describe("buildEnvelopeValuations", () => {
+  const d = (s: string) => new Date(s);
+  it("agrège les valorisations de positions par date", () => {
+    const points = buildEnvelopeValuations([
+      {
+        valuations: [
+          { date: d("2026-01-01"), valueCents: 10_000 },
+          { date: d("2026-03-01"), valueCents: 11_000 },
+        ],
+      },
+      {
+        valuations: [
+          { date: d("2026-02-01"), valueCents: 5_000 },
+          { date: d("2026-03-01"), valueCents: 6_000 },
+        ],
+      },
+    ]);
+    expect(points.map((p) => p.date.toISOString().slice(0, 10))).toEqual([
+      "2026-01-01",
+      "2026-02-01",
+      "2026-03-01",
+    ]);
+    expect(points.map((p) => p.valueCents)).toEqual([10_000, 15_000, 17_000]);
+  });
+  it("retourne une liste vide sans positions valorisées", () => {
+    expect(buildEnvelopeValuations([])).toEqual([]);
+    expect(buildEnvelopeValuations([{ valuations: [] }])).toEqual([]);
   });
 });

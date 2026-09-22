@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  depositsSchema,
   envelopeSchema,
   positionSchema,
   profileSchema,
   signupSchema,
-  valuationSchema,
 } from "./validations";
 
 describe("signupSchema", () => {
@@ -73,13 +73,14 @@ describe("positionSchema", () => {
   });
 });
 
-describe("valuationSchema", () => {
-  it("rejette une date future", () => {
-    const r = valuationSchema.safeParse({ date: "2099-01-01", valueEur: 100 });
-    expect(r.success).toBe(false);
+describe("depositsSchema", () => {
+  it("rejette un montant négatif", () => {
+    expect(depositsSchema.safeParse({ depositsEur: -100 }).success).toBe(false);
   });
-  it("accepte 0 comme valeur", () => {
-    const r = valuationSchema.safeParse({ date: "2026-01-01", valueEur: 0 });
-    expect(r.success).toBe(true);
+  it("accepte 0 comme montant", () => {
+    expect(depositsSchema.safeParse({ depositsEur: 0 }).success).toBe(true);
+  });
+  it("rejette un montant au-delà du plafond", () => {
+    expect(depositsSchema.safeParse({ depositsEur: 500_001 }).success).toBe(false);
   });
 });
