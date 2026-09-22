@@ -2,11 +2,7 @@ import { notFound } from "next/navigation";
 import { getEnvelope, getCurrentUser } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
-import {
-  buildEnvelopeValuations,
-  buildCompoundInterestSeries,
-  annualizedGrowthRate,
-} from "@/lib/portfolio/series";
+import { buildEnvelopeValuations } from "@/lib/portfolio/series";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { AddPositionForm } from "./add-position-form";
@@ -41,21 +37,6 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const investments = envelope.positions.flatMap((p) =>
     p.investments.map((i) => ({ date: i.date, amountCents: i.amountCents })),
   );
-  const compoundSeries = buildCompoundInterestSeries(valuations, investments);
-  const lastCompoundPoint =
-    compoundSeries.length > 0
-      ? compoundSeries[compoundSeries.length - 1]
-      : null;
-  const compoundInterestCents = lastCompoundPoint?.compoundInterestCents ?? null;
-  const interestOnInterestCents = lastCompoundPoint?.interestOnInterestCents ?? null;
-  const effectiveRate =
-    valuations.length > 0 && investments.length > 0
-      ? (annualizedGrowthRate(
-          investments,
-          valuations[valuations.length - 1].valueCents,
-          valuations[valuations.length - 1].date,
-        ) ?? 0)
-      : 0;
   const gainCents = hasUnknownInvested ? null : valueCents - investedCents;
   const gainRatio =
     investedCents > 0 && gainCents !== null ? gainCents / investedCents : null;
@@ -158,21 +139,6 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         )}
       </Card>
 
-      {compoundInterestCents !== null ? (
-        <Card className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <Kpi
-            label="Intérêts composés"
-            value={formatEurCents(compoundInterestCents)}
-            sub={`Gains cumulés au taux annualisé effectif (versement × ((1+r)^t − 1)), dont ${formatEurCents(interestOnInterestCents ?? 0)} d'intérêts sur intérêts`}
-            subTone={compoundInterestCents >= 0 ? "positive" : "negative"}
-          />
-          <Kpi
-            label="Taux annualisé effectif"
-            value={`${(effectiveRate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`}
-            sub="Taux composé qui reproduit la valeur finale depuis les versements"
-          />
-        </Card>
-      ) : null}
 
       <Card>
         <h2 className="mb-4 font-heading text-lg font-semibold">Évolution de la valeur</h2>
