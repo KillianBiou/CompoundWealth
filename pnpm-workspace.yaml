@@ -1,0 +1,9 @@
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+  - esbuild
+  - msgpackr-extract
+  - workerd
+  - '@node-rs/argon2'
+  - prisma
+  - '@prisma/engines'

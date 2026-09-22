@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  age          Int?
+  job          String?
+  salaryCents  Int?
+  createdAt    DateTime  @default(now())
+  envelopes    Envelope[]
+}
+
+model Envelope {
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        EnvelopeType
+  name        String
+  broker      String?
+  openedAt    DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime           @default(now())
+  positions   Position[]
+  valuations  EnvelopeValuation[]
+
+  @@index([userId])
+}
+
+enum EnvelopeType {
+  PEA
+  CTO
+}
+
+model Position {
+  id             String              @id @default(cuid())
+  envelopeId     String
+  envelope       Envelope            @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  name           String
+  category       PositionCategory
+  investedCents  Int
+  quantity       Float?
+  unitPriceCents Int?
+  notes          String?
+  boughtAt       DateTime
+  createdAt      DateTime            @default(now())
+  valuations     PositionValuation[]
+
+  @@index([envelopeId])
+}
+
+enum PositionCategory {
+  ETF
+  STOCK
+  BOND
+  FUND
+  OTHER
+}
+
+model EnvelopeValuation {
+  id         String   @id @default(cuid())
+  envelopeId String
+  envelope   Envelope @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  date       DateTime
+  valueCents Int
+
+  @@unique([envelopeId, date])
+  @@index([envelopeId])
+}
+
+model PositionValuation {
+  id         String   @id @default(cuid())
+  positionId String
+  position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  date       DateTime
+  valueCents Int
+
+  @@unique([positionId, date])
+  @@index([positionId])
+}

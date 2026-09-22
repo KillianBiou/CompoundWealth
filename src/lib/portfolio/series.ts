@@ -1,0 +1,88 @@
+export interface ValuationPoint {
+  date: Date;
+  valueCents: number;
+}
+
+export interface SeriesPoint {
+  date: Date;
+  valueCents: number;
+  known: boolean;
+}
+
+export type PeriodKey = "6m" | "1y" | "all";
+
+export const PERIOD_MONTHS: Record<PeriodKey, number | null> = {
+  "6m": 6,
+  "1y": 12,
+  all: null,
+};
+
+export function buildEnvelopeSeries(
+  valuations: ValuationPoint[],
+  investedCents: number,
+  firstInvestmentDate: Date | null,
+  now: Date = new Date(),
+  period: PeriodKey = "all",
+): SeriesPoint[] {
+  const sorted = [...valuations].sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (sorted.length === 0) return [];
+
+  const months = PERIOD_MONTHS[period];
+  let startDate: Date | null = null;
+  if (months !== null) {
+    const start = new Date(now);
+    start.setMonth(start.getMonth() - months);
+    startDate = start;
+  }
+
+  const points: SeriesPoint[] = [];
+  const first = sorted[0];
+  const includeFirst =
+    startDate === null || first.date.getTime() >= startDate.getTime();
+  if (includeFirst) {
+    points.push({ date: first.date, valueCents: first.valueCents, known: true });
+  } else if (startDate) {
+    const anchorValue = valueAt(sorted, startDate);
+    points.push({ date: startDate, valueCents: anchorValue, known: false });
+  }
+
+  for (const v of sorted.slice(1)) {
+    if (startDate !== null && v.date.getTime() < startDate.getTime()) continue;
+    points.push({ date: v.date, valueCents: v.valueCents, known: true });
+  }
+  return points;
+}
+
+export function valueAt(sorted: ValuationPoint[], date: Date): number {
+  let current: number | null = null;
+  for (const v of sorted) {
+    if (v.date.getTime() <= date.getTime()) {
+      current = v.valueCents;
+    } else {
+      break;
+    }
+  }
+  if (current !== null) return current;
+  const hasEarlier = sorted.some((v) => v.date.getTime() <= date.getTime());
+  if (hasEarlier && current !== null) return current;
+  const firstPoint = sorted[0];
+  return firstPoint ? firstPoint.valueCents : 0;
+}
+
+export function currentValueCents(
+  valuations: ValuationPoint[],
+  investedCents: number,
+): number {
+  if (valuations.length === 0) return investedCents;
+  const sorted = [...valuations].sort((a, b) => a.date.getTime() - b.date.getTime());
+  return sorted[sorted.length - 1].valueCents;
+}
+
+export function investedBefore(
+  positions: { investedCents: number; boughtAt: Date }[],
+  date: Date,
+): number {
+  return positions
+    .filter((p) => p.boughtAt.getTime() <= date.getTime())
+    .reduce((sum, p) => sum + p.investedCents, 0);
+}

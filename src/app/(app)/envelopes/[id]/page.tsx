@@ -1,0 +1,113 @@
+import { notFound } from "next/navigation";
+import { getEnvelope } from "@/server/queries";
+import { formatEurCents } from "@/lib/money";
+import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
+import { Badge, Card, Kpi } from "@/components/ui";
+import { EnvelopeChart } from "./envelope-chart";
+import { AddPositionForm } from "./add-position-form";
+import { AddValuationForm } from "./add-valuation-form";
+import { PositionsTable } from "./positions-table";
+
+export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const envelope = await getEnvelope(id);
+  if (!envelope || envelope.closedAt) notFound();
+
+  const investedCents = envelope.positions.reduce((s, p) => s + p.investedCents, 0);
+  const valuations = envelope.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents }));
+  const valueCents = valuations.length > 0 ? valuations[valuations.length - 1].valueCents : investedCents;
+  const gainCents = valueCents - investedCents;
+  const gainRatio = investedCents > 0 ? gainCents / investedCents : 0;
+  const rules = ENVELOPE_RULES[envelope.type];
+  const antiquity =
+    envelope.type === "PEA" && envelope.openedAt
+      ? peaAntiquity(envelope.openedAt)
+      : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-heading text-2xl font-semibold">{envelope.name}</h1>
+            <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type}</Badge>
+          </div>
+          <p className="mt-1 text-sm text-text-secondary">
+            {envelope.broker ? `${envelope.broker} · ` : ""}
+            {envelope.openedAt
+              ? `Ouvert le ${envelope.openedAt.toLocaleDateString("fr-FR")}`
+              : "Date d'ouverture non renseignée"}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {rules.badges.map((b) => (
+            <Badge
+              key={b}
+              tone={b.includes("Exonération") ? "positive" : "warning"}
+            >
+              {b}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      {envelope.type === "PEA" ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="accent">
+            Versements : {formatEurCents(investedCents)} / {rules.depositCapLabel}
+          </Badge>
+          {antiquity ? (
+            <Badge tone={antiquity.acquired ? "positive" : "neutral"}>
+              {antiquity.acquired
+                ? "Antériorité fiscale acquise ✓"
+                : `Antériorité : ${antiquity.yearsRemaining} an${antiquity.yearsRemaining! > 1 ? "s" : ""} restant${antiquity.yearsRemaining! > 1 ? "s" : ""}`}
+            </Badge>
+          ) : (
+            <Badge tone="neutral">Date d&apos;ouverture à renseigner pour l&apos;antériorité</Badge>
+          )}
+        </div>
+      ) : null}
+
+      <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <Kpi label="Total investi" value={formatEurCents(investedCents)} />
+        <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
+        <Kpi
+          label="Gain / perte"
+          value={formatEurCents(Math.abs(gainCents))}
+          sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
+          subTone={gainCents >= 0 ? "positive" : "negative"}
+        />
+      </Card>
+
+      <Card>
+        <h2 className="mb-4 font-heading text-lg font-semibold">Évolution de la valeur</h2>
+        <EnvelopeChart
+          valuations={valuations}
+          investedCents={investedCents}
+        />
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une valorisation</h2>
+          <AddValuationForm envelopeId={envelope.id} />
+        </Card>
+        <Card>
+          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
+          <AddPositionForm envelopeId={envelope.id} />
+        </Card>
+      </div>
+
+      <PositionsTable
+        envelopeId={envelope.id}
+        positions={envelope.positions.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          investedCents: p.investedCents,
+          boughtAt: p.boughtAt,
+        }))}
+      />
+    </div>
+  );
+}

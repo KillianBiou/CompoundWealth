@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="dark"] {
+  --bg: #0d0f12;
+  --bg-elevated: #14171c;
+  --bg-subtle: #1c2027;
+  --border: #262b33;
+  --text-primary: #f4f6f8;
+  --text-secondary: #9ba3af;
+  --text-muted: #5c6470;
+  --accent-100: #2a1a1a;
+  --accent-500: #e84545;
+  --accent-600: #c73e3e;
+  --accent-700: #a83232;
+  --positive: #34c77b;
+  --negative: #e84545;
+  --warning: #e8a33d;
+  --info: #4c9aff;
+}
+
+[data-theme="light"] {
+  --bg: #f7f8fa;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #eef0f3;
+  --border: #dfe3e8;
+  --text-primary: #14171c;
+  --text-secondary: #5c6470;
+  --text-muted: #9ba3af;
+  --accent-100: #fdeaea;
+  --accent-500: #d93838;
+  --accent-600: #c22e2e;
+  --accent-700: #a82626;
+  --positive: #1e9e63;
+  --negative: #d93838;
+  --warning: #b9791f;
+  --info: #2d7ff9;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-border-cw: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-100: var(--accent-100);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --font-heading: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+}
+
+::selection {
+  background: var(--accent-500);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
