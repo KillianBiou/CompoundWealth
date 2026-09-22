@@ -6,7 +6,7 @@ import { buildEnvelopeValuations } from "@/lib/portfolio/series";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { AddPositionForm } from "./add-position-form";
-import { DepositsBadgeForm } from "./deposits-form";
+import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
@@ -96,10 +96,10 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
 
       {envelope.type === "PEA" ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="accent">Versements / {rules.depositCapLabel}</Badge>
-          <DepositsBadgeForm
+          <DepositsBadge
             envelopeId={envelope.id}
-            depositsEur={(depositsCents / 100).toFixed(2)}
+            depositsCents={depositsCents}
+            depositCapLabel={rules.depositCapLabel}
           />
           {antiquity ? (
             <Badge tone={antiquity.acquired ? "positive" : "neutral"}>

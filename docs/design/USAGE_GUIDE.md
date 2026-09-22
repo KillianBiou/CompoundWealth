@@ -47,7 +47,7 @@ Chaque champ peut être renseigné séparément et modifié ou effacé à tout m
 3. Renseigner : nom (ex. « PEA Bourse »), courtier (optionnel), date d'ouverture (recommandée pour le PEA : elle déclenche le compte à rebours des 5 ans).
 4. Enregistrer → l'enveloppe apparaît sur le dashboard.
 
-Pour un PEA, l'app affiche ensuite en permanence : **Versements / 150 000 €** — un champ éditable directement à côté du badge pour renseigner manuellement vos versements cumulés — et **Antériorité fiscale : X ans restants**.
+Pour un PEA, l'app affiche ensuite en permanence : **Versements : X / 150 000 €** — cliquez sur le badge pour ouvrir une petite modale et renseigner vos versements cumulés (avec texte explicatif) — et **Antériorité fiscale : X ans restants**.
 
 ## 3. Positions — la composition
 
