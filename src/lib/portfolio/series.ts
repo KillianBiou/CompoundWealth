@@ -9,11 +9,16 @@ export interface SeriesPoint {
   known: boolean;
 }
 
-export type PeriodKey = "6m" | "1y" | "all";
+export type PeriodKey = "1w" | "1m" | "3m" | "6m" | "1y" | "2y" | "all";
 
-export const PERIOD_MONTHS: Record<PeriodKey, number | null> = {
-  "6m": 6,
-  "1y": 12,
+/** durée de chaque période en jours ; null = tout l'historique */
+export const PERIOD_DAYS: Record<PeriodKey, number | null> = {
+  "1w": 7,
+  "1m": 30,
+  "3m": 91,
+  "6m": 182,
+  "1y": 365,
+  "2y": 730,
   all: null,
 };
 
@@ -27,11 +32,11 @@ export function buildEnvelopeSeries(
   const sorted = [...valuations].sort((a, b) => a.date.getTime() - b.date.getTime());
   if (sorted.length === 0) return [];
 
-  const months = PERIOD_MONTHS[period];
+  const days = PERIOD_DAYS[period];
   let startDate: Date | null = null;
-  if (months !== null) {
+  if (days !== null) {
     const start = new Date(now);
-    start.setMonth(start.getMonth() - months);
+    start.setDate(start.getDate() - days);
     startDate = start;
   }
 

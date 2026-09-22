@@ -37,12 +37,30 @@ describe("buildEnvelopeSeries", () => {
   });
   it("échantillonne depuis la période demandée avec point d'ancrage interpolé", () => {
     const series = buildEnvelopeSeries(valuations, 0, null, d("2026-09-22"), "6m");
-    const start = d("2026-03-22");
+    const start = d("2026-03-24");
     expect(series[0].date.toDateString()).toBe(start.toDateString());
     expect(series[0].known).toBe(false);
     expect(series[0].valueCents).toBe(110_000);
     expect(series).toHaveLength(2);
     expect(series[1].valueCents).toBe(130_000);
+  });
+
+  it("couvre les nouvelles périodes courtes (1 semaine, 1 mois, 2 ans)", () => {
+    const now = d("2026-09-22");
+    const shortSeries = buildEnvelopeSeries(valuations, 0, null, now, "1w");
+    expect(shortSeries).toHaveLength(1);
+    expect(shortSeries[0].valueCents).toBe(130_000);
+
+    const monthSeries = buildEnvelopeSeries(valuations, 0, null, now, "1m");
+    expect(monthSeries).toHaveLength(2);
+    expect(monthSeries[0].known).toBe(false);
+    expect(monthSeries[0].valueCents).toBe(110_000);
+    expect(monthSeries[1].known).toBe(true);
+    expect(monthSeries[1].valueCents).toBe(130_000);
+
+    const twoYears = buildEnvelopeSeries(valuations, 0, null, now, "2y");
+    expect(twoYears).toHaveLength(3);
+    expect(twoYears.every((p) => p.known)).toBe(true);
   });
   it("série vide sans valorisation", () => {
     expect(buildEnvelopeSeries([], 0, null)).toHaveLength(0);
