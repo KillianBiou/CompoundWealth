@@ -42,10 +42,12 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
     p.investments.map((i) => ({ date: i.date, amountCents: i.amountCents })),
   );
   const compoundSeries = buildCompoundInterestSeries(valuations, investments);
-  const compoundInterestCents =
+  const lastCompoundPoint =
     compoundSeries.length > 0
-      ? compoundSeries[compoundSeries.length - 1].compoundInterestCents
+      ? compoundSeries[compoundSeries.length - 1]
       : null;
+  const compoundInterestCents = lastCompoundPoint?.compoundInterestCents ?? null;
+  const interestOnInterestCents = lastCompoundPoint?.interestOnInterestCents ?? null;
   const effectiveRate =
     valuations.length > 0 && investments.length > 0
       ? (annualizedGrowthRate(
@@ -160,8 +162,8 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         <Card className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <Kpi
             label="Intérêts composés"
-            value={formatEurCents(Math.abs(compoundInterestCents))}
-            sub="Part de la croissance due aux intérêts sur intérêts (composé − simple)"
+            value={formatEurCents(compoundInterestCents)}
+            sub={`Gains cumulés au taux annualisé effectif (versement × ((1+r)^t − 1)), dont ${formatEurCents(interestOnInterestCents ?? 0)} d'intérêts sur intérêts`}
             subTone={compoundInterestCents >= 0 ? "positive" : "negative"}
           />
           <Kpi

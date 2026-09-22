@@ -175,19 +175,23 @@ export interface CompoundInterestPoint {
   valueCents: number;
   /** total investi cumulé à cette date */
   investedCents: number;
-  /** croissance simple : chaque versement croît linéairement au taux annualisé */
-  simpleGrowthCents: number;
-  /** croissance composée : chaque versement croît exponentiellement au taux annualisé */
-  compoundGrowthCents: number;
-  /** part de la croissance due aux intérêts sur intérêts (composé − simple) */
+  /** intérêts composés cumulés : Σ versement × ((1+r)^t − 1), toujours ≥ 0 */
   compoundInterestCents: number;
+  /** part de la croissance due aux intérêts sur intérêts (effet boule de neige), toujours ≥ 0 */
+  interestOnInterestCents: number;
 }
 
 /**
- * Décompose l'accroissement de l'enveloppe entre croissance simple et
- * croissance composée au taux annualisé effectif. La part « intérêts composés »
- * est la différence : chaque versement rapporte le même taux, mais composé il
- * rapporte aussi sur les gains déjà acquis (effet boule de neige).
+ * Intérêts composés générés à chaque date au taux de croissance annualisé
+ * effectif r : chaque versement P rapporte P × ((1+r)^t − 1), la formule usuelle
+ * des intérêts composés, positive dès que r > 0 quelle que soit la durée.
+ *
+ * La part « intérêts sur intérêts » isole l'effet boule de neige : la croissance
+ * composée e^(ρt) est comparée à la croissance simple au taux continu
+ * équivalent ρ = ln(1+r). Comme e^x ≥ 1 + x pour tout x ≥ 0, la part
+ * e^(ρt) − 1 − ρt est positive à toute échéance, même sous un an (comparer au
+ * taux nominal donnerait une part négative sous l'unité de temps, car
+ * (1+r)^t < 1 + r·t lorsque t < 1).
  */
 export function buildCompoundInterestSeries(
   valuations: ValuationPoint[],
@@ -201,27 +205,30 @@ export function buildCompoundInterestSeries(
   const finalDate = sortedValuations[sortedValuations.length - 1].date;
   const rate = annualizedGrowthRate(investments, finalValue, finalDate);
   if (rate === null || !Number.isFinite(rate) || rate <= 0) return [];
+  const continuousRate = Math.log(1 + rate);
 
   return sortedValuations.map((v) => {
     const active = investments.filter((i) => i.date.getTime() <= v.date.getTime());
     const investedUpTo = active.reduce((sum, i) => sum + i.amountCents, 0);
     const elapsedYears = (i: InvestmentPoint) =>
       Math.max(0, (v.date.getTime() - i.date.getTime()) / MS_PER_YEAR);
-    const simple = active.reduce(
-      (sum, i) => sum + i.amountCents * (1 + rate * elapsedYears(i)),
+    const compoundInterest = active.reduce(
+      (sum, i) => sum + i.amountCents * (Math.pow(1 + rate, elapsedYears(i)) - 1),
       0,
     );
-    const compound = active.reduce(
-      (sum, i) => sum + i.amountCents * Math.pow(1 + rate, elapsedYears(i)),
+    const interestOnInterest = active.reduce(
+      (sum, i) =>
+        sum +
+        i.amountCents *
+          (Math.pow(1 + rate, elapsedYears(i)) - 1 - continuousRate * elapsedYears(i)),
       0,
     );
     return {
       date: v.date,
       valueCents: v.valueCents,
       investedCents: investedUpTo,
-      simpleGrowthCents: Math.round(simple),
-      compoundGrowthCents: Math.round(compound),
-      compoundInterestCents: Math.round(compound - simple),
+      compoundInterestCents: Math.round(compoundInterest),
+      interestOnInterestCents: Math.round(interestOnInterest),
     };
   });
 }

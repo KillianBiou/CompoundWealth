@@ -39,6 +39,7 @@ interface ChartPoint {
   value: number | null;
   invested: number | null;
   compoundInterest: number | null;
+  interestOnInterest: number | null;
 }
 
 function mergeSeries(
@@ -73,6 +74,7 @@ function mergeSeries(
       value: valueAt(valuations, time) === null ? null : valueAt(valuations, time)! / 100,
       invested: valueAt(investedPoints, time) === null ? null : valueAt(investedPoints, time)! / 100,
       compoundInterest: compoundPoint ? compoundPoint.compoundInterestCents / 100 : null,
+      interestOnInterest: compoundPoint ? compoundPoint.interestOnInterestCents / 100 : null,
     };
   });
 }
@@ -92,6 +94,7 @@ function ChartTooltip({
   const point = payload[0].payload;
   const invested = point.invested;
   const compoundInterest = point.compoundInterest;
+  const interestOnInterest = point.interestOnInterest;
   const value = point.value;
 
   return (
@@ -124,6 +127,13 @@ function ChartTooltip({
           >
             {compoundInterest >= 0 ? "+" : "−"}
             {formatMoneyCents(Math.abs(compoundInterest * 100), currency, locale)}
+            {interestOnInterest !== null && interestOnInterest > 0 ? (
+              <span className="font-normal text-text-secondary">
+                {" "}
+                (dont {formatMoneyCents(interestOnInterest * 100, currency, locale)}
+                d&apos;intérêts sur intérêts)
+              </span>
+            ) : null}
           </span>
         </p>
       ) : null}
@@ -275,9 +285,9 @@ export function EnvelopeChart({
         </ResponsiveContainer>
       </div>
       <p className="mt-3 text-xs text-text-muted">
-        La courbe « Investi + intérêts composés » projette chaque versement au taux de croissance
-        annualisé effectif du portefeuille ; l&apos;écart avec la courbe « Investi » est la part de
-        l&apos;accroissement due aux intérêts sur intérêts.
+        La courbe « Intérêts composés » cumule les gains de chaque versement au taux annualisé
+        effectif du portefeuille : versement × ((1+r)^t − 1). La part « intérêts sur intérêts »
+        (effet boule de neige) s&apos;accélère avec le temps.
       </p>
     </div>
   );
