@@ -55,6 +55,7 @@ model Position {
   boughtAt       DateTime
   createdAt      DateTime            @default(now())
   valuations     PositionValuation[]
+  investments   PositionInvestment[]
 
   @@index([envelopeId])
 }
@@ -86,5 +87,15 @@ model PositionValuation {
   valueCents Int
 
   @@unique([positionId, date])
+  @@index([positionId])
+}
+
+model PositionInvestment {
+  id          String   @id @default(cuid())
+  positionId  String
+  position    Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amountCents Int
+
   @@index([positionId])
 }
