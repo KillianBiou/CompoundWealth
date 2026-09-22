@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getEnvelope } from "@/server/queries";
+import { getEnvelope, getCurrentUser } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import {
@@ -16,7 +16,7 @@ import { EnvelopeDangerZone } from "./danger-zone";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const envelope = await getEnvelope(id);
+  const [envelope, user] = await Promise.all([getEnvelope(id), getCurrentUser()]);
   if (!envelope || envelope.closedAt) notFound();
 
   const positionsInvestedCents = envelope.positions.reduce(
@@ -178,6 +178,8 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           valuations={valuations}
           investedCents={hasUnknownInvested ? 0 : investedCents}
           investments={investments}
+          currency={user?.currency ?? "EUR"}
+          numberLocale={user?.numberLocale === "en" ? "en" : "fr"}
         />
       </Card>
 

@@ -43,3 +43,48 @@ describe("formatPercent", () => {
     expect(formatPercent(-0.05)).toMatch(/^-/);
   });
 });
+
+import {
+  CURRENCIES,
+  NUMBER_LOCALES,
+  formatMoneyCents,
+  formatMoneyCentsCompact,
+} from "./money";
+
+describe("formatMoneyCents", () => {
+  it("formate à la française par défaut (espaces + virgule)", () => {
+    const formatted = formatMoneyCents(123_456_789);
+    expect(formatted).toMatch(/^1[\s\u202f]234[\s\u202f]567,89[\s\u00a0]€$/);
+  });
+
+  it("formate en anglais (virgules + point)", () => {
+    expect(formatMoneyCents(123_456_789, "USD", "en")).toBe("$1,234,567.89");
+  });
+
+  it("change de devise", () => {
+    expect(formatMoneyCents(50_000, "GBP", "fr")).toContain("£");
+    expect(formatMoneyCents(50_000, "CHF", "en")).toContain("CHF");
+  });
+});
+
+describe("formatMoneyCentsCompact", () => {
+  it("formate en compact selon la locale", () => {
+    const fr = formatMoneyCentsCompact(12_345_678_900, "EUR", "fr");
+    expect(fr).toMatch(/M/);
+    const en = formatMoneyCentsCompact(12_345_678_900, "EUR", "en");
+    expect(en).toMatch(/M/);
+  });
+
+  it("varie selon la locale", () => {
+    const fr = formatMoneyCentsCompact(12_345_678_900, "EUR", "fr");
+    const en = formatMoneyCentsCompact(12_345_678_900, "EUR", "en");
+    expect(fr).not.toBe(en);
+  });
+});
+
+describe("préférences", () => {
+  it("exposent les devises et locales supportées", () => {
+    expect(CURRENCIES.map((c) => c.code)).toContain("EUR");
+    expect(NUMBER_LOCALES.map((l) => l.code)).toEqual(["fr", "en"]);
+  });
+});
