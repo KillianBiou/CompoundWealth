@@ -8,8 +8,9 @@ export default async function DashboardPage() {
   const envelopes = await getEnvelopeSummaries();
   const totalInvested = envelopes.reduce((s, e) => s + e.investedCents, 0);
   const totalValue = envelopes.reduce((s, e) => s + e.valueCents, 0);
-  const totalGain = totalValue - totalInvested;
-  const gainRatio = totalInvested > 0 ? totalGain / totalInvested : 0;
+  const hasUnknown = envelopes.some((e) => e.hasUnknownInvested);
+  const totalGain = hasUnknown ? null : totalValue - totalInvested;
+  const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
 
   if (envelopes.length === 0) {
     return (
@@ -38,14 +39,25 @@ export default async function DashboardPage() {
       </div>
 
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <Kpi label="Total investi" value={formatEurCents(totalInvested)} />
-        <Kpi label="Valeur actuelle" value={formatEurCents(totalValue)} />
         <Kpi
-          label="Gain / perte"
-          value={formatEurCents(Math.abs(totalGain))}
-          sub={`${totalGain >= 0 ? "+" : "−"}${formatEurCents(Math.abs(totalGain))} (${formatPercent(gainRatio)})`}
-          subTone={totalGain >= 0 ? "positive" : "negative"}
+          label="Total investi"
+          value={hasUnknown ? `${formatEurCents(totalInvested)} + ?` : formatEurCents(totalInvested)}
         />
+        <Kpi label="Valeur actuelle" value={formatEurCents(totalValue)} />
+        {totalGain !== null && gainRatio !== null ? (
+          <Kpi
+            label="Gain / perte"
+            value={formatEurCents(Math.abs(totalGain))}
+            sub={`${totalGain >= 0 ? "+" : "−"}${formatEurCents(Math.abs(totalGain))} (${formatPercent(gainRatio)})`}
+            subTone={totalGain >= 0 ? "positive" : "negative"}
+          />
+        ) : (
+          <Kpi
+            label="Gain / perte"
+            value="—"
+            sub="Certaines positions sont en état des lieux (sans montant investi)"
+          />
+        )}
       </Card>
 
       <div className="flex items-center justify-between">

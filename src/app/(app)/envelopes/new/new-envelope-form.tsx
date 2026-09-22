@@ -54,20 +54,31 @@ export function NewEnvelopeForm() {
       </div>
 
       <Card className="space-y-2 p-4">
-        <p className="text-sm font-medium">Conditions fiscales {type} ({`taux ${new Date().getFullYear()}`})</p>
+        <p className="text-sm font-medium">Conditions fiscales {type} — {new Date().getFullYear()}</p>
         <div className="flex flex-wrap gap-2">
           {rules.badges.map((b) => (
             <Badge key={b} tone={type === "PEA" && b.includes("Exonération") ? "positive" : "warning"}>
               {b}
             </Badge>
           ))}
-          <Badge tone="neutral">Prélèvements sociaux 18,6 %</Badge>
         </div>
-        <p className="text-xs text-text-muted">
-          {type === "PEA"
-            ? "Le retrait avant 5 ans entraîne la clôture du plan (sauf cas légaux). La date d'ouverture déclenche le compte à rebours."
-            : "Fiscalité identique quelle que soit la durée de détention. Option barème progressif possible à la déclaration."}
+        <p className="text-sm text-text-secondary">
+          <span className="font-medium text-text-primary">Flat tax 31,4 %</span> = 12,8 %
+          d&apos;impôt sur le revenu + 18,6 % de prélèvements sociaux
+          {type === "PEA" ? " (avant 5 ans)" : " (dividendes, intérêts et plus-values)"}
         </p>
+        {type === "PEA" ? (
+          <p className="text-xs text-text-muted">
+            Après 5 ans : exonération d&apos;impôt sur le revenu, seuls les prélèvements sociaux
+            (18,6 %) restent dus sur les gains. Le retrait avant 5 ans entraîne la clôture du
+            plan (sauf cas légaux).
+          </p>
+        ) : (
+          <p className="text-xs text-text-muted">
+            Fiscalité identique quelle que soit la durée de détention. Option barème progressif
+            possible à la déclaration annuelle.
+          </p>
+        )}
       </Card>
 
       <Field label="Nom de l'enveloppe" htmlFor="name" error={state?.errors?.name}>

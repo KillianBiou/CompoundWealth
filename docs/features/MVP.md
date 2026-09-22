@@ -74,9 +74,20 @@ Positionnement : suivi et compréhension de la croissance (intérêts composés)
 > En tant qu'utilisateur, je veux ajouter une position (ETF, action, ...) avec ma valeur investie, pour suivre la composition de mon portefeuille.
 
 - Critères d'acceptation :
+  - [ ] **Recherche par identifiant/ticker** : à partir de 2 caractères, une liste de suggestions (symbole, nom, place, type) est proposée depuis une base publique (Yahoo Finance) ; la sélection pré-remplit nom, catégorie et cours actuel.
   - [ ] Champs : nom/ticker (requis), catégorie — ETF / Action / Obligation / Fonds / Autre, montant investi (requis, > 0), date d'achat (requis, non future), quantité (optionnelle), prix unitaire (optionnel), notes (optionnel).
   - [ ] Montants en EUR, saisie avec 2 décimales, stockage en centimes (entier).
   - [ ] La position apparaît immédiatement dans l'enveloppe et met à jour le total investi.
+  - [ ] Si la recherche est indisponible (API limitée), le formulaire reste utilisable en saisie manuelle complète.
+
+**US-301b — État des lieux (« j'arrive en cours »)**
+> En tant qu'investisseur qui détient déjà des valeurs dans un compte existant chez un courtier, je veux saisir l'état des lieux actuel — pour tel titre, j'ai X à l'instant T — sans reconstituer l'historique.
+
+- Critères d'acceptation :
+  - [ ] Mode dédié activable par case à cocher « J'arrive en cours ».
+  - [ ] Saisie : quantité détenue + cours actuel (pré-rempli si trouvé), OU valeur totale de la ligne.
+  - [ ] Le montant investi est **optionnel** dans ce mode (`investedCents` nullable) ; gain/perte affichés « — » avec mention « état des lieux » tant qu'il manque des données.
+  - [ ] Une valorisation initiale de position est créée à la date de l'état des lieux.
 
 **US-302 — Éditer / supprimer une position**
 - [ ] Édition de tous les champs avec validation identique à la création.

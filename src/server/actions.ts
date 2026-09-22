@@ -164,6 +164,7 @@ export async function createPositionAction(
 
   const parsed = positionSchema.safeParse({
     name: str(formData, "name"),
+    symbol: str(formData, "symbol"),
     category: str(formData, "category"),
     investedEur: str(formData, "investedEur"),
     boughtAt: str(formData, "boughtAt"),
@@ -173,20 +174,59 @@ export async function createPositionAction(
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { name, category, investedEur, boughtAt, quantity, unitPriceEur, notes } = parsed.data;
-  await prisma.position.create({
+  const { name, symbol, category, investedEur, boughtAt, quantity, unitPriceEur, notes } =
+    parsed.data;
+  const qty = quantity === "" || quantity === undefined ? null : Number(quantity);
+  const unitPrice =
+    unitPriceEur === "" || unitPriceEur === undefined ? null : eurosToCents(Number(unitPriceEur));
+
+  let investedCents: number | null = null;
+  if (investedEur !== "" && investedEur !== undefined) {
+    investedCents = eurosToCents(Number(investedEur));
+  } else if (qty !== null && unitPrice !== null) {
+    investedCents = Math.round(qty * unitPrice);
+  }
+
+  const position = await prisma.position.create({
     data: {
       envelopeId,
       name,
+      symbol: symbol || null,
       category,
-      investedCents: eurosToCents(investedEur),
+      investedCents,
       boughtAt: new Date(boughtAt),
-      quantity: quantity === "" || quantity === undefined ? null : Number(quantity),
-      unitPriceCents:
-        unitPriceEur === "" || unitPriceEur === undefined ? null : eurosToCents(Number(unitPriceEur)),
+      quantity: qty,
+      unitPriceCents: unitPrice,
       notes: notes || null,
     },
   });
+
+  // État des lieux : valorisation initiale = montant investi connu, ou fournie séparément
+  const initialValuationEur = str(formData, "initialValueEur");
+  if (
+    initialValuationEur !== "" &&
+    !Number.isNaN(Number(initialValuationEur)) &&
+    Number(initialValuationEur) >= 0
+  ) {
+    const date = new Date(boughtAt);
+    await prisma.positionValuation.upsert({
+      where: { positionId_date: { positionId: position.id, date } },
+      create: {
+        positionId: position.id,
+        date,
+        valueCents: eurosToCents(Number(initialValuationEur)),
+      },
+      update: { valueCents: eurosToCents(Number(initialValuationEur)) },
+    });
+  } else if (investedCents !== null) {
+    const date = new Date(boughtAt);
+    await prisma.positionValuation.upsert({
+      where: { positionId_date: { positionId: position.id, date } },
+      create: { positionId: position.id, date, valueCents: investedCents },
+      update: { valueCents: investedCents },
+    });
+  }
+
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
   return { message: "Position ajoutée" };

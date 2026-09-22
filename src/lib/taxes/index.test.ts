@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ENVELOPE_RULES,
+  FLAT_TAX_2026,
   PEA_DEPOSIT_CAP_CENTS,
   peaAntiquity,
 } from "./index";
@@ -10,18 +11,41 @@ describe("ENVELOPE_RULES", () => {
     expect(PEA_DEPOSIT_CAP_CENTS).toBe(15_000_000);
     expect(ENVELOPE_RULES.PEA.depositCapCents).toBe(15_000_000);
   });
-  it("PEA : flat tax avant 5 ans = 12,8 % IR + 18,6 % PS", () => {
-    expect(ENVELOPE_RULES.PEA.flatTax).toBeCloseTo(0.314, 3);
+
+  it("la flat tax 31,4 % est la SOMME d'IR et de PS, pas une addition en plus", () => {
+    expect(FLAT_TAX_2026).toBeCloseTo(0.314, 3);
+    for (const rules of [ENVELOPE_RULES.PEA, ENVELOPE_RULES.CTO]) {
+      expect(rules.flatTax).toBeCloseTo(0.314, 3);
+      expect(rules.incomeTaxBefore5Years + rules.socialLevies).toBeCloseTo(
+        rules.flatTax,
+        10,
+      );
+      const sum = rules.flatTaxBreakdown.reduce((s, b) => s + b.rate, 0);
+      expect(sum).toBeCloseTo(rules.flatTax, 10);
+      expect(rules.flatTaxBreakdown).toHaveLength(2);
+      expect(rules.flatTaxBreakdown[0].label).toBe("Impôt sur le revenu");
+      expect(rules.flatTaxBreakdown[1].label).toBe("Prélèvements sociaux");
+    }
   });
-  it("PEA : exonération d'IR après 5 ans", () => {
+
+  it("PEA : exonération d'IR après 5 ans, PS restent dus", () => {
     expect(ENVELOPE_RULES.PEA.incomeTaxAfter5Years).toBe(0);
+    expect(ENVELOPE_RULES.PEA.incomeTaxIsDurationBased).toBe(true);
+    expect(ENVELOPE_RULES.PEA.socialLevies).toBeCloseTo(0.186, 3);
   });
-  it("CTO : sans plafond, flat tax constante", () => {
+
+  it("CTO : sans plafond, flat tax constante dans le temps", () => {
     expect(ENVELOPE_RULES.CTO.depositCapCents).toBeNull();
     expect(ENVELOPE_RULES.CTO.incomeTaxAfter5Years).toBeCloseTo(0.128, 3);
     expect(ENVELOPE_RULES.CTO.incomeTaxAfter5Years).toBe(
       ENVELOPE_RULES.CTO.incomeTaxBefore5Years,
     );
+    expect(ENVELOPE_RULES.CTO.incomeTaxIsDurationBased).toBe(false);
+  });
+
+  it("les badges PEA mentionnent la flat tax avant 5 ans et l'exonération ensuite", () => {
+    expect(ENVELOPE_RULES.PEA.badges[0]).toContain("31,4 %");
+    expect(ENVELOPE_RULES.PEA.badges[1]).toContain("Exonération");
   });
 });
 

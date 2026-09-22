@@ -13,8 +13,10 @@ const categoryLabels: Record<string, string> = {
 export interface PositionRow {
   id: string;
   name: string;
+  symbol: string | null;
   category: string;
-  investedCents: number;
+  investedCents: number | null;
+  currentValueCents: number | null;
   boughtAt: Date;
 }
 
@@ -43,6 +45,7 @@ export function PositionsTable({
                 <th className="px-6 py-3 font-medium">Nom</th>
                 <th className="px-4 py-3 font-medium">Catégorie</th>
                 <th className="px-4 py-3 text-right font-medium">Investi</th>
+                <th className="px-4 py-3 text-right font-medium">Valeur actuelle</th>
                 <th className="px-4 py-3 font-medium">Date d&apos;achat</th>
                 <th className="px-6 py-3" aria-label="Actions" />
               </tr>
@@ -50,12 +53,28 @@ export function PositionsTable({
             <tbody>
               {positions.map((p) => (
                 <tr key={p.id} className="border-t border-border-cw/60">
-                  <td className="px-6 py-3 font-medium text-text-primary">{p.name}</td>
+                  <td className="px-6 py-3">
+                    <span className="font-medium text-text-primary">{p.name}</span>
+                    {p.symbol ? (
+                      <span className="ml-2 text-xs text-text-muted">{p.symbol}</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge tone="neutral">{categoryLabels[p.category] ?? p.category}</Badge>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {formatEurCents(p.investedCents)}
+                    {p.investedCents !== null ? (
+                      formatEurCents(p.investedCents)
+                    ) : (
+                      <span className="italic text-text-muted">état des lieux</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {p.currentValueCents !== null ? (
+                      formatEurCents(p.currentValueCents)
+                    ) : (
+                      <span className="text-text-muted">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-text-secondary tabular-nums">
                     {p.boughtAt.toLocaleDateString("fr-FR")}

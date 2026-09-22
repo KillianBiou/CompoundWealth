@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
+import { currentValueCents } from "@/lib/portfolio/series";
 
 export interface EnvelopeSummary {
   id: string;
@@ -10,8 +11,10 @@ export interface EnvelopeSummary {
   openedAt: Date | null;
   closedAt: Date | null;
   investedCents: number;
+  /** true si au moins une position n'a pas de montant investi (état des lieux) */
+  hasUnknownInvested: boolean;
   valueCents: number;
-  gainCents: number;
+  gainCents: number | null;
   positionsCount: number;
   series: { date: Date; valueCents: number }[];
 }
@@ -21,18 +24,31 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
   const envelopes = await prisma.envelope.findMany({
     where: { userId, closedAt: null },
     include: {
-      positions: { select: { investedCents: true } },
+      positions: {
+        select: {
+          investedCents: true,
+          valuations: { orderBy: { date: "asc" } },
+        },
+      },
       valuations: { orderBy: { date: "asc" } },
     },
     orderBy: { createdAt: "asc" },
   });
 
   return envelopes.map((e) => {
-    const investedCents = e.positions.reduce((s, p) => s + p.investedCents, 0);
-    const valueCents =
-      e.valuations.length > 0
-        ? e.valuations[e.valuations.length - 1].valueCents
-        : investedCents;
+    const investedCents = e.positions.reduce(
+      (s, p) => s + (p.investedCents ?? 0),
+      0,
+    );
+    const hasUnknownInvested = e.positions.some((p) => p.investedCents === null);
+    const positionsValue = e.positions.reduce(
+      (s, p) => s + currentValueCents(p.valuations, p.investedCents ?? 0),
+      0,
+    );
+    const envelopeValue = e.valuations.length
+      ? e.valuations[e.valuations.length - 1].valueCents
+      : positionsValue;
+    const gainCents = hasUnknownInvested ? null : envelopeValue - investedCents;
     return {
       id: e.id,
       type: e.type,
@@ -41,8 +57,9 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       openedAt: e.openedAt,
       closedAt: e.closedAt,
       investedCents,
-      valueCents,
-      gainCents: valueCents - investedCents,
+      hasUnknownInvested,
+      valueCents: envelopeValue,
+      gainCents,
       positionsCount: e.positions.length,
       series: e.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents })),
     };
@@ -54,7 +71,10 @@ export const getEnvelope = cache(async (envelopeId: string) => {
   return prisma.envelope.findFirst({
     where: { id: envelopeId, userId },
     include: {
-      positions: { orderBy: { boughtAt: "desc" } },
+      positions: {
+        include: { valuations: { orderBy: { date: "asc" } } },
+        orderBy: { boughtAt: "desc" },
+      },
       valuations: { orderBy: { date: "asc" } },
     },
   });

@@ -13,11 +13,24 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
   const envelope = await getEnvelope(id);
   if (!envelope || envelope.closedAt) notFound();
 
-  const investedCents = envelope.positions.reduce((s, p) => s + p.investedCents, 0);
+  const investedCents = envelope.positions.reduce(
+    (s, p) => s + (p.investedCents ?? 0),
+    0,
+  );
+  const hasUnknownInvested = envelope.positions.some((p) => p.investedCents === null);
+  const positionsValue = envelope.positions.reduce(
+    (s, p) =>
+      s +
+      (p.valuations.length > 0
+        ? p.valuations[p.valuations.length - 1].valueCents
+        : (p.investedCents ?? 0)),
+    0,
+  );
   const valuations = envelope.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents }));
-  const valueCents = valuations.length > 0 ? valuations[valuations.length - 1].valueCents : investedCents;
-  const gainCents = valueCents - investedCents;
-  const gainRatio = investedCents > 0 ? gainCents / investedCents : 0;
+  const valueCents = valuations.length > 0 ? valuations[valuations.length - 1].valueCents : positionsValue;
+  const gainCents = hasUnknownInvested ? null : valueCents - investedCents;
+  const gainRatio =
+    investedCents > 0 && gainCents !== null ? gainCents / investedCents : null;
   const rules = ENVELOPE_RULES[envelope.type];
   const antiquity =
     envelope.type === "PEA" && envelope.openedAt
@@ -39,17 +52,42 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               : "Date d'ouverture non renseignée"}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+      </div>
+
+      <Card className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
           {rules.badges.map((b) => (
-            <Badge
-              key={b}
-              tone={b.includes("Exonération") ? "positive" : "warning"}
-            >
+            <Badge key={b} tone={b.includes("Exonération") ? "positive" : "warning"}>
               {b}
             </Badge>
           ))}
         </div>
-      </div>
+        <div className="space-y-1.5 text-sm text-text-secondary">
+          <p className="font-medium text-text-primary">
+            Flat tax 31,4 %&nbsp;
+            <span className="font-normal text-text-secondary">
+              = {(rules.flatTaxBreakdown[0].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} % d&apos;IR
+              + {(rules.flatTaxBreakdown[1].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} % de prélèvements sociaux
+            </span>
+          </p>
+          {envelope.type === "PEA" && antiquity ? (
+            <p className="text-xs">
+              {antiquity.acquired
+                ? "Antériorité acquise : 0 % d'IR, seuls les prélèvements sociaux (18,6 %) s'appliquent aux gains."
+                : "Avant 5 ans : flat tax 31,4 %. Après 5 ans : 0 % d'IR, prélèvements sociaux 18,6 % uniquement."}
+            </p>
+          ) : null}
+          <p className="text-xs text-text-muted">
+            La flat tax de 31,4 % est la somme de l&apos;impôt sur le revenu et des prélèvements
+            sociaux — pas un taux en plus de ceux-ci.
+          </p>
+        </div>
+        <ul className="space-y-1 border-t border-border-cw/60 pt-3 text-xs text-text-muted">
+          {rules.details.map((d) => (
+            <li key={d}>· {d}</li>
+          ))}
+        </ul>
+      </Card>
 
       {envelope.type === "PEA" ? (
         <div className="flex flex-wrap gap-2">
@@ -69,21 +107,32 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       ) : null}
 
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <Kpi label="Total investi" value={formatEurCents(investedCents)} />
-        <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
         <Kpi
-          label="Gain / perte"
-          value={formatEurCents(Math.abs(gainCents))}
-          sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
-          subTone={gainCents >= 0 ? "positive" : "negative"}
+          label="Total investi"
+          value={hasUnknownInvested ? `${formatEurCents(investedCents)} + ?` : formatEurCents(investedCents)}
         />
+        <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
+        {gainCents !== null && gainRatio !== null ? (
+          <Kpi
+            label="Gain / perte"
+            value={formatEurCents(Math.abs(gainCents))}
+            sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
+            subTone={gainCents >= 0 ? "positive" : "negative"}
+          />
+        ) : (
+          <Kpi
+            label="Gain / perte"
+            value="—"
+            sub="Complétez les montants investis pour calculer le gain"
+          />
+        )}
       </Card>
 
       <Card>
         <h2 className="mb-4 font-heading text-lg font-semibold">Évolution de la valeur</h2>
         <EnvelopeChart
           valuations={valuations}
-          investedCents={investedCents}
+          investedCents={hasUnknownInvested ? 0 : investedCents}
         />
       </Card>
 
@@ -103,8 +152,13 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         positions={envelope.positions.map((p) => ({
           id: p.id,
           name: p.name,
+          symbol: p.symbol,
           category: p.category,
           investedCents: p.investedCents,
+          currentValueCents:
+            p.valuations.length > 0
+              ? p.valuations[p.valuations.length - 1].valueCents
+              : (p.investedCents ?? null),
           boughtAt: p.boughtAt,
         }))}
       />

@@ -55,14 +55,26 @@ Pour un PEA, l'app affiche ensuite en permanence : **Versements cumulés / 150 0
 
 Dans l'enveloppe → **+ Ajouter une position** :
 
-- **Nom / ticker** (requis) — ex. « CW8 » ou « MSCI World »
-- **Catégorie** — ETF, Action, Obligation, Fonds, Autre
-- **Montant investi** (requis, > 0)
-- **Date d'achat** (requis)
-- Quantité et prix unitaire (optionnels)
-- Notes (optionnel)
+1. **Recherche par identifiant / ticker** (ex. `CW8`, `AAPL`, `CW8.PA`) : une liste de suggestions apparaît avec le nom, la place de cotation et le type. En sélectionnant une ligne, le nom, la catégorie et le **cours actuel** sont pré-remplis depuis une base publique (Yahoo Finance). Vous pouvez aussi tout saisir manuellement.
+2. Complétez :
+   - **Nom affiché** (requis)
+   - **Catégorie** — ETF, Action, Obligation, Fonds, Autre (auto si recherche utilisée)
+   - **Montant investi** (requis, > 0)
+   - **Date d'achat** (requis)
+   - Quantité et prix unitaire (optionnels)
 
 Le montant investi alimente automatiquement le « total investi » de l'enveloppe. Les montants sont en euros ; c'est la valeur que vous avez réellement investie, frais inclus.
+
+### « J'arrive en cours » — état des lieux d'une enveloppe existante
+
+Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Cochez **« J'arrive en cours »** lors de l'ajout :
+
+- Renseignez la **quantité détenue** et le **cours actuel** (pré-rempli si trouvé via la recherche), ou directement la **valeur totale de la ligne** à l'instant T.
+- Aucun montant investi n'est requis : la position est créée en « état des lieux », avec sa valeur actuelle.
+- Les KPIs de gain/perte affichent alors « — » avec la mention *état des lieux* tant que les montants investis ne sont pas renseignés.
+- Vous pouvez compléter le montant investi plus tard (édition de la position) pour activer le suivi du gain.
+
+L'important est de pouvoir **commencer à suivre la valeur dès aujourd'hui** sans devoir reconstituer tout l'historique fiscal.
 
 ### Suivre la valeur — les valorisations
 

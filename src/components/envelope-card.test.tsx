@@ -17,6 +17,7 @@ const base: EnvelopeSummary = {
   openedAt: new Date("2024-06-01"),
   closedAt: null,
   investedCents: 100_000,
+  hasUnknownInvested: false,
   valueCents: 120_000,
   gainCents: 20_000,
   positionsCount: 2,
@@ -47,5 +48,16 @@ describe("EnvelopeCard", () => {
     const loss = document.querySelector("p.text-negative");
     expect(loss?.textContent).toContain("↘");
     expect(loss?.textContent).toContain("100,00");
+  });
+
+  it("état des lieux : gain non calculable affiché explicitement", () => {
+    const { container } = render(
+      <EnvelopeCard
+        envelope={{ ...base, gainCents: null, hasUnknownInvested: true }}
+      />,
+    );
+    expect(container.textContent).toContain("État des lieux");
+    expect(container.querySelector("p.text-negative")).toBeNull();
+    expect(container.querySelector("p.text-positive")).toBeNull();
   });
 });

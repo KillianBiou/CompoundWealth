@@ -45,8 +45,9 @@ model Position {
   envelopeId     String
   envelope       Envelope            @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
   name           String
+  symbol          String?
   category       PositionCategory
-  investedCents  Int
+  investedCents  Int?
   quantity       Float?
   unitPriceCents Int?
   notes          String?

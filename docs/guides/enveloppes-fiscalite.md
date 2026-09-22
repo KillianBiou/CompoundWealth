@@ -17,6 +17,10 @@
 
 ### Fiscalité (barème en vigueur pour les gains, sources 2026)
 
+> **Important** : la flat tax de **31,4 %** est un taux **global**, déjà composé de l'impôt sur le revenu et des prélèvements sociaux. Ce n'est **pas** 31,4 % en plus des prélèvements sociaux.
+>
+> **31,4 % = 12,8 % (impôt sur le revenu) + 18,6 % (prélèvements sociaux)**
+
 | Situation | Impôt sur le revenu | Prélèvements sociaux | Total |
 |---|---|---|---|
 | Retrait/gains **avant 5 ans** | 12,8 % | 18,6 % | **31,4 %** |
@@ -52,8 +56,18 @@
 ### Implémentation dans CompoundWealth
 
 - Champs enveloppe CTO : nom, courtier, date d'ouverture (informatif).
-- Badge : « Flat tax 31,4 % ».
+- Badge : « Flat tax 31,4 % » avec décomposition affichée systématiquement : 12,8 % IR + 18,6 % PS.
 - Le CTO est présenté comme l'enveloppe de souplesse ; le PEA comme celle de l'optimisation long terme.
+
+## 5. Recherche d'instruments (base publique)
+
+L'ajout de position propose une **recherche par identifiant/ticker** (ex. `CW8`, `AAPL`, `CW8.PA`) :
+
+- **Source** : API publique Yahoo Finance (sans clé, sans compte) — endpoints `search` et `chart`.
+- **Données récupérées** : symbole, nom long, place de cotation, type (ETF / action / obligation / fonds) et **cours actuel** (pré-remplit le prix unitaire).
+- **Base de recherche locale** : la catégorie est mappée automatiquement (ETF→ETF, EQUITY→Action, etc.).
+- **Résilience** : si l'API est indisponible ou limitée en débit (429), le formulaire reste utilisable en saisie manuelle complète — la recherche est une aide, jamais un blocage.
+- Aucune donnée n'est envoyée à un tiers tant que l'utilisateur ne recherche pas ; la requête part uniquement à la saisie (débouncée 350 ms).
 
 ## 3. Aide au choix (libellé UI)
 

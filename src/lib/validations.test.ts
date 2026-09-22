@@ -50,10 +50,27 @@ describe("envelopeSchema", () => {
 });
 
 describe("positionSchema", () => {
-  it("exige un montant strictement positif", () => {
+  it("exige un montant strictement positif quand il est fourni", () => {
     const base = { name: "CW8", category: "ETF", boughtAt: "2026-01-15" };
     expect(positionSchema.safeParse({ ...base, investedEur: 0 }).success).toBe(false);
     expect(positionSchema.safeParse({ ...base, investedEur: 100.5 }).success).toBe(true);
+  });
+  it("état des lieux : sans montant investi, quantité x prix unitaire requis", () => {
+    const base = { name: "CW8", category: "ETF", boughtAt: "2026-01-15" };
+    expect(positionSchema.safeParse({ ...base }).success).toBe(false);
+    expect(
+      positionSchema.safeParse({ ...base, quantity: 12, unitPriceEur: 70.5 }).success,
+    ).toBe(true);
+  });
+  it("quantité x prix sans montant investi est valide (snapshot)", () => {
+    const r = positionSchema.safeParse({
+      name: "CW8",
+      category: "ETF",
+      boughtAt: "2026-09-01",
+      quantity: 12,
+      unitPriceEur: 70.5,
+    });
+    expect(r.success).toBe(true);
   });
   it("rejette une date d'achat future", () => {
     const r = positionSchema.safeParse({
@@ -64,7 +81,7 @@ describe("positionSchema", () => {
     });
     expect(r.success).toBe(false);
   });
-  it("accepte une quantité optionnelle", () => {
+  it("accepte une quantité optionnelle quand le montant est fourni", () => {
     const r = positionSchema.safeParse({
       name: "AAPL",
       category: "STOCK",
