@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getEtfByIsin } from "./etf-catalog";
 
 export const signupSchema = z.object({
   email: z.email("Adresse email invalide"),
@@ -42,35 +43,18 @@ export const envelopeSchema = z.object({
   openedAt: isoDateOptional,
 });
 
-const optionalAmount = z.coerce
-  .number()
-  .positive("Doit être supérieur à 0")
-  .max(10_000_000, "Montant trop élevé")
-  .optional()
-  .or(z.literal(""));
-
 export const positionSchema = z
   .object({
-    name: z.string().trim().min(1, "Le nom/ticker est requis").max(80),
-    symbol: z.string().trim().max(20).optional().or(z.literal("")),
-    category: z.enum(["ETF", "STOCK", "BOND", "FUND", "OTHER"]),
-    investedEur: optionalAmount,
+    isin: z
+      .string()
+      .trim()
+      .refine((v) => getEtfByIsin(v) !== null, "Choisissez un ETF dans la liste"),
+    valueEur: z.coerce
+      .number()
+      .positive("La valeur doit être supérieure à 0")
+      .max(100_000_000, "Valeur trop élevée"),
     boughtAt: notFuture,
-    quantity: optionalAmount,
-    unitPriceEur: optionalAmount,
-    notes: z.string().max(500).optional().or(z.literal("")),
-  })
-  .refine(
-    (data) =>
-      data.investedEur !== undefined && data.investedEur !== "" ||
-      (data.quantity !== undefined && data.quantity !== "" &&
-        data.unitPriceEur !== undefined && data.unitPriceEur !== ""),
-    {
-      message:
-        "Renseignez le montant investi, ou la quantité et le prix unitaire (cas de l'état des lieux : uniquement la valeur actuelle)",
-      path: ["investedEur"],
-    },
-  );
+  });
 
 export const valuationSchema = z.object({
   date: notFuture,

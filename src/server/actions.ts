@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
+import { getEtfByIsin } from "@/lib/etf-catalog";
 import {
   envelopeSchema,
   loginSchema,
@@ -163,69 +164,37 @@ export async function createPositionAction(
   if (!envelope) return { message: "Enveloppe introuvable" };
 
   const parsed = positionSchema.safeParse({
-    name: str(formData, "name"),
-    symbol: str(formData, "symbol"),
-    category: str(formData, "category"),
-    investedEur: str(formData, "investedEur"),
+    isin: str(formData, "isin"),
+    valueEur: str(formData, "valueEur"),
     boughtAt: str(formData, "boughtAt"),
-    quantity: str(formData, "quantity"),
-    unitPriceEur: str(formData, "unitPriceEur"),
-    notes: str(formData, "notes"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { name, symbol, category, investedEur, boughtAt, quantity, unitPriceEur, notes } =
-    parsed.data;
-  const qty = quantity === "" || quantity === undefined ? null : Number(quantity);
-  const unitPrice =
-    unitPriceEur === "" || unitPriceEur === undefined ? null : eurosToCents(Number(unitPriceEur));
+  const { isin, valueEur, boughtAt } = parsed.data;
+  const etf = getEtfByIsin(isin);
+  if (!etf) return { errors: { isin: ["ETF introuvable dans le catalog"] } };
 
-  let investedCents: number | null = null;
-  if (investedEur !== "" && investedEur !== undefined) {
-    investedCents = eurosToCents(Number(investedEur));
-  } else if (qty !== null && unitPrice !== null) {
-    investedCents = Math.round(qty * unitPrice);
-  }
+  const valueCents = eurosToCents(valueEur);
+  const date = new Date(boughtAt);
 
   const position = await prisma.position.create({
     data: {
       envelopeId,
-      name,
-      symbol: symbol || null,
-      category,
-      investedCents,
-      boughtAt: new Date(boughtAt),
-      quantity: qty,
-      unitPriceCents: unitPrice,
-      notes: notes || null,
+      name: `${etf.ticker} — ${etf.name}`,
+      symbol: etf.ticker,
+      category: "ETF",
+      investedCents: null,
+      boughtAt: date,
     },
   });
 
-  // État des lieux : valorisation initiale = montant investi connu, ou fournie séparément
-  const initialValuationEur = str(formData, "initialValueEur");
-  if (
-    initialValuationEur !== "" &&
-    !Number.isNaN(Number(initialValuationEur)) &&
-    Number(initialValuationEur) >= 0
-  ) {
-    const date = new Date(boughtAt);
-    await prisma.positionValuation.upsert({
-      where: { positionId_date: { positionId: position.id, date } },
-      create: {
-        positionId: position.id,
-        date,
-        valueCents: eurosToCents(Number(initialValuationEur)),
-      },
-      update: { valueCents: eurosToCents(Number(initialValuationEur)) },
-    });
-  } else if (investedCents !== null) {
-    const date = new Date(boughtAt);
-    await prisma.positionValuation.upsert({
-      where: { positionId_date: { positionId: position.id, date } },
-      create: { positionId: position.id, date, valueCents: investedCents },
-      update: { valueCents: investedCents },
-    });
-  }
+  await prisma.positionValuation.create({
+    data: {
+      positionId: position.id,
+      date,
+      valueCents,
+    },
+  });
 
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");

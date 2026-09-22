@@ -55,24 +55,19 @@ Pour un PEA, l'app affiche ensuite en permanence : **Versements cumulés / 150 0
 
 Dans l'enveloppe → **+ Ajouter une position** :
 
-1. **Recherche par identifiant / ticker** (ex. `CW8`, `AAPL`, `CW8.PA`) : une liste de suggestions apparaît avec le nom, la place de cotation et le type. En sélectionnant une ligne, le nom, la catégorie et le **cours actuel** sont pré-remplis depuis une base publique (Yahoo Finance). Vous pouvez aussi tout saisir manuellement.
-2. Complétez :
-   - **Nom affiché** (requis)
-   - **Catégorie** — ETF, Action, Obligation, Fonds, Autre (auto si recherche utilisée)
-   - **Montant investi** (requis, > 0)
-   - **Date d'achat** (requis)
-   - Quantité et prix unitaire (optionnels)
+1. **Recherche par nom ou ISIN** dans le catalog des ETF éligibles au PEA (ex. `CW8`, `MSCI World`, `LU1681043599`). La liste affiche le ticker, la catégorie d'indice, le TER, le nom et l'ISIN de chaque ETF.
+2. Saisissez la **valeur actuelle de la position** (€) — pas de nombre de parts ni de cours unitaire : la valeur de la ligne à l'instant T.
+3. Renseignez la **date de l'état des lieux**.
 
-Le montant investi alimente automatiquement le « total investi » de l'enveloppe. Les montants sont en euros ; c'est la valeur que vous avez réellement investie, frais inclus.
+L'ajout se fait en deux valeurs : l'ETF depuis le catalog, la valeur en euros. Aucun montant investi historique n'est demandé — la variation et les détails de la valeur viendront plus tard.
 
 ### « J'arrive en cours » — état des lieux d'une enveloppe existante
 
-Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Cochez **« J'arrive en cours »** lors de l'ajout :
+Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Le formulaire d'ajout est pensé exactement pour ce cas :
 
-- Renseignez la **quantité détenue** et le **cours actuel** (pré-rempli si trouvé via la recherche), ou directement la **valeur totale de la ligne** à l'instant T.
+- Sélectionnez votre ETF dans la liste, puis renseignez directement la **valeur totale de la ligne** à l'instant T.
 - Aucun montant investi n'est requis : la position est créée en « état des lieux », avec sa valeur actuelle.
 - Les KPIs de gain/perte affichent alors « — » avec la mention *état des lieux* tant que les montants investis ne sont pas renseignés.
-- Vous pouvez compléter le montant investi plus tard (édition de la position) pour activer le suivi du gain.
 
 L'important est de pouvoir **commencer à suivre la valeur dès aujourd'hui** sans devoir reconstituer tout l'historique fiscal.
 

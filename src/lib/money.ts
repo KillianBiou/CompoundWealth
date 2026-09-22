@@ -32,6 +32,13 @@ export function formatEurCentsCompact(cents: number): string {
   return eurCompactFormatter.format(cents / 100);
 }
 
+export function formatRate(ratio: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(ratio);
+}
+
 export function formatPercent(ratio: number): string {
   const formatted = new Intl.NumberFormat("fr-FR", {
     style: "percent",
