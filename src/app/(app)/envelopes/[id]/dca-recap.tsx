@@ -15,8 +15,9 @@ import {
 import { BarChart3, CalendarClock, Coins, PieChart as PieChartIcon, LayoutGrid } from "lucide-react";
 import type { DcaWindowSummary } from "@/lib/dca";
 import { formatEurCents, formatEurCentsCompact } from "@/lib/money";
-import { cn } from "@/components/ui";
+
 import type { DcaSlice } from "./dca-section";
+import { cn } from "@/components/cn";
 
 type PeriodKey = "1m" | "3m" | "1y";
 

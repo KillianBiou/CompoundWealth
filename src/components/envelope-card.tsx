@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { EnvelopeSummary } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
-import { Badge, Card, cn } from "./ui";
+import { Badge, Card } from "./ui";
+import { cn } from "./cn";
 
 export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
   const gain = envelope.gainCents;

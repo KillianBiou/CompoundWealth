@@ -1,7 +1,8 @@
 "use client";
 
 import { deleteDcaLineAction, toggleDcaLineAction } from "@/server/actions";
-import { cn } from "@/components/ui";
+import { cn } from "@/components/cn";
+
 
 export interface DcaTableRow {
   id: string;

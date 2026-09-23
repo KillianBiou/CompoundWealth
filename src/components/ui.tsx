@@ -3,12 +3,8 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "./cn";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
