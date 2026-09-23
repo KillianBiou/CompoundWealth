@@ -10,6 +10,7 @@ import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 import { EnvelopeDangerZone } from "./danger-zone";
 import { RefreshPricesButton } from "./refresh-prices-button";
+import { RebuildHistoryButton } from "./rebuild-history-button";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -143,7 +144,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
               subTone={gainCents >= 0 ? "positive" : "negative"}
             />
-            <RefreshPricesButton envelopeId={envelope.id} />
+            <div className="flex gap-2"><RebuildHistoryButton envelopeId={envelope.id} /><RefreshPricesButton envelopeId={envelope.id} /></div>
           </div>
         ) : (
           <div className="flex items-start justify-between gap-3">
@@ -152,7 +153,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               value="—"
               sub="Complétez les montants investis pour calculer le gain"
             />
-            <RefreshPricesButton envelopeId={envelope.id} />
+            <div className="flex gap-2"><RebuildHistoryButton envelopeId={envelope.id} /><RefreshPricesButton envelopeId={envelope.id} /></div>
           </div>
         )}
       </Card>
