@@ -81,6 +81,10 @@ export const getEnvelope = cache(async (envelopeId: string) => {
         },
         orderBy: { boughtAt: "desc" },
       },
+      dcaPlans: {
+        include: { lines: true },
+        orderBy: { createdAt: "asc" },
+      },
       valuations: { orderBy: { date: "asc" } },
     },
   });
