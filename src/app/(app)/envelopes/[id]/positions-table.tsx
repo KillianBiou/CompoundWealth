@@ -1,5 +1,5 @@
 import { deletePositionAction } from "@/server/actions";
-import { formatEurCents } from "@/lib/money";
+import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
 
@@ -76,7 +76,7 @@ export function PositionsTable({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.investedCents !== null ? (
-                      <span className="font-semibold text-positive">
+                      <span className="font-semibold text-text-secondary">
                         {formatEurCents(p.investedCents)}
                       </span>
                     ) : (
@@ -84,19 +84,41 @@ export function PositionsTable({
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {p.currentValueCents !== null ? (
-                      <span className="font-semibold text-text-primary">
-                        {formatEurCents(p.currentValueCents)}
-                        {p.valuationDate ? (
-                          <span className="block text-xs font-normal text-text-muted">
-                            {p.valuationDate.toLocaleDateString("fr-FR")}
-                            {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
+                    {(() => {
+                      if (p.currentValueCents === null) {
+                        return <span className="text-text-muted">—</span>;
+                      }
+                      const gainCents =
+                        p.investedCents !== null ? p.currentValueCents - p.investedCents : null;
+                      const gainRatio =
+                        gainCents !== null && p.investedCents && p.investedCents > 0
+                          ? gainCents / p.investedCents
+                          : null;
+                      const tone =
+                        gainCents === null || gainCents === 0
+                          ? "text-text-primary"
+                          : gainCents > 0
+                            ? "text-positive"
+                            : "text-negative";
+                      return (
+                        <span className={`font-semibold ${tone}`}>
+                          {formatEurCents(p.currentValueCents)}
+                          {gainRatio !== null ? (
+                            <span
+                              className={`block text-xs font-normal ${gainCents === 0 ? "text-text-muted" : tone}`}
+                            >
+                              ({formatPercent(gainRatio)})
+                            </span>
+                          ) : null}
+                          {p.valuationDate ? (
+                            <span className="block text-xs font-normal text-text-muted">
+                              {p.valuationDate.toLocaleDateString("fr-FR")}
+                              {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-text-secondary tabular-nums">
                     {p.boughtAt.toLocaleDateString("fr-FR")}
@@ -107,7 +129,7 @@ export function PositionsTable({
                       <input type="hidden" name="envelopeId" value={envelopeId} />
                       <button
                         type="submit"
-                        className="text-xs text-text-muted transition-colors hover:text-negative"
+                        className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-negative/60 hover:text-negative"
                       >
                         Supprimer
                       </button>

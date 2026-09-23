@@ -215,6 +215,31 @@ describe("DcaSection", () => {
     );
   });
 
+  it("donne aux boutons pause/supprimer l'apparence d'éléments cliquables", () => {
+    render(
+      <DcaSection
+        envelopeId="env-1"
+        envelopeType="PEA"
+        plans={[
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
+        ]}
+        positions={positions}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Mettre en pause" })).toHaveClass(
+      "cursor-pointer",
+    );
+    expect(screen.getByRole("button", { name: "Supprimer" })).toHaveClass("cursor-pointer");
+  });
+
   it("affiche la répartition avec le ticker de chaque position", () => {
     render(
       <DcaSection
