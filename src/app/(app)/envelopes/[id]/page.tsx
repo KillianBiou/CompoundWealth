@@ -118,7 +118,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             <Badge tone={antiquity.acquired ? "positive" : "neutral"}>
               {antiquity.acquired
                 ? "Antériorité fiscale acquise ✓"
-                : `Antériorité : ${antiquity.yearsRemaining} an${antiquity.yearsRemaining! > 1 ? "s" : ""} restant${antiquity.yearsRemaining! > 1 ? "s" : ""}`}
+                : `Antériorité : ${antiquity.remainingLabel}`}
             </Badge>
           ) : (
             <Badge tone="neutral">Date d&apos;ouverture à renseigner pour l&apos;antériorité</Badge>
