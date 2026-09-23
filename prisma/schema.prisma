@@ -35,6 +35,7 @@ model Envelope {
   lastPriceRefreshAt DateTime?
   positions   Position[]
   valuations  EnvelopeValuation[]
+  dcaPlans    DcaPlan[]
 
   @@index([userId])
 }
@@ -42,6 +43,13 @@ model Envelope {
 enum EnvelopeType {
   PEA
   CTO
+}
+
+enum DcaFrequency {
+  BIWEEKLY
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
 }
 
 model Position {
@@ -102,4 +110,30 @@ model PositionInvestment {
   amountCents Int
 
   @@index([positionId])
+}
+
+model DcaPlan {
+  id         String       @id @default(cuid())
+  envelopeId String
+  envelope   Envelope     @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  frequency  DcaFrequency
+  startDate  DateTime
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  lines      DcaLine[]
+
+  @@index([envelopeId])
+}
+
+model DcaLine {
+  id             String   @id @default(cuid())
+  planId         String
+  plan           DcaPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  isin           String
+  name           String
+  maxAmountCents Int
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@index([planId])
 }

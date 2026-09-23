@@ -10,7 +10,8 @@ import {
   type ImportPreviewEnvelope,
 } from "@/server/actions";
 import { formatEurCents } from "@/lib/money";
-import { Badge, Button, Card, cn } from "@/components/ui";
+import { Badge, Button, Card } from "@/components/ui";
+import { cn } from "@/components/cn";
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

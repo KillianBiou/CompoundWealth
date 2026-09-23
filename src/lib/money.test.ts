@@ -3,6 +3,7 @@ import {
   centsToEuros,
   eurosToCents,
   formatEurCents,
+  formatEurCentsCompact,
   formatPercent,
 } from "./money";
 
@@ -86,5 +87,23 @@ describe("préférences", () => {
   it("exposent les devises et locales supportées", () => {
     expect(CURRENCIES.map((c) => c.code)).toContain("EUR");
     expect(NUMBER_LOCALES.map((l) => l.code)).toEqual(["fr", "en"]);
+  });
+});
+
+describe("formatEurCentsCompact (déterministe, sans ICU compact)", () => {
+  it("affiche 12 k€ pour 1 200 € — identique serveur/client (pas d'ICU)", () => {
+    expect(formatEurCentsCompact(1_200_000)).toBe("12 k€");
+  });
+  it("affiche 1 440 € sous 10 000 € avec séparateur fin", () => {
+    expect(formatEurCentsCompact(144_000)).toBe("1\u202f440 €");
+  });
+  it("affiche 172,8 k€ avec décimale utile", () => {
+    expect(formatEurCentsCompact(17_280_000)).toBe("172,8 k€");
+  });
+  it("affiche 1,5 M€ au-delà du million", () => {
+    expect(formatEurCentsCompact(150_000_000)).toBe("1,5 M€");
+  });
+  it("gère les négatifs", () => {
+    expect(formatEurCentsCompact(-1_200_000)).toBe("−12 k€");
   });
 });

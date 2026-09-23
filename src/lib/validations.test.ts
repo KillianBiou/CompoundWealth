@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createDcaSchema,
   depositsSchema,
   envelopeSchema,
   positionSchema,
@@ -82,5 +83,63 @@ describe("depositsSchema", () => {
   });
   it("rejette un montant au-delà du plafond", () => {
     expect(depositsSchema.safeParse({ depositsEur: 500_001 }).success).toBe(false);
+  });
+});
+describe("createDcaSchema", () => {
+  const base = {
+    frequency: "MONTHLY" as const,
+    startDate: "2026-10-02",
+    lines: [{ isin: "LU1681043599", maxAmountEur: 1500 }],
+  };
+  it("accepte un plan valide avec plusieurs lignes", () => {
+    const result = createDcaSchema.safeParse({
+      ...base,
+      lines: [
+        { isin: "LU1681043599", maxAmountEur: 1500 },
+        { isin: "FR001400U5Q4", maxAmountEur: 500 },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+  it("accepte les quatre périodicités", () => {
+    for (const frequency of ["BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY"] as const) {
+      expect(createDcaSchema.safeParse({ ...base, frequency }).success).toBe(true);
+    }
+  });
+  it("rejette une périodicité inconnue", () => {
+    expect(createDcaSchema.safeParse({ ...base, frequency: "WEEKLY" }).success).toBe(false);
+  });
+  it("accepte une date de départ future", () => {
+    expect(createDcaSchema.safeParse({ ...base, startDate: "2099-01-01" }).success).toBe(true);
+  });
+  it("rejette une liste vide", () => {
+    expect(createDcaSchema.safeParse({ ...base, lines: [] }).success).toBe(false);
+  });
+  it("rejette un montant nul ou négatif", () => {
+    expect(
+      createDcaSchema.safeParse({ ...base, lines: [{ isin: "LU1681043599", maxAmountEur: 0 }] })
+        .success,
+    ).toBe(false);
+  });
+  it("rejette un ISIN hors catalog", () => {
+    expect(
+      createDcaSchema.safeParse({ ...base, lines: [{ isin: "US0378331005", maxAmountEur: 100 }] })
+        .success,
+    ).toBe(false);
+  });
+  it("rejette les doublons de titre avec l'index de la ligne", () => {
+    const result = createDcaSchema.safeParse({
+      ...base,
+      lines: [
+        { isin: "LU1681043599", maxAmountEur: 1500 },
+        { isin: "LU1681043599", maxAmountEur: 500 },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message === "Ce titre est déjà dans la liste")).toBe(
+        true,
+      );
+    }
   });
 });

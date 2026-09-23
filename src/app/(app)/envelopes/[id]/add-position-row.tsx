@@ -6,13 +6,16 @@ import { Plus, Search, X } from "lucide-react";
 import { createPositionAction, type ActionState } from "@/server/actions";
 import { searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-catalog";
 import { formatRate } from "@/lib/money";
-import { Badge, Button, Input, cn } from "@/components/ui";
+import { Badge, Button, Input } from "@/components/ui";
+import { useActionToast } from "@/components/use-action-toast";
+import { cn } from "@/components/cn";
 
 export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(
     createPositionAction,
     {},
   );
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<EtfCatalogEntry | null>(null);
@@ -32,6 +35,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
     setSelected(null);
     setQuery("");
   };
+  useActionToast(state, reset);
 
   if (!open) {
     return (
@@ -162,11 +166,6 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
           </p>
         )}
 
-        {state?.message ? (
-          <p role="status" className="text-sm text-positive">
-            {state.message}
-          </p>
-        ) : null}
         {state?.errors?.form ? (
           <p role="alert" className="text-sm text-negative">
             {state.errors.form[0]}

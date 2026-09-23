@@ -134,3 +134,150 @@ describe("investedSeries", () => {
     ]);
   });
 });
+
+import { aggregateSeries } from "./series";
+
+describe("aggregateSeries", () => {
+  it("agrège plusieurs enveloppes en sommant les dernières valeurs connues", () => {
+    const a = [
+      { date: d("2026-01-01"), valueCents: 10_000 },
+      { date: d("2026-03-01"), valueCents: 12_000 },
+    ];
+    const b = [
+      { date: d("2026-02-01"), valueCents: 5_000 },
+      { date: d("2026-03-01"), valueCents: 6_000 },
+    ];
+    const points = aggregateSeries([a, b]);
+    expect(points.map((p) => p.date.toISOString().slice(0, 10))).toEqual([
+      "2026-01-01",
+      "2026-02-01",
+      "2026-03-01",
+    ]);
+    expect(points.map((p) => p.valueCents)).toEqual([10_000, 15_000, 18_000]);
+  });
+
+  it("interpole à plat une enveloppe sans point à une date donnée", () => {
+    const a = [
+      { date: d("2026-01-01"), valueCents: 10_000 },
+      { date: d("2026-04-01"), valueCents: 20_000 },
+    ];
+    const b = [{ date: d("2026-02-01"), valueCents: 5_000 }];
+    const points = aggregateSeries([a, b]);
+    expect(points.map((p) => p.valueCents)).toEqual([10_000, 15_000, 25_000]);
+  });
+
+  it("ignore les séries vides", () => {
+    const a = [{ date: d("2026-01-01"), valueCents: 10_000 }];
+    expect(aggregateSeries([a, []])).toEqual(a);
+    expect(aggregateSeries([[], []])).toEqual([]);
+  });
+});
+
+import { buildEnvelopeInvestedSeries } from "./series";
+
+describe("buildEnvelopeInvestedSeries", () => {
+  it("utilise l'historique détaillé des versements quand il existe", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 10_000,
+        boughtAt: d("2026-01-01"),
+        investments: [
+          { date: d("2026-02-01"), amountCents: 6_000 },
+          { date: d("2026-03-01"), amountCents: 4_000 },
+        ],
+      },
+    ]);
+    expect(points).toEqual([
+      { date: d("2026-02-01"), valueCents: 6_000 },
+      { date: d("2026-03-01"), valueCents: 10_000 },
+    ]);
+  });
+
+  it("retombe sur le montant investi à la date d'achat sans historique", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 10_000,
+        boughtAt: d("2026-01-15"),
+        investments: [],
+      },
+    ]);
+    expect(points).toEqual([{ date: d("2026-01-15"), valueCents: 10_000 }]);
+  });
+
+  it("ignore les positions en état des lieux sans historique", () => {
+    expect(
+      buildEnvelopeInvestedSeries([
+        { investedCents: null, boughtAt: d("2026-01-15"), investments: [] },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("cumule les versements de plusieurs positions", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 5_000,
+        boughtAt: d("2026-01-01"),
+        investments: [{ date: d("2026-02-01"), amountCents: 5_000 }],
+      },
+      {
+        investedCents: 3_000,
+        boughtAt: d("2026-02-01"),
+        investments: [{ date: d("2026-02-01"), amountCents: 3_000 }],
+      },
+    ]);
+    expect(points).toEqual([{ date: d("2026-02-01"), valueCents: 8_000 }]);
+  });
+});
+
+import { periodPerformance } from "./series";
+
+describe("periodPerformance", () => {
+  const now = d("2026-12-31");
+  const valuations = [
+    { date: d("2026-01-01"), valueCents: 10_000 },
+    { date: d("2026-06-30"), valueCents: 60_000 },
+    { date: d("2026-12-31"), valueCents: 130_000 },
+  ];
+  const invested = [
+    { date: d("2026-01-01"), valueCents: 10_000 },
+    { date: d("2026-06-30"), valueCents: 110_000 },
+  ];
+
+  it("sur tout l'historique : gain = valeur finale − total investi", () => {
+    const result = periodPerformance(valuations, invested, "all", now);
+    expect(result.gainCents).toBe(130_000 - 110_000);
+    expect(result.ratio).toBeCloseTo(20_000 / 110_000, 5);
+  });
+
+  it("sur 6 mois : exclut les versements de la période du gain", () => {
+    const investedLate = [
+      { date: d("2026-01-01"), valueCents: 10_000 },
+      { date: d("2026-08-01"), valueCents: 110_000 },
+    ];
+    const result = periodPerformance(valuations, investedLate, "6m", now);
+    // Δvaleur = 70 000, Δinvesti = 100 000 → gain = −30 000 sur 10 000 investis au début
+    expect(result.gainCents).toBe(130_000 - 60_000 - (110_000 - 10_000));
+    expect(result.ratio).toBe(-30_000 / 10_000);
+  });
+
+  it("sans historique d'investissement : repli sur la variation de valeur", () => {
+    const result = periodPerformance(valuations, [], "all", now);
+    expect(result.gainCents).toBe(130_000 - 10_000);
+    expect(result.ratio).toBeCloseTo(120_000 / 10_000, 5);
+  });
+
+  it("retourne null sans valorisations", () => {
+    expect(periodPerformance([], [], "all", now)).toEqual({ gainCents: null, ratio: null });
+  });
+
+  it("période sans point antérieur : part de 0 investi", () => {
+    const short = [
+      { date: d("2026-12-02"), valueCents: 5_000 },
+      { date: d("2026-12-31"), valueCents: 7_000 },
+    ];
+    const shortInvested = [{ date: d("2026-12-05"), valueCents: 5_000 }];
+    const result = periodPerformance(short, shortInvested, "1m", now);
+    expect(result.gainCents).toBe(7_000 - 0 - 5_000);
+    expect(result.ratio).toBeCloseTo(2_000 / 5_000, 5);
+  });
+});

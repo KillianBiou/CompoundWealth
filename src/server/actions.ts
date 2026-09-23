@@ -8,6 +8,7 @@ import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
+  createDcaSchema,
   envelopeSchema,
   loginSchema,
   positionSchema,
@@ -382,6 +383,87 @@ export async function createPositionAction(
   };
 }
 
+export async function createDcaAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const envelopeId = str(formData, "envelopeId");
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId: session.userId },
+  });
+  if (!envelope) return { message: "Enveloppe introuvable" };
+  const rawLines = formData.getAll("lines").map((v) => String(v));
+  const parsed = createDcaSchema.safeParse({
+    frequency: str(formData, "frequency"),
+    startDate: str(formData, "startDate"),
+    lines: rawLines.map((line) => {
+      try {
+        return JSON.parse(line) as { isin: string; maxAmountEur: number | string };
+      } catch {
+        return { isin: "invalide", maxAmountEur: "invalide" };
+      }
+    }),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const { frequency, startDate, lines } = parsed.data;
+  const plan = await prisma.dcaPlan.create({
+    data: {
+      envelopeId,
+      frequency,
+      startDate: new Date(startDate),
+      active: true,
+      lines: {
+        create: lines.map((line) => {
+          const etf = getEtfByIsin(line.isin)!;
+          return {
+            isin: etf.isin,
+            name: `${etf.ticker} — ${etf.name}`,
+            maxAmountCents: eurosToCents(line.maxAmountEur),
+            active: true,
+          };
+        }),
+      },
+    },
+    include: { lines: true },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  return {
+    message:
+      lines.length === 1
+        ? `DCA créé : ${plan.lines[0].name}`
+        : `Plan DCA créé : ${lines.length} titres`,
+  };
+}
+
+export async function toggleDcaLineAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const lineId = String(formData.get("lineId") ?? "");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  const line = await prisma.dcaLine.findFirst({
+    where: { id: lineId, plan: { envelope: { userId: session.userId } } },
+  });
+  if (!line) return;
+  await prisma.dcaLine.update({
+    where: { id: line.id },
+    data: { active: !line.active },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+}
+
+export async function deleteDcaLineAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const lineId = String(formData.get("lineId") ?? "");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  await prisma.dcaLine.deleteMany({
+    where: { id: lineId, plan: { envelope: { userId: session.userId } } },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+}
+
 export async function deletePositionAction(formData: FormData): Promise<void> {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -680,6 +762,92 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
     };
   }
   return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
+}
+
+/**
+ * Actualise les prix de toutes les enveloppes actives de l'utilisateur.
+ * Respecte le cooldown de 5 min par enveloppe (les enveloppes récemment
+ * actualisées sont ignorées), espace les requêtes Yahoo de ~1 s et collecte
+ * les échecs par position pour un retour détaillé.
+ */
+export async function refreshAllPricesAction(): Promise<{
+  message?: string;
+  errors?: { form?: string[]; skipped?: string[]; failures?: string[] };
+}> {
+  const userId = await requireUserId();
+  const envelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null },
+    include: { positions: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (envelopes.length === 0) return { errors: { form: ["Aucune enveloppe active"] } };
+  const now = Date.now();
+  const skipped: string[] = [];
+  const failures: string[] = [];
+  const refreshedEnvelopes: { id: string; name: string }[] = [];
+  let updated = 0;
+  let firstRequest = true;
+  for (const envelope of envelopes) {
+    const onCooldown =
+      envelope.lastPriceRefreshAt !== null &&
+      now - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS;
+    const refreshable = envelope.positions.filter(
+      (p) => p.symbol?.trim() && p.quantity !== null,
+    );
+    if (onCooldown || refreshable.length === 0) {
+      if (refreshable.length > 0) skipped.push(envelope.name);
+      continue;
+    }
+    for (const position of refreshable) {
+      if (!firstRequest) await new Promise((resolve) => setTimeout(resolve, 1000));
+      firstRequest = false;
+      const quote = await fetchMarketQuote(position.symbol!.trim());
+      if (!quote.ok) {
+        failures.push(`${envelope.name} · ${position.name} (${quote.reason})`);
+        continue;
+      }
+      const valueCents = Math.round(position.quantity! * quote.priceCents);
+      const valuationDate = new Date();
+      await prisma.positionValuation.upsert({
+        where: { positionId_date: { positionId: position.id, date: valuationDate } },
+        create: {
+          positionId: position.id,
+          date: valuationDate,
+          valueCents,
+          source: "yahoo",
+        },
+        update: { valueCents, source: "yahoo" },
+      });
+      updated += 1;
+    }
+    await prisma.envelope.update({
+      where: { id: envelope.id },
+      data: { lastPriceRefreshAt: new Date() },
+    });
+    refreshedEnvelopes.push({ id: envelope.id, name: envelope.name });
+  }
+  if (updated === 0) {
+    return {
+      errors: {
+        form: [
+          skipped.length > 0
+            ? `Aucun prix actualisé — ${skipped.length} enveloppe${skipped.length > 1 ? "s" : ""} récemment actualisée${skipped.length > 1 ? "s" : ""}`
+            : "Aucun prix récupéré",
+        ],
+        skipped,
+        failures,
+      },
+    };
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  for (const envelope of refreshedEnvelopes) {
+    revalidatePath(`/envelopes/${envelope.id}`);
+  }
+  return {
+    message: `${updated} prix actualisé${updated > 1 ? "s" : ""} sur ${refreshedEnvelopes.length} enveloppe${refreshedEnvelopes.length > 1 ? "s" : ""}`,
+    errors: skipped.length > 0 || failures.length > 0 ? { skipped, failures } : undefined,
+  };
 }
 
 export async function rebuildHistoryAction(envelopeId: string): Promise<ActionState> {

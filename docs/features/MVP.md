@@ -208,4 +208,4 @@ Voir [docs/design/USAGE_GUIDE.md](../design/USAGE_GUIDE.md) (parcours utilisateu
 
 ## 7. Idées pour la suite (hors V1)
 
-Projets d'investissement récurrents (DCA), objectifs de patrimoine, dividendes/coupons, PEA-PME et assurance-vie, multi-devises, export CSV, mode démo, agrégation automatique de comptes.
+Projets d'investissement récurrents — **désormais spécifié : [docs/features/DCA.md](DCA.md)** —, objectifs de patrimoine, dividendes/coupons, PEA-PME et assurance-vie, multi-devises, export CSV, mode démo, agrégation automatique de comptes.

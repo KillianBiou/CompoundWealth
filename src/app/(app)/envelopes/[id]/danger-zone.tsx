@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { deleteEnvelopeAction } from "@/server/actions";
+import { useToast } from "@/components/toast";
 import { Button, Card } from "@/components/ui";
 
 export function EnvelopeDangerZone({
@@ -12,6 +13,19 @@ export function EnvelopeDangerZone({
   envelopeName: string;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const toast = useToast();
+
+  const remove = () => {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("envelopeId", envelopeId);
+      await deleteEnvelopeAction(formData);
+      toast.success(`Enveloppe ${envelopeName} supprimée`, {
+        details: ["Positions, valorisations et historique effacés définitivement."],
+      });
+    });
+  };
 
   if (!confirming) {
     return (
@@ -27,7 +41,6 @@ export function EnvelopeDangerZone({
       </Card>
     );
   }
-
   return (
     <Card className="border-negative/60">
       <h2 className="font-heading text-lg font-semibold text-negative">
@@ -41,12 +54,9 @@ export function EnvelopeDangerZone({
         <Button variant="ghost" type="button" onClick={() => setConfirming(false)}>
           Annuler
         </Button>
-        <form action={deleteEnvelopeAction}>
-          <input type="hidden" name="envelopeId" value={envelopeId} />
-          <Button variant="danger" type="submit">
-            Oui, supprimer définitivement
-          </Button>
-        </form>
+        <Button variant="danger" type="button" disabled={pending} onClick={remove}>
+          {pending ? "Suppression…" : "Oui, supprimer définitivement"}
+        </Button>
       </div>
     </Card>
   );
