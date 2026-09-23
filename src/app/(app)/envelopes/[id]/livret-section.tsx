@@ -83,13 +83,14 @@ export function LivretSection({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />
           <div>
             <p className="text-sm font-semibold text-negative">
-              {formatEurCents(overCapCents)} hors livret — au-delà du plafond de versement de 22 950 €
+              {formatEurCents(overCapCents)} au-dessus du plafond de 22 950 €
             </p>
             <p className="mt-0.5 text-xs text-text-secondary">
-              La banque refuse tout versement au-delà du plafond : cette somme reste sur votre
-              compte courant, rémunérée à un taux très faible (voire nul). Très nocif pour votre
-              épargne : placez-la sur un support rémunéré (autre livret réglementé, fonds
-              euros…).
+              Seuls les intérêts capitalisés peuvent porter le solde au-delà du plafond — les
+              versements y sont bloqués. Si ce solde dépasse le plafond par vos versements
+              historiques, le surplus est suivi hors livret : rémunération très faible, nocif
+              pour votre épargne. Placez-le sur un support rémunéré (autre livret réglementé,
+              fonds euros…).
             </p>
           </div>
         </div>

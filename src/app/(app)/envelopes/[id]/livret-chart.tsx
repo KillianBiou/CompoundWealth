@@ -55,8 +55,8 @@ function ChartTooltip({
       </p>
       {point.overCap > 0 ? (
         <p className="mt-1 rounded bg-negative/10 px-1.5 py-1 tabular-nums text-negative">
-          {formatEurCents(point.overCap * 100)} refusés au-delà du plafond — hors livret,
-          rémunération très faible
+          {formatEurCents(point.overCap * 100)} au-dessus du plafond de versement — suivis
+          hors livret, rémunération très faible
         </p>
       ) : null}
     </div>
@@ -107,7 +107,7 @@ export function LivretChart({
         </label>
         {hasOverCap ? (
           <span className="rounded-full bg-negative/10 px-2.5 py-0.5 text-xs font-medium text-negative">
-            ⚠ Versements refusés au-delà du plafond — hors livret
+            ⚠ Solde au-dessus du plafond — seuls les intérêts peuvent y figurer
           </span>
         ) : null}
       </div>
