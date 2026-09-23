@@ -316,34 +316,32 @@ export function WealthChart({
             />
             <Tooltip content={<ChartTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
-            {hasSavings ? (
-              <Area
-                type="monotone"
-                dataKey="savings"
-                stackId="wealth"
-                name="Épargne (livrets)"
-                stroke="var(--info)"
-                strokeWidth={2}
-                fill="url(#savingsGradient)"
-                isAnimationActive
-                animationDuration={400}
-                connectNulls
-              />
-            ) : null}
-            {hasEquity ? (
-              <Area
-                type="monotone"
-                dataKey="equity"
-                stackId="wealth"
-                name="Actions / ETF"
-                stroke="var(--positive)"
-                strokeWidth={2}
-                fill="url(#equityGradient)"
-                isAnimationActive
-                animationDuration={400}
-                connectNulls
-              />
-            ) : null}
+            <Area
+              type="monotone"
+              dataKey="savings"
+              stackId="wealth"
+              name="Épargne (livrets)"
+              stroke="var(--info)"
+              strokeWidth={2}
+              fill="url(#savingsGradient)"
+              isAnimationActive
+              animationDuration={400}
+              connectNulls
+              hide={!hasSavings}
+            />
+            <Area
+              type="monotone"
+              dataKey="equity"
+              stackId="wealth"
+              name="Actions / ETF"
+              stroke="var(--positive)"
+              strokeWidth={2}
+              fill="url(#equityGradient)"
+              isAnimationActive
+              animationDuration={400}
+              connectNulls
+              hide={!hasEquity}
+            />
             <Line
               type="monotone"
               dataKey="investedDisplay"
