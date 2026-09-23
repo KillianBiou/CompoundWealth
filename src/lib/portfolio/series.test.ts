@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEnvelopeSeries,
+  buildEnvelopeValuations,
   currentValueCents,
   investedBefore,
   valueAt,
@@ -36,12 +37,30 @@ describe("buildEnvelopeSeries", () => {
   });
   it("échantillonne depuis la période demandée avec point d'ancrage interpolé", () => {
     const series = buildEnvelopeSeries(valuations, 0, null, d("2026-09-22"), "6m");
-    const start = d("2026-03-22");
+    const start = d("2026-03-24");
     expect(series[0].date.toDateString()).toBe(start.toDateString());
     expect(series[0].known).toBe(false);
     expect(series[0].valueCents).toBe(110_000);
     expect(series).toHaveLength(2);
     expect(series[1].valueCents).toBe(130_000);
+  });
+
+  it("couvre les nouvelles périodes courtes (1 semaine, 1 mois, 2 ans)", () => {
+    const now = d("2026-09-22");
+    const shortSeries = buildEnvelopeSeries(valuations, 0, null, now, "1w");
+    expect(shortSeries).toHaveLength(1);
+    expect(shortSeries[0].valueCents).toBe(130_000);
+
+    const monthSeries = buildEnvelopeSeries(valuations, 0, null, now, "1m");
+    expect(monthSeries).toHaveLength(2);
+    expect(monthSeries[0].known).toBe(false);
+    expect(monthSeries[0].valueCents).toBe(110_000);
+    expect(monthSeries[1].known).toBe(true);
+    expect(monthSeries[1].valueCents).toBe(130_000);
+
+    const twoYears = buildEnvelopeSeries(valuations, 0, null, now, "2y");
+    expect(twoYears).toHaveLength(3);
+    expect(twoYears.every((p) => p.known)).toBe(true);
   });
   it("série vide sans valorisation", () => {
     expect(buildEnvelopeSeries([], 0, null)).toHaveLength(0);
@@ -67,5 +86,51 @@ describe("investedBefore", () => {
     ];
     expect(investedBefore(positions, d("2026-03-01"))).toBe(10_000);
     expect(investedBefore(positions, d("2026-12-31"))).toBe(15_000);
+  });
+});
+
+describe("buildEnvelopeValuations", () => {
+  const d = (s: string) => new Date(s);
+  it("agrège les valorisations de positions par date", () => {
+    const points = buildEnvelopeValuations([
+      {
+        valuations: [
+          { date: d("2026-01-01"), valueCents: 10_000 },
+          { date: d("2026-03-01"), valueCents: 11_000 },
+        ],
+      },
+      {
+        valuations: [
+          { date: d("2026-02-01"), valueCents: 5_000 },
+          { date: d("2026-03-01"), valueCents: 6_000 },
+        ],
+      },
+    ]);
+    expect(points.map((p) => p.date.toISOString().slice(0, 10))).toEqual([
+      "2026-01-01",
+      "2026-02-01",
+      "2026-03-01",
+    ]);
+    expect(points.map((p) => p.valueCents)).toEqual([10_000, 15_000, 17_000]);
+  });
+  it("retourne une liste vide sans positions valorisées", () => {
+    expect(buildEnvelopeValuations([])).toEqual([]);
+    expect(buildEnvelopeValuations([{ valuations: [] }])).toEqual([]);
+  });
+});
+
+import { investedSeries } from "./series";
+
+describe("investedSeries", () => {
+  it("cumule les versements par date", () => {
+    const points = investedSeries([
+      { date: d("2026-02-01"), amountCents: 10_000 },
+      { date: d("2026-01-01"), amountCents: 5_000 },
+      { date: d("2026-02-01"), amountCents: 3_000 },
+    ]);
+    expect(points).toEqual([
+      { date: d("2026-01-01"), valueCents: 5_000 },
+      { date: d("2026-02-01"), valueCents: 18_000 },
+    ]);
   });
 });

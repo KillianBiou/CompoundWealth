@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/server/queries";
 import { centsToEuros } from "@/lib/money";
 import { ProfileForm } from "./profile-form";
+import { PreferencesForm } from "./preferences-form";
 import { DangerZone } from "./danger-zone";
 
 export default async function SettingsPage() {
@@ -22,6 +23,13 @@ export default async function SettingsPage() {
         job={user.job ?? ""}
         salaryEur={user.salaryCents ? centsToEuros(user.salaryCents) : ""}
       />
+      <div>
+        <h2 className="font-heading text-lg font-semibold">Préférences d&apos;affichage</h2>
+        <p className="mt-1 mb-4 text-sm text-text-secondary">
+          Devise et format des montants affichés dans toute l&apos;application.
+        </p>
+        <PreferencesForm currency={user.currency} numberLocale={user.numberLocale} />
+      </div>
       <DangerZone />
     </div>
   );

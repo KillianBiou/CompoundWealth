@@ -28,7 +28,7 @@ export default async function HomePage() {
             laissez les <span className="text-accent-500">intérêts composés</span> travailler.
           </h1>
           <p className="mx-auto max-w-xl text-text-secondary">
-            CompoundWealth est un tracker de portefeuille pensé pour l&apos;investissement long
+            CompoundedWealth est un tracker de portefeuille pensé pour l&apos;investissement long
             terme. Organisez vos enveloppes (PEA, CTO), suivez vos positions et visualisez la
             croissance de votre capital — sans synchronisation bancaire, sans bruit de trading.
           </p>
@@ -67,7 +67,7 @@ export default async function HomePage() {
       </div>
       <footer className="text-center text-xs text-text-muted">
         <Link href="/login" className="hover:text-text-secondary">
-          CompoundWealth
+          CompoundedWealth
         </Link>{" "}
         — investissement long terme, pas de trading.
       </footer>

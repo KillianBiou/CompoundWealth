@@ -15,20 +15,24 @@ model User {
   age          Int?
   job          String?
   salaryCents  Int?
+  currency     String    @default("EUR")
+  numberLocale  String    @default("fr")
   createdAt    DateTime  @default(now())
   envelopes    Envelope[]
 }
 
 model Envelope {
-  id          String             @id @default(cuid())
-  userId      String
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        EnvelopeType
-  name        String
-  broker      String?
-  openedAt    DateTime?
-  closedAt    DateTime?
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          EnvelopeType
+  name          String
+  broker        String?
+  openedAt      DateTime?
+  closedAt      DateTime?
+  depositsCents Int?
   createdAt   DateTime           @default(now())
+  lastPriceRefreshAt DateTime?
   positions   Position[]
   valuations  EnvelopeValuation[]
 
@@ -54,6 +58,7 @@ model Position {
   boughtAt       DateTime
   createdAt      DateTime            @default(now())
   valuations     PositionValuation[]
+  investments   PositionInvestment[]
 
   @@index([envelopeId])
 }
@@ -83,7 +88,18 @@ model PositionValuation {
   position   Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
   date       DateTime
   valueCents Int
+  source     String?
 
   @@unique([positionId, date])
+  @@index([positionId])
+}
+
+model PositionInvestment {
+  id          String   @id @default(cuid())
+  positionId  String
+  position    Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amountCents Int
+
   @@index([positionId])
 }
