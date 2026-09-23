@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  aggregateSeries,
   buildEnvelopeSeries,
   periodPerformance,
   valueAt,
@@ -34,12 +35,14 @@ interface ChartPoint {
   savings: number | null;
   equity: number | null;
   invested: number | null;
+  investedDisplay: number | null;
 }
 
 function mergeSeries(
   savings: ValuationPoint[],
   equity: ValuationPoint[],
   investedPoints: ValuationPoint[],
+  investedOffset: boolean,
 ): ChartPoint[] {
   const times = [
     ...new Set([
@@ -50,11 +53,20 @@ function mergeSeries(
   ].sort((a, b) => a - b);
   return times.map((time) => {
     const date = new Date(time);
+    const savingsValue = savings.length > 0 ? valueAt(savings, date) / 100 : null;
+    const investedValue =
+      investedPoints.length > 0 ? valueAt(investedPoints, date) / 100 : null;
     return {
       date: time,
-      savings: savings.length > 0 ? valueAt(savings, date) / 100 : null,
+      savings: savingsValue,
       equity: equity.length > 0 ? valueAt(equity, date) / 100 : null,
-      invested: investedPoints.length > 0 ? valueAt(investedPoints, date) / 100 : null,
+      invested: investedValue,
+      investedDisplay:
+        investedValue === null
+          ? null
+          : investedOffset
+            ? investedValue + (savingsValue ?? 0)
+            : investedValue,
     };
   });
 }
@@ -120,26 +132,52 @@ function ChartTooltip({
   );
 }
 
+export interface ChartSeriesToggle {
+  id: string;
+  label: string;
+  kind: "savings" | "equity";
+  series: ValuationPoint[];
+}
+
 export function WealthChart({
   valuations,
   investedPoints,
-  savingsPoints,
-  equityPoints,
+  envelopeToggles,
+  visible,
+  onToggleEnvelope,
+  onToggleCategory,
 }: {
   valuations: ValuationPoint[];
   investedPoints: ValuationPoint[];
-  savingsPoints?: ValuationPoint[];
-  equityPoints?: ValuationPoint[];
+  envelopeToggles?: ChartSeriesToggle[];
+  visible?: Record<string, boolean>;
+  onToggleEnvelope?: (id: string) => void;
+  onToggleCategory?: (kind: "savings" | "equity", next?: boolean) => void;
 }) {
   const [period, setPeriod] = useState<PeriodKey>("all");
+  const [internalVisible, setInternalVisible] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries((envelopeToggles ?? []).map((t) => [t.id, true])),
+  );
+  const isControlled = visible !== undefined;
+  const visibleState = isControlled ? visible : internalVisible;
+  const toggleEnvelope =
+    onToggleEnvelope ??
+    ((id: string) => setInternalVisible((prev) => ({ ...prev, [id]: !(prev[id] ?? true) })));
+  const toggles = envelopeToggles ?? [];
+  const isAllVisible = toggles.length > 0 && toggles.every((t) => visibleState[t.id] ?? true);
 
-  const { data, changeCents, changeRatio } = useMemo(() => {
-    const savings = savingsPoints ?? [];
-    const equity = equityPoints ?? [];
+  const { data, changeCents, changeRatio, hasSavings, hasEquity } = useMemo(() => {
+    const visibleToggles = (envelopeToggles ?? []).filter((t) => visibleState[t.id] ?? true);
+    const savings = aggregateSeries(
+      visibleToggles.filter((t) => t.kind === "savings").map((t) => t.series),
+    );
+    const equity = aggregateSeries(
+      visibleToggles.filter((t) => t.kind === "equity").map((t) => t.series),
+    );
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
-    const merged = mergeSeries(savings, equity, investedPoints).filter(
+    const merged = mergeSeries(savings, equity, investedPoints, true).filter(
       (p) => p.date >= startBoundary,
     );
     const performance = periodPerformance(valuations, investedPoints, period);
@@ -147,10 +185,10 @@ export function WealthChart({
       data: merged,
       changeCents: performance.gainCents,
       changeRatio: performance.ratio,
-      savings,
-      equity,
+      hasSavings: savings.length > 0,
+      hasEquity: equity.length > 0,
     };
-  }, [valuations, investedPoints, savingsPoints, equityPoints, period]);
+  }, [valuations, investedPoints, envelopeToggles, visibleState, period]);
 
   if (valuations.length === 0) {
     return (
@@ -162,6 +200,43 @@ export function WealthChart({
 
   return (
     <div>
+      {toggles.length > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (onToggleCategory) {
+                toggles.forEach((t) => onToggleCategory(t.kind, !isAllVisible));
+              } else {
+                setInternalVisible(Object.fromEntries(toggles.map((t) => [t.id, !isAllVisible])));
+              }
+            }}
+            className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs font-medium text-text-secondary transition-colors hover:border-accent-500/50 hover:text-text-primary"
+          >
+            {isAllVisible ? "Tout masquer" : "Tout afficher"}
+          </button>
+          {toggles.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={visibleState[t.id] ?? true}
+              onClick={() => toggleEnvelope(t.id)}
+              className={cn(
+                "cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                (visibleState[t.id] ?? true)
+                  ? t.kind === "savings"
+                    ? "border-info/50 bg-info/10 text-info"
+                    : "border-positive/50 bg-positive/10 text-positive"
+                  : "border-border-cw bg-bg-subtle text-text-muted hover:text-text-secondary",
+              )}
+            >
+              {(visibleState[t.id] ?? true) ? "👁 " : ""}
+
+              {t.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1 overflow-x-auto" role="group" aria-label="Période d'affichage">
           {periods.map((p) => (
@@ -236,34 +311,38 @@ export function WealthChart({
             />
             <Tooltip content={<ChartTooltip />} />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
-            <Area
-              type="monotone"
-              dataKey="savings"
-              stackId="wealth"
-              name="Épargne (livrets)"
-              stroke="var(--info)"
-              strokeWidth={2}
-              fill="url(#savingsGradient)"
-              isAnimationActive
-              animationDuration={400}
-              connectNulls
-            />
-            <Area
-              type="monotone"
-              dataKey="equity"
-              stackId="wealth"
-              name="Actions / ETF"
-              stroke="var(--positive)"
-              strokeWidth={2}
-              fill="url(#equityGradient)"
-              isAnimationActive
-              animationDuration={400}
-              connectNulls
-            />
+            {hasSavings ? (
+              <Area
+                type="monotone"
+                dataKey="savings"
+                stackId="wealth"
+                name="Épargne (livrets)"
+                stroke="var(--info)"
+                strokeWidth={2}
+                fill="url(#savingsGradient)"
+                isAnimationActive
+                animationDuration={400}
+                connectNulls
+              />
+            ) : null}
+            {hasEquity ? (
+              <Area
+                type="monotone"
+                dataKey="equity"
+                stackId="wealth"
+                name="Actions / ETF"
+                stroke="var(--positive)"
+                strokeWidth={2}
+                fill="url(#equityGradient)"
+                isAnimationActive
+                animationDuration={400}
+                connectNulls
+              />
+            ) : null}
             <Line
               type="monotone"
-              dataKey="invested"
-              name="Investi (total)"
+              dataKey="investedDisplay"
+              name="Investi (hors épargne)"
               stroke="var(--info)"
               strokeWidth={2}
               strokeDasharray="6 3"

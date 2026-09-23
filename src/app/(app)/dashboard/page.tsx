@@ -2,9 +2,9 @@ import { Plus } from "lucide-react";
 import { getEnvelopeSummaries } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { aggregateSeries, periodPerformance } from "@/lib/portfolio/series";
-import { Badge, ButtonLink, Card, Kpi } from "@/components/ui";
-import { EnvelopeCard } from "@/components/envelope-card";
-import { WealthChart } from "./wealth-chart";
+import { ButtonLink, Card, Kpi } from "@/components/ui";
+import { DashboardWealthSection } from "./dashboard-wealth-section";
+import type { ChartSeriesToggle } from "./wealth-chart";
 import { RefreshAllButton } from "./refresh-all-button";
 
 function periodChange(
@@ -23,15 +23,17 @@ export default async function DashboardPage() {
   const totalGain = hasUnknown ? null : totalValue - totalInvested;
   const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
   const wealthSeries = aggregateSeries(envelopes.map((e) => e.series));
-  const wealthInvestedSeries = aggregateSeries(envelopes.map((e) => e.investedSeries));
-  const savingsSeries = aggregateSeries(
-    envelopes.filter((e) => e.type === "LIVRET_A").map((e) => e.series),
-  );
-  const equitySeries = aggregateSeries(
-    envelopes.filter((e) => e.type !== "LIVRET_A").map((e) => e.series),
+  const wealthInvestedSeries = aggregateSeries(
+    envelopes.filter((e) => e.type !== "LIVRET_A").map((e) => e.investedSeries),
   );
   const monthChange = periodChange(wealthSeries, wealthInvestedSeries, "1m");
   const yearChange = periodChange(wealthSeries, wealthInvestedSeries, "1y");
+  const envelopeToggles: ChartSeriesToggle[] = envelopes.map((e) => ({
+    id: e.id,
+    label: e.name,
+    kind: e.type === "LIVRET_A" ? "savings" : "equity",
+    series: e.series,
+  }));
 
   if (envelopes.length === 0) {
     return (
@@ -89,53 +91,14 @@ export default async function DashboardPage() {
         )}
       </Card>
 
-      {wealthSeries.length > 1 ? (
-        <Card>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="font-heading text-lg font-semibold">Évolution du patrimoine</h2>
-              <p className="mt-0.5 text-xs text-text-muted">
-                {monthChange.ratio !== null ? (
-                  <>
-                    1 mois :{" "}
-                    <span className={monthChange.ratio >= 0 ? "text-positive" : "text-negative"}>
-                      {formatPercent(monthChange.ratio)}
-                    </span>
-                    {" · "}
-                  </>
-                ) : null}
-                1 an :{" "}
-                {yearChange.ratio !== null ? (
-                  <span className={yearChange.ratio >= 0 ? "text-positive" : "text-negative"}>
-                    {formatPercent(yearChange.ratio)}
-                  </span>
-                ) : (
-                  "historique insuffisant"
-                )}
-                <span className="ml-1">(hors versements)</span>
-              </p>
-            </div>
-          </div>
-          <WealthChart
-            valuations={wealthSeries}
-            investedPoints={wealthInvestedSeries}
-            savingsPoints={savingsSeries}
-            equityPoints={equitySeries}
-          />
-        </Card>
-      ) : null}
-
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-lg font-semibold">Mes enveloppes</h2>
-        <Badge tone="accent">
-          {envelopes.length} active{envelopes.length > 1 ? "s" : ""}
-        </Badge>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {envelopes.map((e) => (
-          <EnvelopeCard key={e.id} envelope={e} />
-        ))}
-      </div>
+      <DashboardWealthSection
+        wealthSeries={wealthSeries}
+        wealthInvestedSeries={wealthInvestedSeries}
+        envelopeToggles={envelopeToggles}
+        envelopes={envelopes}
+        monthChangeRatio={monthChange.ratio}
+        yearChangeRatio={yearChange.ratio}
+      />
     </div>
   );
 }
