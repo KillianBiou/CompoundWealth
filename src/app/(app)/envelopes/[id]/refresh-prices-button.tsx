@@ -3,7 +3,8 @@
 import { useTransition, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { refreshPricesAction } from "@/server/actions";
-import { cn } from "@/components/ui";
+import { cn } from "@/components/cn";
+
 
 export function RefreshPricesButton({ envelopeId }: { envelopeId: string }) {
   const [pending, startTransition] = useTransition();

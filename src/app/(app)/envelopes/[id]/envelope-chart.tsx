@@ -20,7 +20,8 @@ import {
 } from "@/lib/portfolio/series";
 import { formatMoneyCents, formatMoneyCentsCompact } from "@/lib/money";
 import type { NumberLocale } from "@/lib/money";
-import { cn } from "@/components/ui";
+import { cn } from "@/components/cn";
+
 
 const periods: { key: PeriodKey; label: string }[] = [
   { key: "1w", label: "1 sem" },

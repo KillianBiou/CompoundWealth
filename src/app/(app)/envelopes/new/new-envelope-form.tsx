@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 import { createEnvelopeAction, type ActionState } from "@/server/actions";
 import { ENVELOPE_RULES, type EnvelopeType } from "@/lib/taxes";
-import { Badge, Button, Card, Field, Input, cn } from "@/components/ui";
+import { Badge, Button, Card, Field, Input } from "@/components/ui";
+import { cn } from "@/components/cn";
 
 const types: { value: EnvelopeType; title: string; description: string; recommended?: boolean }[] = [
   {

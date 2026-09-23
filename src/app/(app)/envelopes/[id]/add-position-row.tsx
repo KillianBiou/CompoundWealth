@@ -6,7 +6,8 @@ import { Plus, Search, X } from "lucide-react";
 import { createPositionAction, type ActionState } from "@/server/actions";
 import { searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-catalog";
 import { formatRate } from "@/lib/money";
-import { Badge, Button, Input, cn } from "@/components/ui";
+import { Badge, Button, Input } from "@/components/ui";
+import { cn } from "@/components/cn";
 
 export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(

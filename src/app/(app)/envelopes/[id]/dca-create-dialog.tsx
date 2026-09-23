@@ -6,7 +6,8 @@ import { Plus, Search, X } from "lucide-react";
 import { createDcaAction, type ActionState } from "@/server/actions";
 import { getEtfByIsin, searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-catalog";
 import { DCA_FREQUENCY_LABELS, type DcaFrequency } from "@/lib/dca";
-import { Badge, Button, Input, Modal, Select, cn } from "@/components/ui";
+import { Badge, Button, Input, Modal, Select } from "@/components/ui";
+import { cn } from "@/components/cn";
 
 interface LineDraft {
   isin: string;

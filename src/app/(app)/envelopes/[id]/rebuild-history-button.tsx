@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { History } from "lucide-react";
 import { rebuildHistoryAction } from "@/server/actions";
-import { cn } from "@/components/ui";
+import { cn } from "@/components/cn";
+
 
 export function RebuildHistoryButton({ envelopeId }: { envelopeId: string }) {
   const [pending, startTransition] = useTransition();
