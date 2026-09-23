@@ -1,7 +1,11 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
-import { buildEnvelopeValuations, currentValueCents } from "@/lib/portfolio/series";
+import {
+  buildEnvelopeInvestedSeries,
+  buildEnvelopeValuations,
+  currentValueCents,
+} from "@/lib/portfolio/series";
 
 export interface EnvelopeSummary {
   id: string;
@@ -17,6 +21,8 @@ export interface EnvelopeSummary {
   gainCents: number | null;
   positionsCount: number;
   series: { date: Date; valueCents: number }[];
+  /** cumul des sommes investies au fil du temps (versements détaillés si présents) */
+  investedSeries: { date: Date; valueCents: number }[];
 }
 
 export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> => {
@@ -27,7 +33,9 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       positions: {
         select: {
           investedCents: true,
+          boughtAt: true,
           valuations: { orderBy: { date: "asc" } },
+          investments: { orderBy: { date: "asc" } },
         },
       },
       valuations: { orderBy: { date: "asc" } },
@@ -65,6 +73,7 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       gainCents,
       positionsCount: e.positions.length,
       series: valuations,
+      investedSeries: buildEnvelopeInvestedSeries(e.positions),
     };
   });
 });
@@ -80,6 +89,10 @@ export const getEnvelope = cache(async (envelopeId: string) => {
           investments: { orderBy: { date: "asc" } },
         },
         orderBy: { boughtAt: "desc" },
+      },
+      dcaPlans: {
+        include: { lines: true },
+        orderBy: { createdAt: "asc" },
       },
       valuations: { orderBy: { date: "asc" } },
     },

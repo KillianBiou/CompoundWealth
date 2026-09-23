@@ -1,11 +1,10 @@
+"use client";
+
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { X } from "lucide-react";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "./cn";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -165,6 +164,44 @@ export function Kpi({
           {sub}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+export function Modal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl rounded-lg border border-border-cw bg-bg-elevated p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-heading text-lg font-semibold">{title}</h2>
+          <button
+            type="button"
+            className="text-text-muted transition-colors hover:text-text-primary"
+            onClick={onClose}
+            aria-label="Fermer"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 }

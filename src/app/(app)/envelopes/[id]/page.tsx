@@ -7,6 +7,7 @@ import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
+import { DcaSection } from "./dca-section";
 import { EnvelopeDangerZone } from "./danger-zone";
 import { RefreshPricesButton } from "./refresh-prices-button";
 import { RebuildHistoryButton } from "./rebuild-history-button";
@@ -184,6 +185,29 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           boughtAt: p.boughtAt,
           valuationDate: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].date : null,
           valuationSource: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].source : null,
+        }))}
+      />
+      <DcaSection
+        envelopeId={envelope.id}
+        envelopeType={envelope.type}
+        plans={envelope.dcaPlans.map((plan) => ({
+          id: plan.id,
+          frequency: plan.frequency,
+          startDate: plan.startDate,
+          active: plan.active,
+          lines: plan.lines.map((line) => ({
+            id: line.id,
+            isin: line.isin,
+            name: line.name,
+            maxAmountCents: line.maxAmountCents,
+            active: line.active,
+          })),
+        }))}
+        positions={envelope.positions.map((p) => ({
+          symbol: p.symbol,
+          quantity: p.quantity,
+          unitPriceCents: p.unitPriceCents,
+          valuations: p.valuations.map((v) => ({ valueCents: v.valueCents })),
         }))}
       />
       <EnvelopeDangerZone envelopeId={envelope.id} envelopeName={envelope.name} />

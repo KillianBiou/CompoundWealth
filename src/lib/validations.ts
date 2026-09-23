@@ -68,10 +68,50 @@ export const depositsSchema = z.object({
     .max(500_000, "Montant trop élevé"),
 });
 
+export const dcaFrequencySchema = z.enum(["BIWEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY"], {
+  message: "Périodicité invalide",
+});
+
+export const dcaLineSchema = z.object({
+  isin: z
+    .string()
+    .trim()
+    .refine((v) => getEtfByIsin(v) !== null, "Choisissez un ETF dans la liste"),
+  maxAmountEur: z.coerce
+    .number()
+    .positive("Le montant doit être supérieur à 0")
+    .max(1_000_000, "Montant trop élevé"),
+});
+
+const isoDate = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), "Date de départ invalide");
+
+export const createDcaSchema = z
+  .object({
+    frequency: dcaFrequencySchema,
+    startDate: isoDate,
+    lines: z.array(dcaLineSchema).min(1, "Ajoutez au moins un titre").max(20, "20 titres maximum"),
+  })
+  .superRefine((data, ctx) => {
+    const isins = new Set<string>();
+    for (const [index, line] of data.lines.entries()) {
+      if (isins.has(line.isin)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["lines", index, "isin"],
+          message: "Ce titre est déjà dans la liste",
+        });
+      }
+      isins.add(line.isin);
+    }
+  });
+
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type EnvelopeInput = z.infer<typeof envelopeSchema>;
 export type PositionInput = z.infer<typeof positionSchema>;
 export type DepositsInput = z.infer<typeof depositsSchema>;
+export type CreateDcaInput = z.infer<typeof createDcaSchema>;
 export type PreferencesInput = z.infer<typeof preferencesSchema>;

@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { updateDepositsAction, type ActionState } from "@/server/actions";
 import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Field, Input } from "@/components/ui";
+import { useActionToast } from "@/components/use-action-toast";
 
 export function DepositsBadge({
   envelopeId,
@@ -20,6 +21,7 @@ export function DepositsBadge({
     updateDepositsAction,
     {},
   );
+  useActionToast(state, () => setOpen(false));
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,11 +124,6 @@ export function DepositsBadge({
                   {pending ? "Enregistrement…" : "Enregistrer"}
                 </Button>
               </div>
-              {state?.message && !state.errors ? (
-                <p role="status" className="text-sm text-positive">
-                  {state.message}
-                </p>
-              ) : null}
             </form>
           </div>
         </div>

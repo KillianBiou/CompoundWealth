@@ -1,7 +1,7 @@
-import { deletePositionAction } from "@/server/actions";
-import { formatEurCents } from "@/lib/money";
+import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
+import { DeletePositionButton } from "./delete-position-button";
 
 const categoryLabels: Record<string, string> = {
   ETF: "ETF",
@@ -53,7 +53,7 @@ export function PositionsTable({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-t border-border-cw text-left text-xs uppercase tracking-wide text-text-muted">
+              <tr className="border-b-2 border-border-cw bg-bg-subtle/50 text-left text-xs uppercase tracking-wide text-text-muted">
                 <th className="px-6 py-3 font-medium">Nom</th>
                 <th className="px-4 py-3 font-medium">Catégorie</th>
                 <th className="px-4 py-3 text-right font-medium">Investi</th>
@@ -64,7 +64,7 @@ export function PositionsTable({
             </thead>
             <tbody>
               {positions.map((p) => (
-                <tr key={p.id} className="border-t border-border-cw/60">
+                <tr key={p.id} className="border-b border-border-cw/40 transition-colors hover:bg-bg-subtle/30">
                   <td className="px-6 py-3">
                     <span className="font-medium text-text-primary">{p.name}</span>
                     {p.symbol ? (
@@ -76,40 +76,59 @@ export function PositionsTable({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.investedCents !== null ? (
-                      formatEurCents(p.investedCents)
+                      <span className="font-semibold text-text-secondary">
+                        {formatEurCents(p.investedCents)}
+                      </span>
                     ) : (
                       <span className="italic text-text-muted">état des lieux</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {p.currentValueCents !== null ? (
-                      <span>
-                        {formatEurCents(p.currentValueCents)}
-                        {p.valuationDate ? (
-                          <span className="block text-xs font-normal text-text-muted">
-                            {p.valuationDate.toLocaleDateString("fr-FR")}
-                            {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
+                    {(() => {
+                      if (p.currentValueCents === null) {
+                        return <span className="text-text-muted">—</span>;
+                      }
+                      const gainCents =
+                        p.investedCents !== null ? p.currentValueCents - p.investedCents : null;
+                      const gainRatio =
+                        gainCents !== null && p.investedCents && p.investedCents > 0
+                          ? gainCents / p.investedCents
+                          : null;
+                      const tone =
+                        gainCents === null || gainCents === 0
+                          ? "text-text-primary"
+                          : gainCents > 0
+                            ? "text-positive"
+                            : "text-negative";
+                      return (
+                        <span className={`font-semibold ${tone}`}>
+                          {formatEurCents(p.currentValueCents)}
+                          {gainRatio !== null ? (
+                            <span
+                              className={`block text-xs font-normal ${gainCents === 0 ? "text-text-muted" : tone}`}
+                            >
+                              ({formatPercent(gainRatio)})
+                            </span>
+                          ) : null}
+                          {p.valuationDate ? (
+                            <span className="block text-xs font-normal text-text-muted">
+                              {p.valuationDate.toLocaleDateString("fr-FR")}
+                              {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-text-secondary tabular-nums">
                     {p.boughtAt.toLocaleDateString("fr-FR")}
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <form action={deletePositionAction}>
-                      <input type="hidden" name="positionId" value={p.id} />
-                      <input type="hidden" name="envelopeId" value={envelopeId} />
-                      <button
-                        type="submit"
-                        className="text-xs text-text-muted transition-colors hover:text-negative"
-                      >
-                        Supprimer
-                      </button>
-                    </form>
+                    <DeletePositionButton
+                      positionId={p.id}
+                      envelopeId={envelopeId}
+                      name={p.symbol ?? p.name}
+                    />
                   </td>
                 </tr>
               ))}
