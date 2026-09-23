@@ -1,7 +1,7 @@
-import { deletePositionAction } from "@/server/actions";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
+import { DeletePositionButton } from "./delete-position-button";
 
 const categoryLabels: Record<string, string> = {
   ETF: "ETF",
@@ -124,16 +124,11 @@ export function PositionsTable({
                     {p.boughtAt.toLocaleDateString("fr-FR")}
                   </td>
                   <td className="px-6 py-3 text-right">
-                    <form action={deletePositionAction}>
-                      <input type="hidden" name="positionId" value={p.id} />
-                      <input type="hidden" name="envelopeId" value={envelopeId} />
-                      <button
-                        type="submit"
-                        className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-negative/60 hover:text-negative"
-                      >
-                        Supprimer
-                      </button>
-                    </form>
+                    <DeletePositionButton
+                      positionId={p.id}
+                      envelopeId={envelopeId}
+                      name={p.symbol ?? p.name}
+                    />
                   </td>
                 </tr>
               ))}

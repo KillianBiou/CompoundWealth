@@ -764,6 +764,92 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
   return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
 }
 
+/**
+ * Actualise les prix de toutes les enveloppes actives de l'utilisateur.
+ * Respecte le cooldown de 5 min par enveloppe (les enveloppes récemment
+ * actualisées sont ignorées), espace les requêtes Yahoo de ~1 s et collecte
+ * les échecs par position pour un retour détaillé.
+ */
+export async function refreshAllPricesAction(): Promise<{
+  message?: string;
+  errors?: { form?: string[]; skipped?: string[]; failures?: string[] };
+}> {
+  const userId = await requireUserId();
+  const envelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null },
+    include: { positions: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (envelopes.length === 0) return { errors: { form: ["Aucune enveloppe active"] } };
+  const now = Date.now();
+  const skipped: string[] = [];
+  const failures: string[] = [];
+  const refreshedEnvelopes: { id: string; name: string }[] = [];
+  let updated = 0;
+  let firstRequest = true;
+  for (const envelope of envelopes) {
+    const onCooldown =
+      envelope.lastPriceRefreshAt !== null &&
+      now - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS;
+    const refreshable = envelope.positions.filter(
+      (p) => p.symbol?.trim() && p.quantity !== null,
+    );
+    if (onCooldown || refreshable.length === 0) {
+      if (refreshable.length > 0) skipped.push(envelope.name);
+      continue;
+    }
+    for (const position of refreshable) {
+      if (!firstRequest) await new Promise((resolve) => setTimeout(resolve, 1000));
+      firstRequest = false;
+      const quote = await fetchMarketQuote(position.symbol!.trim());
+      if (!quote.ok) {
+        failures.push(`${envelope.name} · ${position.name} (${quote.reason})`);
+        continue;
+      }
+      const valueCents = Math.round(position.quantity! * quote.priceCents);
+      const valuationDate = new Date();
+      await prisma.positionValuation.upsert({
+        where: { positionId_date: { positionId: position.id, date: valuationDate } },
+        create: {
+          positionId: position.id,
+          date: valuationDate,
+          valueCents,
+          source: "yahoo",
+        },
+        update: { valueCents, source: "yahoo" },
+      });
+      updated += 1;
+    }
+    await prisma.envelope.update({
+      where: { id: envelope.id },
+      data: { lastPriceRefreshAt: new Date() },
+    });
+    refreshedEnvelopes.push({ id: envelope.id, name: envelope.name });
+  }
+  if (updated === 0) {
+    return {
+      errors: {
+        form: [
+          skipped.length > 0
+            ? `Aucun prix actualisé — ${skipped.length} enveloppe${skipped.length > 1 ? "s" : ""} récemment actualisée${skipped.length > 1 ? "s" : ""}`
+            : "Aucun prix récupéré",
+        ],
+        skipped,
+        failures,
+      },
+    };
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  for (const envelope of refreshedEnvelopes) {
+    revalidatePath(`/envelopes/${envelope.id}`);
+  }
+  return {
+    message: `${updated} prix actualisé${updated > 1 ? "s" : ""} sur ${refreshedEnvelopes.length} enveloppe${refreshedEnvelopes.length > 1 ? "s" : ""}`,
+    errors: skipped.length > 0 || failures.length > 0 ? { skipped, failures } : undefined,
+  };
+}
+
 export async function rebuildHistoryAction(envelopeId: string): Promise<ActionState> {
   const userId = await requireUserId();
   const envelope = await prisma.envelope.findFirst({

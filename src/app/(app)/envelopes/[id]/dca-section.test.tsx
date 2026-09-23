@@ -1,4 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import { renderWithToast } from "../../../../../tests/test-utils";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DcaSection } from "./dca-section";
@@ -51,7 +52,7 @@ function monthlyPlan(
 
 describe("DcaSection", () => {
   it("affiche l'état vide quand aucun plan n'existe", () => {
-    render(
+    renderWithToast(
       <DcaSection envelopeId="env-1" envelopeType="PEA" plans={[]} positions={positions} />,
     );
     expect(
@@ -61,7 +62,7 @@ describe("DcaSection", () => {
   });
 
   it("affiche le récapitulatif avec le montant engagé en vert", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -87,7 +88,7 @@ describe("DcaSection", () => {
   });
 
   it("affiche le montant max de chaque ligne en vert dans la table", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -110,7 +111,7 @@ describe("DcaSection", () => {
   });
 
   it("affiche l'estimation parts entières pour un PEA (≈ 12 parts)", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -132,7 +133,7 @@ describe("DcaSection", () => {
   });
 
   it("affiche une ligne en pause comme telle", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -156,7 +157,7 @@ describe("DcaSection", () => {
 
   it("bascule la période du récapitulatif au clic (1 mois → 3 mois)", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -181,7 +182,7 @@ describe("DcaSection", () => {
 
   it("bascule le type de visualisation au clic (Barres → Anneau → Treemap)", async () => {
     const user = userEvent.setup();
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -216,7 +217,7 @@ describe("DcaSection", () => {
   });
 
   it("donne aux boutons pause/supprimer l'apparence d'éléments cliquables", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
@@ -241,7 +242,7 @@ describe("DcaSection", () => {
   });
 
   it("affiche la répartition avec le ticker de chaque position", () => {
-    render(
+    renderWithToast(
       <DcaSection
         envelopeId="env-1"
         envelopeType="CTO"

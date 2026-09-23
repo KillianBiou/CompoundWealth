@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithToast } from "../../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { PositionsTable } from "./positions-table";
 
@@ -27,7 +28,7 @@ function row(investedCents: number | null, currentValueCents: number | null) {
 
 describe("PositionsTable", () => {
   it("colore la valeur actuelle en vert avec le % de bénéfice", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(100_000, 120_000)]} />,
     );
     const value = screen.getByText(/1[\s\u00a0\u202f]200,00[\s\u00a0\u202f]\u20ac/);
@@ -37,7 +38,7 @@ describe("PositionsTable", () => {
   });
 
   it("colore la valeur actuelle en rouge avec le % de perte", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(100_000, 80_000)]} />,
     );
     const value = screen.getByText(/800,00[\s\u00a0\u202f]\u20ac/);
@@ -47,7 +48,7 @@ describe("PositionsTable", () => {
   });
 
   it("garde une valeur neutre à gain nul", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(100_000, 100_000)]} />,
     );
     const values = screen.getAllByText(/1[\s\u00a0\u202f]000,00[\s\u00a0\u202f]€/);
@@ -58,7 +59,7 @@ describe("PositionsTable", () => {
   });
 
   it("n'affiche pas de % sans montant investi (état des lieux)", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(null, 120_000)]} />,
     );
     expect(screen.getByText(/1[\s\u00a0\u202f]200,00[\s\u00a0\u202f]\u20ac/)).toBeInTheDocument();
@@ -67,7 +68,7 @@ describe("PositionsTable", () => {
   });
 
   it("affiche l'investi en gris neutre, pas en vert", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(100_000, 120_000)]} />,
     );
     const invested = screen.getByText(/1[\s\u00a0\u202f]000,00[\s\u00a0\u202f]\u20ac/);
@@ -76,7 +77,7 @@ describe("PositionsTable", () => {
   });
 
   it("donne aux boutons d'action l'apparence d'éléments cliquables", () => {
-    render(
+    renderWithToast(
       <PositionsTable envelopeId="env-1" positions={[row(100_000, 120_000)]} />,
     );
     const deleteButton = screen.getByRole("button", { name: "Supprimer" });

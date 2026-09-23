@@ -137,3 +137,31 @@ export function investedSeries(investments: InvestmentPoint[]): ValuationPoint[]
 }
 
 
+
+/**
+ * Agrège les séries de valorisation de plusieurs enveloppes en une série
+ * patrimoine unique : la valeur à chaque instant t est la somme des dernières
+ * valeurs connues de chaque enveloppe (interpolation plate).
+ */
+export function aggregateSeries(
+  seriesList: ValuationPoint[][],
+): ValuationPoint[] {
+  const nonEmpty = seriesList.filter((s) => s.length > 0);
+  if (nonEmpty.length === 0) return [];
+  const times = [
+    ...new Set(
+      nonEmpty.flatMap((series) => series.map((point) => point.date.getTime())),
+    ),
+  ].sort((a, b) => a - b);
+  return times.map((time) => ({
+    date: new Date(time),
+    valueCents: nonEmpty.reduce((sum, series) => {
+      let current = 0;
+      for (const point of series) {
+        if (point.date.getTime() <= time) current = point.valueCents;
+        else break;
+      }
+      return sum + current;
+    }, 0),
+  }));
+}

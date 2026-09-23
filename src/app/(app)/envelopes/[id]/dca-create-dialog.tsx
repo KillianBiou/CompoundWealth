@@ -8,6 +8,7 @@ import { getEtfByIsin, searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-
 import { DCA_FREQUENCY_LABELS, type DcaFrequency } from "@/lib/dca";
 import { Badge, Button, Input, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/cn";
+import { useActionToast } from "@/components/use-action-toast";
 
 interface LineDraft {
   isin: string;
@@ -40,6 +41,7 @@ export function DcaCreateDialog({
     setOpen(false);
     resetDraft();
   };
+  useActionToast(state, closeAfterSuccess);
 
   const results = useMemo(
     () => (pendingAdd ? searchEtfCatalog(query).slice(0, 8) : []),
@@ -86,32 +88,6 @@ export function DcaCreateDialog({
         <Plus className="h-4 w-4" aria-hidden />
         Planifier un investissement régulier
       </button>
-    );
-  }
-
-  if (state.message) {
-    return (
-      <Modal title="Investissement régulier créé" onClose={closeAfterSuccess}>
-        <div className="space-y-4">
-          <p role="status" className="text-sm text-positive">
-            {state.message}
-          </p>
-          <div className="flex items-center gap-3">
-            <Button type="button" onClick={closeAfterSuccess}>
-              Fermer
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                resetDraft();
-              }}
-            >
-              En planifier un autre
-            </Button>
-          </div>
-        </div>
-      </Modal>
     );
   }
 
