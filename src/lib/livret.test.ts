@@ -21,6 +21,21 @@ describe("nextFortnightStart", () => {
   });
 });
 
+describe("solde initial d'un livret fraîchement créé", () => {
+  it("un versement daté du début de la quinzaine courante est visible immédiatement", () => {
+    const now = d("2026-09-23");
+    const series = buildLivretBalanceSeries(
+      [{ date: d("2026-09-16"), amountCents: 2_250_000 }],
+      0.017,
+      now,
+    );
+    const current =
+      [...series].reverse().find((p) => p.date.getTime() <= now.getTime()) ?? null;
+    expect(current).not.toBeNull();
+    expect(current?.balanceCents).toBe(2_250_000);
+  });
+});
+
 describe("buildLivretBalanceSeries", () => {
   it("capitalise les intérêts annuellement au 1er janvier", () => {
     const events: LivretEvent[] = [{ date: d("2025-12-20"), amountCents: 10_000 }];

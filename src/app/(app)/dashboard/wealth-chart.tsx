@@ -137,18 +137,18 @@ export interface ChartSeriesToggle {
   label: string;
   kind: "savings" | "equity";
   series: ValuationPoint[];
+  /** cumul investi de l'enveloppe (centimes), pour la courbe Investi */
+  investedSeries?: ValuationPoint[];
 }
 
 export function WealthChart({
   valuations,
-  investedPoints,
   envelopeToggles,
   visible,
   onToggleEnvelope,
   onToggleCategory,
 }: {
   valuations: ValuationPoint[];
-  investedPoints: ValuationPoint[];
   envelopeToggles?: ChartSeriesToggle[];
   visible?: Record<string, boolean>;
   onToggleEnvelope?: (id: string) => void;
@@ -174,13 +174,18 @@ export function WealthChart({
     const equity = aggregateSeries(
       visibleToggles.filter((t) => t.kind === "equity").map((t) => t.series),
     );
+    const investedVisible = aggregateSeries(
+      visibleToggles
+        .filter((t) => t.kind === "equity")
+        .map((t) => t.investedSeries ?? []),
+    );
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
-    const merged = mergeSeries(savings, equity, investedPoints, true).filter(
+    const merged = mergeSeries(savings, equity, investedVisible, true).filter(
       (p) => p.date >= startBoundary,
     );
-    const performance = periodPerformance(valuations, investedPoints, period);
+    const performance = periodPerformance(valuations, investedVisible, period);
     return {
       data: merged,
       changeCents: performance.gainCents,
@@ -188,7 +193,7 @@ export function WealthChart({
       hasSavings: savings.length > 0,
       hasEquity: equity.length > 0,
     };
-  }, [valuations, investedPoints, envelopeToggles, visibleState, period]);
+  }, [valuations, envelopeToggles, visibleState, period]);
 
   if (valuations.length === 0) {
     return (

@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   ChevronDown,
-  Eye,
-  EyeOff,
   Landmark,
   LayoutGrid,
   List,
@@ -18,7 +16,6 @@ import {
   formatPercent,
 } from "@/lib/money";
 import { cn } from "@/components/cn";
-import { Sparkline } from "@/components/envelope-card";
 
 export type EnvelopeKind = "savings" | "equity";
 
@@ -34,6 +31,44 @@ const viewModes: { key: ViewMode; label: string; icon: typeof List }[] = [
   { key: "compact", label: "Compacte", icon: List },
 ];
 
+const kindStyles: Record<
+  EnvelopeKind,
+  {
+    /** bordures / accents */
+    border: string;
+    borderStrong: string;
+    /** dégradé de fond : couleur visible aux bords, discrète au centre */
+    panelBg: string;
+    cardBg: string;
+    text: string;
+    toggleOn: string;
+    toggleKnobOn: string;
+  }
+> = {
+  savings: {
+    border: "border-info/40",
+    borderStrong: "border-info/60",
+    panelBg:
+      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_0%,color-mix(in_srgb,var(--info)_7%,var(--bg-elevated))_120%)]",
+    cardBg:
+      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_30%,color-mix(in_srgb,var(--info)_5%,var(--bg-elevated))_140%)]",
+    text: "text-info",
+    toggleOn: "border-info/50",
+    toggleKnobOn: "bg-info",
+  },
+  equity: {
+    border: "border-positive/40",
+    borderStrong: "border-positive/60",
+    panelBg:
+      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_0%,color-mix(in_srgb,var(--positive)_7%,var(--bg-elevated))_120%)]",
+    cardBg:
+      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_30%,color-mix(in_srgb,var(--positive)_5%,var(--bg-elevated))_140%)]",
+    text: "text-positive",
+    toggleOn: "border-positive/50",
+    toggleKnobOn: "bg-positive",
+  },
+};
+
 function ToggleSwitch({
   checked,
   onToggle,
@@ -47,38 +82,32 @@ function ToggleSwitch({
   label: string;
   size?: "sm" | "md";
 }) {
+  const styles = kindStyles[kind];
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={`${label} — afficher dans le graphique`}
+      title="Afficher dans le graphique"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
         onToggle();
       }}
       className={cn(
-        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border transition-colors",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border bg-bg-subtle transition-colors",
         size === "sm" ? "h-5 w-9" : "h-6 w-11",
-        checked
-          ? kind === "savings"
-            ? "border-info/60 bg-info/25"
-            : "border-positive/60 bg-positive/25"
-          : "border-border-cw bg-bg-subtle",
+        checked ? styles.toggleOn : "border-border-cw",
       )}
     >
       <span
         className={cn(
-          "absolute rounded-full shadow-sm transition-all",
-          size === "sm" ? "h-3.5 w-3.5" : "h-4.5 w-4.5",
+          "absolute top-1/2 -translate-y-1/2 rounded-full shadow-sm transition-all",
+          size === "sm" ? "h-3 w-3" : "h-4 w-4",
           checked
-            ? kind === "savings"
-              ? "left-[calc(100%-1.05rem)] bg-info"
-              : "left-[calc(100%-1.05rem)] bg-positive"
-            : "left-1 bg-text-muted",
-          size === "sm" && (checked ? "left-[1.15rem]" : "left-[0.2rem]"),
-          size === "md" && (checked ? "left-[1.5rem]" : "left-[0.25rem]"),
+            ? cn(styles.toggleKnobOn, size === "sm" ? "left-[1.3rem]" : "left-[1.6rem]")
+            : cn("bg-text-muted", size === "sm" ? "left-[0.2rem]" : "left-[0.25rem]"),
         )}
       />
     </button>
@@ -126,6 +155,77 @@ function DcaMonthlyInfo({ envelope }: { envelope: PanelEnvelope }) {
   );
 }
 
+function Sparkline({
+  series,
+  gainCents,
+  className,
+}: {
+  series: { date: Date; valueCents: number }[];
+  gainCents: number | null;
+  className?: string;
+}) {
+  if (series.length < 2) {
+    return (
+      <div
+        className={cn(
+          "flex items-center justify-end text-[11px] text-text-muted",
+          className,
+        )}
+      >
+        Historique en construction…
+      </div>
+    );
+  }
+  const width = 320;
+  const height = 48;
+  const values = series.map((p) => p.valueCents);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const points = values.map((value, index) => {
+    const x = (index / (values.length - 1)) * width;
+    const y = height - 4 - ((value - min) / span) * (height - 8);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  const positive = gainCents === null || gainCents >= 0;
+  const stroke = positive ? "var(--positive)" : "var(--negative)";
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className={cn("h-12", className)}
+      role="img"
+      aria-label="Évolution récente de la valeur"
+      preserveAspectRatio="none"
+    >
+      <polyline
+        points={points.join(" ")}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TopPositionsInfo({ envelope }: { envelope: PanelEnvelope }) {
+  if (envelope.topPositions.length === 0) return null;
+  const top = envelope.topPositions[0];
+  const rest = envelope.topPositions.length - 1;
+  return (
+    <p className="text-xs text-text-secondary tabular-nums">
+      <span className="font-medium text-text-primary">
+        {top.symbol ?? top.name}
+      </span>{" "}
+      {formatEurCentsCompact(top.valueCents)}
+      {rest > 0 ? (
+        <span className="text-text-muted"> (+{rest} autre{rest > 1 ? "s" : ""})</span>
+      ) : null}
+    </p>
+  );
+}
+
 interface PanelEnvelope {
   id: string;
   name: string;
@@ -141,75 +241,112 @@ interface PanelEnvelope {
   dcaMonthlyPayments?: number;
   overCapCents?: number;
   type: EnvelopeSummary["type"];
+  topPositions: { name: string; symbol: string | null; valueCents: number }[];
+}
+
+function EnvelopeToggle({
+  envelope,
+  visible,
+  onToggleEnvelope,
+}: {
+  envelope: PanelEnvelope;
+  visible: boolean;
+  onToggleEnvelope: (id: string) => void;
+}) {
+  return (
+    <ToggleSwitch
+      checked={visible}
+      onToggle={() => onToggleEnvelope(envelope.id)}
+      kind={envelope.kind}
+      label={envelope.name}
+    />
+  );
 }
 
 function CompactEnvelope({
   envelope,
+  visible,
+  onToggleEnvelope,
 }: {
   envelope: PanelEnvelope;
+  visible: boolean;
+  onToggleEnvelope: (id: string) => void;
 }) {
+  const styles = kindStyles[envelope.kind];
   return (
-    <Link
-      href={`/envelopes/${envelope.id}`}
+    <div
       className={cn(
-        "group flex cursor-pointer items-center justify-between gap-4 rounded-lg border px-4 py-2.5 transition-colors",
-        envelope.kind === "savings"
-          ? "border-info/25 bg-info/5 hover:border-info/50"
-          : "border-positive/25 bg-positive/5 hover:border-positive/50",
+        "group flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors",
+        styles.border,
+        styles.cardBg,
+        visible ? "hover:border-info/60" : "opacity-60",
       )}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <Link href={`/envelopes/${envelope.id}`} className="flex min-w-0 flex-1 items-center gap-3">
         {envelope.kind === "savings" ? (
           <Landmark className="h-4 w-4 shrink-0 text-info" aria-hidden />
         ) : null}
         <p className="truncate text-sm font-medium text-text-primary group-hover:text-accent-500">
           {envelope.name}
         </p>
-        <p className="shrink-0 text-xs text-text-muted">{envelope.type}</p>
-      </div>
+        <p className="shrink-0 text-xs text-text-muted">
+          {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+        </p>
+      </Link>
       <div className="flex shrink-0 items-center gap-3 tabular-nums">
-        <span className="text-sm font-semibold text-text-primary">
-          {formatEurCentsCompact(envelope.valueCents)}
-        </span>
-        {envelope.gainCents !== null ? (
-          <span
-            className={cn(
-              "text-sm font-medium",
-              envelope.gainCents >= 0 ? "text-positive" : "text-negative",
-            )}
-          >
-            {envelope.gainCents >= 0 ? "+" : "−"}
-            {formatEurCentsCompact(Math.abs(envelope.gainCents))}
+        <Link href={`/envelopes/${envelope.id}`} className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-text-primary">
+            {formatEurCentsCompact(envelope.valueCents)}
           </span>
-        ) : null}
+          {envelope.gainCents !== null ? (
+            <span
+              className={cn(
+                "text-sm font-medium",
+                envelope.gainCents >= 0 ? "text-positive" : "text-negative",
+              )}
+            >
+              {envelope.gainCents >= 0 ? "+" : "−"}
+              {formatEurCentsCompact(Math.abs(envelope.gainCents))}
+            </span>
+          ) : null}
+        </Link>
+        <EnvelopeToggle
+          envelope={envelope}
+          visible={visible}
+          onToggleEnvelope={onToggleEnvelope}
+        />
       </div>
-    </Link>
+    </div>
   );
 }
 
 function DetailedEnvelope({
   envelope,
+  visible,
+  onToggleEnvelope,
 }: {
   envelope: PanelEnvelope;
+  visible: boolean;
+  onToggleEnvelope: (id: string) => void;
 }) {
+  const styles = kindStyles[envelope.kind];
   const isLivret = envelope.type === "LIVRET_A";
   return (
-    <Link
-      href={`/envelopes/${envelope.id}`}
+    <div
       className={cn(
-        "group block cursor-pointer rounded-lg border p-5 transition-colors",
-        envelope.kind === "savings"
-          ? "border-info/30 bg-info/5 hover:border-info/60"
-          : "border-positive/30 bg-positive/5 hover:border-positive/60",
+        "group rounded-lg border p-5 transition-colors",
+        styles.border,
+        styles.cardBg,
+        visible ? "" : "opacity-60",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+        <Link href={`/envelopes/${envelope.id}`} className="group/link min-w-0 cursor-pointer">
           <div className="flex items-center gap-2">
             {envelope.kind === "savings" ? (
               <Landmark className="h-4 w-4 shrink-0 text-info" aria-hidden />
             ) : null}
-            <p className="truncate font-medium text-text-primary group-hover:text-accent-500">
+            <p className="truncate font-medium text-text-primary group-hover/link:text-accent-500">
               {envelope.name}
             </p>
             <span
@@ -234,23 +371,37 @@ function DetailedEnvelope({
                 ? "épargne de précaution"
                 : "—"}
           </p>
-        </div>
-        <div className="shrink-0">
-          <Sparkline series={envelope.sparkSeries} gainCents={envelope.gainCents} />
+        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link href={`/envelopes/${envelope.id}`} className="min-w-0 flex-1 cursor-pointer">
+            <Sparkline
+              series={envelope.sparkSeries}
+              gainCents={envelope.gainCents}
+              className="w-full min-w-32 max-w-xl sm:w-64"
+            />
+          </Link>
+          <EnvelopeToggle
+            envelope={envelope}
+            visible={visible}
+            onToggleEnvelope={onToggleEnvelope}
+          />
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <Link href={`/envelopes/${envelope.id}`} className="cursor-pointer">
           <p className="font-heading text-3xl font-semibold tabular-nums text-text-primary">
             {formatEurCents(envelope.valueCents)}
           </p>
           <p className="mt-1.5">{gainPill(envelope.gainCents, envelope.investedCents)}</p>
-        </div>
+        </Link>
         <div className="flex flex-col items-end gap-1.5 text-right">
           {isLivret ? (
             <>
               <p className="text-xs text-text-secondary tabular-nums">
-                Versé <span className="font-medium text-text-primary">{formatEurCents(envelope.investedCents)}</span>
+                Versé{" "}
+                <span className="font-medium text-text-primary">
+                  {formatEurCents(envelope.investedCents)}
+                </span>
               </p>
               {envelope.overCapCents && envelope.overCapCents > 0 ? (
                 <p className="text-xs text-negative tabular-nums">
@@ -259,17 +410,78 @@ function DetailedEnvelope({
               ) : null}
             </>
           ) : (
-            <p className="text-xs text-text-secondary tabular-nums">
-              {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""} · investi{" "}
-              <span className="font-medium text-text-primary">
-                {formatEurCents(envelope.investedCents)}
-              </span>
-            </p>
+            <>
+              <p className="text-xs text-text-secondary tabular-nums">
+                {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""} · investi{" "}
+                <span className="font-medium text-text-primary">
+                  {formatEurCents(envelope.investedCents)}
+                </span>
+              </p>
+              <TopPositionsInfo envelope={envelope} />
+            </>
           )}
           <DcaMonthlyInfo envelope={envelope} />
         </div>
       </div>
-    </Link>
+    </div>
+  );
+}
+
+function SemiCompactEnvelope({
+  envelope,
+  visible,
+  onToggleEnvelope,
+}: {
+  envelope: PanelEnvelope;
+  visible: boolean;
+  onToggleEnvelope: (id: string) => void;
+}) {
+  const styles = kindStyles[envelope.kind];
+  const isLivret = envelope.type === "LIVRET_A";
+  return (
+    <div
+      className={cn(
+        "group flex h-full flex-col rounded-lg border p-4 transition-colors",
+        styles.border,
+        styles.cardBg,
+        visible ? "" : "opacity-60",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <Link href={`/envelopes/${envelope.id}`} className="group/link min-w-0 flex-1 cursor-pointer">
+          <p className="truncate font-medium text-text-primary group-hover/link:text-accent-500">
+            {envelope.name}
+          </p>
+          <p className="mt-0.5 text-xs text-text-muted">
+            {isLivret ? "Livret A" : envelope.type}
+            {envelope.broker ? ` · ${envelope.broker}` : ""}
+          </p>
+        </Link>
+        <EnvelopeToggle
+          envelope={envelope}
+          visible={visible}
+          onToggleEnvelope={onToggleEnvelope}
+        />
+      </div>
+      <Link href={`/envelopes/${envelope.id}`} className="mt-3 cursor-pointer">
+        <p className="font-heading text-2xl font-semibold tabular-nums text-text-primary">
+          {formatEurCents(envelope.valueCents)}
+        </p>
+        <p className="mt-1">{gainPill(envelope.gainCents, envelope.investedCents)}</p>
+      </Link>
+      <div className="mt-auto flex items-center justify-between border-t border-border-cw/60 pt-2.5">
+        <p className="text-xs text-text-muted">
+          {isLivret
+            ? `Versé ${formatEurCentsCompact(envelope.investedCents)}${
+                envelope.overCapCents && envelope.overCapCents > 0
+                  ? ` · ⚠ ${formatEurCentsCompact(envelope.overCapCents)} hors plafond`
+                  : ""
+              }`
+            : `${envelope.positionsCount} position${envelope.positionsCount > 1 ? "s" : ""} · investi ${formatEurCentsCompact(envelope.investedCents)}`}
+        </p>
+        <DcaMonthlyInfo envelope={envelope} />
+      </div>
+    </div>
   );
 }
 
@@ -281,10 +493,7 @@ interface CategoryData {
   totalValueCents: number;
 }
 
-const categoryMeta: Record<
-  EnvelopeKind,
-  { label: string; description: string }
-> = {
+const categoryMeta: Record<EnvelopeKind, { label: string; description: string }> = {
   savings: {
     label: "Épargne",
     description: "Livrets et fonds euros — capital stable, rendement faible",
@@ -336,18 +545,13 @@ export function EnvelopeListPanel({
         dcaMonthlyPayments: e.dcaMonthlyPayments,
         overCapCents: e.overCapCents,
         type: e.type,
+        topPositions: e.topPositions ?? [],
       })),
       totalValueCents: list.reduce((s, e) => s + e.valueCents, 0),
     });
     return [
-      build(
-        "savings",
-        envelopes.filter((e) => e.type === "LIVRET_A"),
-      ),
-      build(
-        "equity",
-        envelopes.filter((e) => e.type !== "LIVRET_A"),
-      ),
+      build("savings", envelopes.filter((e) => e.type === "LIVRET_A")),
+      build("equity", envelopes.filter((e) => e.type !== "LIVRET_A")),
     ].filter((c) => c.envelopes.length > 0);
   }, [envelopes]);
 
@@ -384,17 +588,20 @@ export function EnvelopeListPanel({
       {categories.map((category) => {
         const allVisible =
           category.envelopes.length > 0 &&
-          category.envelopes.every((e) => visible[e.id]);
+          category.envelopes.every((e) => visible[e.id] ?? true);
         const isCollapsed = collapsed[category.key];
+        const styles = kindStyles[category.key];
         return (
-          <section key={category.key} className="space-y-3">
-            <div
-              className={cn(
-                "flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-2.5",
-                category.key === "savings" ? "border-info/30 bg-info/10" : "border-positive/30 bg-positive/10",
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-3">
+          <section
+            key={category.key}
+            className={cn(
+              "overflow-hidden rounded-xl border",
+              styles.border,
+              styles.panelBg,
+            )}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-cw/40 px-5 py-4">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <button
                   type="button"
                   onClick={() =>
@@ -404,40 +611,36 @@ export function EnvelopeListPanel({
                     }))
                   }
                   aria-expanded={!isCollapsed}
-                  className="flex cursor-pointer items-center gap-2 text-text-primary"
+                  className="flex cursor-pointer items-center gap-2.5"
                 >
                   <ChevronDown
                     className={cn(
-                      "h-4 w-4 text-text-muted transition-transform",
+                      "h-5 w-5 text-text-muted transition-transform",
                       isCollapsed && "-rotate-90",
                     )}
                     aria-hidden
                   />
-                  <span className="font-heading text-sm font-semibold">
+                  <span className="font-heading text-base font-bold tracking-tight text-text-primary">
                     {category.label}
                   </span>
                 </button>
                 <span
                   className={cn(
-                    "text-xs font-medium tabular-nums",
-                    category.key === "savings" ? "text-info" : "text-positive",
+                    "rounded-full bg-bg-subtle px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                    styles.text,
                   )}
                 >
-                  {category.envelopes.length} enveloppe
-                  {category.envelopes.length > 1 ? "s" : ""}
-                  {" · "}
                   {formatEurCents(category.totalValueCents)}
                 </span>
-                <span className="hidden text-xs text-text-muted md:inline">
+                <span className="hidden text-xs text-text-muted lg:inline">
                   {category.description}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {allVisible ? (
-                  <Eye className="h-3.5 w-3.5 text-text-muted" aria-hidden />
-                ) : (
-                  <EyeOff className="h-3.5 w-3.5 text-text-muted" aria-hidden />
-                )}
+                <span className="text-xs text-text-muted">
+                  {category.envelopes.length} enveloppe
+                  {category.envelopes.length > 1 ? "s" : ""}
+                </span>
                 <ToggleSwitch
                   checked={allVisible}
                   onToggle={() => onToggleCategory(category.key)}
@@ -447,121 +650,43 @@ export function EnvelopeListPanel({
                 />
               </div>
             </div>
-
             {!isCollapsed ? (
-              view === "compact" ? (
-                <div className="space-y-2">
-                  {category.envelopes.map((envelope) => (
-                    <div key={envelope.id} className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1">
-                        <CompactEnvelope envelope={envelope} />
-                      </div>
-                      <ToggleSwitch
-                        checked={visible[envelope.id] ?? true}
-                        onToggle={() => onToggleEnvelope(envelope.id)}
-                        kind={envelope.kind}
-                        label={envelope.name}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : view === "detailed" ? (
-                <div className="space-y-3">
-                  {category.envelopes.map((envelope) => (
-                    <div key={envelope.id} className="flex items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <DetailedEnvelope envelope={envelope} />
-                      </div>
-                      <ToggleSwitch
-                        checked={visible[envelope.id] ?? true}
-                        onToggle={() => onToggleEnvelope(envelope.id)}
-                        kind={envelope.kind}
-                        label={envelope.name}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {category.envelopes.map((envelope) => (
-                    <div
+              <div className="space-y-3 p-4">
+                {view === "compact" ? (
+                  category.envelopes.map((envelope) => (
+                    <CompactEnvelope
                       key={envelope.id}
-                      className="flex flex-col gap-2 sm:flex-col-reverse"
-                    >
-                      <div className="flex items-center justify-between px-1">
-                        <span className="text-xs text-text-muted">
-                          Dans le graphique
-                        </span>
-                        <ToggleSwitch
-                          checked={visible[envelope.id] ?? true}
-                          onToggle={() => onToggleEnvelope(envelope.id)}
-                          kind={envelope.kind}
-                          label={envelope.name}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <SemiCompactEnvelope envelope={envelope} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
+                      envelope={envelope}
+                      visible={visible[envelope.id] ?? true}
+                      onToggleEnvelope={onToggleEnvelope}
+                    />
+                  ))
+                ) : view === "detailed" ? (
+                  category.envelopes.map((envelope) => (
+                    <DetailedEnvelope
+                      key={envelope.id}
+                      envelope={envelope}
+                      visible={visible[envelope.id] ?? true}
+                      onToggleEnvelope={onToggleEnvelope}
+                    />
+                  ))
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {category.envelopes.map((envelope) => (
+                      <SemiCompactEnvelope
+                        key={envelope.id}
+                        envelope={envelope}
+                        visible={visible[envelope.id] ?? true}
+                        onToggleEnvelope={onToggleEnvelope}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : null}
           </section>
         );
       })}
     </div>
-  );
-}
-
-function SemiCompactEnvelope({
-  envelope,
-}: {
-  envelope: PanelEnvelope;
-}) {
-  const isLivret = envelope.type === "LIVRET_A";
-  return (
-    <Link
-      href={`/envelopes/${envelope.id}`}
-      className={cn(
-        "group block h-full cursor-pointer rounded-lg border p-4 transition-colors",
-        envelope.kind === "savings"
-          ? "border-info/25 bg-info/5 hover:border-info/50"
-          : "border-positive/25 bg-positive/5 hover:border-positive/50",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-medium text-text-primary group-hover:text-accent-500">
-            {envelope.name}
-          </p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            {isLivret ? "Livret A" : envelope.type}
-            {envelope.broker ? ` · ${envelope.broker}` : ""}
-          </p>
-        </div>
-        <div className="shrink-0">
-          <Sparkline series={envelope.sparkSeries} gainCents={envelope.gainCents} />
-        </div>
-      </div>
-      <div className="mt-3">
-        <p className="font-heading text-2xl font-semibold tabular-nums text-text-primary">
-          {formatEurCents(envelope.valueCents)}
-        </p>
-        <p className="mt-1">{gainPill(envelope.gainCents, envelope.investedCents)}</p>
-      </div>
-      <div className="mt-3 flex items-center justify-between border-t border-border-cw/60 pt-2.5">
-        <p className="text-xs text-text-muted">
-          {isLivret
-            ? `Versé ${formatEurCentsCompact(envelope.investedCents)}${
-                envelope.overCapCents && envelope.overCapCents > 0
-                  ? ` · ⚠ ${formatEurCentsCompact(envelope.overCapCents)} hors plafond`
-                  : ""
-              }`
-            : `${envelope.positionsCount} position${envelope.positionsCount > 1 ? "s" : ""} · investi ${formatEurCentsCompact(envelope.investedCents)}`}
-        </p>
-        <DcaMonthlyInfo envelope={envelope} />
-      </div>
-    </Link>
   );
 }

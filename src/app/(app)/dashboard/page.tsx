@@ -33,6 +33,7 @@ export default async function DashboardPage() {
     label: e.name,
     kind: e.type === "LIVRET_A" ? "savings" : "equity",
     series: e.series,
+    investedSeries: e.investedSeries,
   }));
 
   if (envelopes.length === 0) {
@@ -93,7 +94,6 @@ export default async function DashboardPage() {
 
       <DashboardWealthSection
         wealthSeries={wealthSeries}
-        wealthInvestedSeries={wealthInvestedSeries}
         envelopeToggles={envelopeToggles}
         envelopes={envelopes}
         monthChangeRatio={monthChange.ratio}

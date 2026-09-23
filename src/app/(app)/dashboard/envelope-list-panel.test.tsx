@@ -32,6 +32,10 @@ const equityEnvelope: EnvelopeSummary = {
   envelopeType: "PEA",
   dcaMonthlyCents: 15_000,
   dcaMonthlyPayments: 2,
+  topPositions: [
+    { name: "MSCI World", symbol: "CW8", valueCents: 800_000 },
+    { name: "S&P 500", symbol: "SPY", valueCents: 300_000 },
+  ],
 };
 
 const savingsEnvelope: EnvelopeSummary = {
@@ -133,6 +137,31 @@ describe("EnvelopeListPanel", () => {
     renderPanel();
     await userEvent.click(screen.getByTitle("Compacte"));
     expect(screen.getAllByText("PEA Croissance").length).toBeGreaterThan(0);
+  });
+
+  it("affiche la plus grande position et le nombre d'autres en vue détaillée", async () => {
+    renderPanel();
+    await userEvent.click(screen.getByTitle("Détaillée"));
+    expect(screen.getByText(/CW8/)).toBeInTheDocument();
+    expect(screen.getByText(/\+1 autre/)).toBeInTheDocument();
+  });
+
+  it("affiche un sparkline pour un livret avec une série récente", async () => {
+    const now = new Date();
+    renderPanel({}, {
+      envelopes: [
+        {
+          ...savingsEnvelope,
+          livretSeries: Array.from({ length: 6 }, (_, i) => ({
+            date: new Date(now.getFullYear(), now.getMonth(), 1 + i * 5),
+            balanceCents: 30_000_000 + i * 10_000,
+            overCapCents: 0,
+          })),
+        },
+      ],
+    });
+    await userEvent.click(screen.getByTitle("Détaillée"));
+    expect(document.querySelector("svg[role=img]")).not.toBeNull();
   });
 
   it("replie et déplie une catégorie", async () => {
