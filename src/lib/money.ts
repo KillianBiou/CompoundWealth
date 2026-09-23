@@ -17,19 +17,28 @@ const eurFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
-const eurCompactFormatter = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "EUR",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+function formatCompactDeterministic(euros: number): string {
+  const abs = Math.abs(euros);
+  const sign = euros < 0 ? "−" : "";
+  const format = (value: number, digits: number, unit: string) => {
+    let fixed = value.toFixed(digits);
+    if (/\.0$/.test(fixed)) fixed = fixed.slice(0, -2);
+    const [int, dec] = fixed.split(".");
+    const intFr = int.replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f");
+    return `${sign}${intFr}${dec ? "," + dec : ""} ${unit}`;
+  };
+  if (abs >= 1_000_000) return format(abs / 1_000_000, 1, "M€");
+  if (abs >= 10_000) return format(abs / 1_000, 1, "k€");
+  if (abs >= 100) return format(abs, 0, "€");
+  return format(abs, 1, "€");
+}
 
 export function formatEurCents(cents: number): string {
   return eurFormatter.format(cents / 100);
 }
 
 export function formatEurCentsCompact(cents: number): string {
-  return eurCompactFormatter.format(cents / 100);
+  return formatCompactDeterministic(cents / 100);
 }
 
 export function formatRate(ratio: number): string {
