@@ -84,6 +84,8 @@ export interface AntiquityStatus {
   yearsRemaining: number | null;
   daysRemaining: number | null;
   anniversaryDate: Date;
+  /** description « X ans et Y mois restants » pour l'affichage */
+  remainingLabel: string;
 }
 
 export function peaAntiquity(openedAt: Date, now: Date = new Date()): AntiquityStatus {
@@ -91,10 +93,34 @@ export function peaAntiquity(openedAt: Date, now: Date = new Date()): AntiquityS
   anniversary.setFullYear(anniversary.getFullYear() + PEA_ANTIQUITY_YEARS);
   const acquired = now >= anniversary;
   if (acquired) {
-    return { acquired, yearsRemaining: 0, daysRemaining: 0, anniversaryDate: anniversary };
+    return {
+      acquired,
+      yearsRemaining: 0,
+      daysRemaining: 0,
+      anniversaryDate: anniversary,
+      remainingLabel: "Ant\u00e9riorit\u00e9 acquise",
+    };
   }
-  const msRemaining = anniversary.getTime() - now.getTime();
-  const daysRemaining = Math.ceil(msRemaining / 86_400_000);
-  const yearsRemaining = Math.ceil(daysRemaining / 365.25);
-  return { acquired, yearsRemaining, daysRemaining, anniversaryDate: anniversary };
+  let yearsRemaining = anniversary.getFullYear() - now.getFullYear();
+  let monthsRemaining = anniversary.getMonth() - now.getMonth();
+  if (anniversary.getDate() < now.getDate()) monthsRemaining -= 1;
+  if (monthsRemaining < 0) {
+    monthsRemaining += 12;
+    yearsRemaining -= 1;
+  }
+  const daysRemaining = Math.ceil(
+    (anniversary.getTime() - now.getTime()) / 86_400_000,
+  );
+  return {
+    acquired,
+    yearsRemaining,
+    daysRemaining,
+    anniversaryDate: anniversary,
+    remainingLabel:
+      yearsRemaining > 0
+        ? `${yearsRemaining} an${yearsRemaining > 1 ? "s" : ""} et ${monthsRemaining} mois restants`
+        : monthsRemaining > 0
+          ? `${monthsRemaining} mois restants`
+          : `${daysRemaining} jour${daysRemaining > 1 ? "s" : ""} restants`,
+  };
 }
