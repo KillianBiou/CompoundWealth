@@ -10,6 +10,81 @@ const RESOLUTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const symbolResolutionCache = new Map<string, { symbol: string; fetchedAt: number }>();
 
+export interface MarketHistoryPoint {
+  date: Date;
+  closeCents: number;
+}
+
+export type MarketHistoryResult =
+  | { ok: true; symbol: string; points: MarketHistoryPoint[] }
+  | { ok: false; reason: string };
+
+async function resolveYahooSymbol(symbol: string): Promise<string | null> {
+  const trimmed = symbol.trim().toUpperCase();
+  if (!trimmed) return null;
+  const cached = symbolResolutionCache.get(trimmed);
+  if (cached) return cached.symbol;
+  const catalogEntry = ISIN_PATTERN.test(trimmed)
+    ? getEtfByIsin(trimmed)
+    : getEtfByTicker(trimmed);
+  if (catalogEntry?.yahooSymbol) {
+    symbolResolutionCache.set(trimmed, {
+      symbol: catalogEntry.yahooSymbol,
+      fetchedAt: Date.now(),
+    });
+    return catalogEntry.yahooSymbol;
+  }
+  const quote = await fetchMarketQuote(trimmed);
+  return quote.ok ? quote.symbol : null;
+}
+
+/**
+ * Recupere tout l'historique quotidien des cours entre deux dates en une seule
+ * requete (endpoint chart avec period1/period2 et interval=1d) : des annees
+ * de donnees pour un seul appel, au lieu d'un appel par jour.
+ */
+export async function fetchMarketHistory(
+  symbol: string,
+  fromDate: Date,
+  toDate: Date,
+): Promise<MarketHistoryResult> {
+  const resolved = await resolveYahooSymbol(symbol);
+  if (!resolved) return { ok: false, reason: "symbole introuvable" };
+  const query = `period1=${Math.floor(fromDate.getTime() / 1000)}&period2=${Math.floor(
+    toDate.getTime() / 1000,
+  )}&interval=1d`;
+  const { status, json } = await fetchJson(
+    `${YAHOO_CHART_PATH}/${encodeURIComponent(resolved)}`,
+    query,
+  );
+  if (status === 0) return { ok: false, reason: "injoignable" };
+  if (status !== 200) return { ok: false, reason: `HTTP ${status}` };
+  const result = (
+    json as {
+      chart?: {
+        result?: {
+          timestamp?: number[];
+          indicators?: { quote?: { close?: (number | null)[] }[] };
+        }[];
+      };
+    }
+  )?.chart?.result?.[0];
+  const timestamps = result?.timestamp ?? [];
+  const closes = result?.indicators?.quote?.[0]?.close ?? [];
+  const byDay = new Map<string, number>();
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const close = closes[i];
+    if (close == null) continue;
+    const dayKey = new Date(timestamps[i] * 1000).toISOString().slice(0, 10);
+    byDay.set(dayKey, Math.round(close * 100));
+  }
+  const points = [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, closeCents]) => ({ date: new Date(day), closeCents }));
+  if (points.length === 0) return { ok: false, reason: "aucune donnee historique" };
+  return { ok: true, symbol: resolved, points };
+}
+
 export interface MarketQuote {
   symbol: string;
   /** prix en centimes (1/100 d'unité de la devise) */

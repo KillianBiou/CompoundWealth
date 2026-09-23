@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
-import { fetchMarketQuote } from "@/lib/market/quotes";
+import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
@@ -544,4 +544,109 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
     };
   }
   return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
+}
+
+export async function rebuildHistoryAction(envelopeId: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId },
+    include: {
+      positions: {
+        include: {
+          investments: { orderBy: { date: "asc" } },
+          valuations: { orderBy: { date: "asc" } },
+        },
+      },
+    },
+  });
+  if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
+
+  const positionsWithHistory = envelope.positions.filter((p) => p.symbol && p.investments.length > 0);
+  if (positionsWithHistory.length === 0) {
+    return {
+      errors: {
+        form: [
+          "Aucune position avec historique de versements à reconstruire (l'historique détaillé vient de l'import bancaire)",
+        ],
+      },
+    };
+  }
+
+  const failures: string[] = [];
+  let rebuilt = 0;
+  for (const [index, position] of positionsWithHistory.entries()) {
+    const symbol = position.symbol!.trim();
+    const firstDate = position.investments[0].date;
+    const lastDate = new Date();
+    const history = await fetchMarketHistory(symbol, firstDate, lastDate);
+    if (!history.ok) {
+      failures.push(`${position.name} (${history.reason})`);
+      continue;
+    }
+
+    const sharesByDay = new Map<string, number>();
+    let shares = 0;
+    let dayCursor = 0;
+    for (const point of history.points) {
+      const dayKey = point.date.toISOString().slice(0, 10);
+      while (
+        dayCursor < position.investments.length &&
+        position.investments[dayCursor].date.getTime() <= point.date.getTime()
+      ) {
+        const inv = position.investments[dayCursor];
+        const priceAtInv = history.points.find(
+          (hp) => hp.date.getTime() >= inv.date.getTime(),
+        );
+        if (priceAtInv && priceAtInv.closeCents > 0) {
+          shares += inv.amountCents / priceAtInv.closeCents;
+        }
+        dayCursor += 1;
+      }
+      sharesByDay.set(dayKey, shares);
+    }
+
+    const valuationData = history.points
+      .map((point) => ({
+        positionId: position.id,
+        date: point.date,
+        valueCents: Math.round((sharesByDay.get(point.date.toISOString().slice(0, 10)) ?? 0) * point.closeCents),
+        source: "yahoo",
+      }))
+      .filter((v) => v.valueCents > 0);
+
+    await prisma.positionValuation.deleteMany({
+      where: { positionId: position.id, source: { in: ["import" as const, "yahoo" as const] } },
+    });
+    if (valuationData.length > 0) {
+      await prisma.positionValuation.createMany({ data: valuationData });
+    }
+    rebuilt += 1;
+    if (index < positionsWithHistory.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (rebuilt === 0) {
+    return {
+      errors: {
+        form: [`Aucun historique récupéré : ${failures.join(", ")}`],
+      },
+    };
+  }
+
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { lastPriceRefreshAt: new Date() },
+  });
+
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+
+  if (failures.length > 0) {
+    return {
+      message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} ; échec pour : ${failures.join(", ")}`,
+    };
+  }
+  return { message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} (valorisations quotidiennes)` };
 }
