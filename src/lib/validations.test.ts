@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  depositsSchema,
   envelopeSchema,
   positionSchema,
   profileSchema,
   signupSchema,
-  valuationSchema,
 } from "./validations";
 
 describe("signupSchema", () => {
@@ -50,56 +50,37 @@ describe("envelopeSchema", () => {
 });
 
 describe("positionSchema", () => {
-  it("exige un montant strictement positif quand il est fourni", () => {
-    const base = { name: "CW8", category: "ETF", boughtAt: "2026-01-15" };
-    expect(positionSchema.safeParse({ ...base, investedEur: 0 }).success).toBe(false);
-    expect(positionSchema.safeParse({ ...base, investedEur: 100.5 }).success).toBe(true);
-  });
-  it("état des lieux : sans montant investi, quantité x prix unitaire requis", () => {
-    const base = { name: "CW8", category: "ETF", boughtAt: "2026-01-15" };
-    expect(positionSchema.safeParse({ ...base }).success).toBe(false);
+  const base = { isin: "LU1681043599", boughtAt: "2026-01-15" };
+  it("accepte un ISIN du catalog avec une valeur positive", () => {
     expect(
-      positionSchema.safeParse({ ...base, quantity: 12, unitPriceEur: 70.5 }).success,
+      positionSchema.safeParse({ ...base, valueEur: 1250.5 }).success,
     ).toBe(true);
   });
-  it("quantité x prix sans montant investi est valide (snapshot)", () => {
-    const r = positionSchema.safeParse({
-      name: "CW8",
-      category: "ETF",
-      boughtAt: "2026-09-01",
-      quantity: 12,
-      unitPriceEur: 70.5,
-    });
-    expect(r.success).toBe(true);
+  it("rejette un ISIN hors catalog", () => {
+    expect(
+      positionSchema.safeParse({ ...base, isin: "US0378331005", valueEur: 100 }).success,
+    ).toBe(false);
   });
-  it("rejette une date d'achat future", () => {
-    const r = positionSchema.safeParse({
-      name: "CW8",
-      category: "ETF",
-      investedEur: 100,
-      boughtAt: "2099-01-01",
-    });
-    expect(r.success).toBe(false);
+  it("rejette une valeur nulle ou négative", () => {
+    expect(positionSchema.safeParse({ ...base, valueEur: 0 }).success).toBe(false);
+    expect(positionSchema.safeParse({ ...base, valueEur: -10 }).success).toBe(false);
   });
-  it("accepte une quantité optionnelle quand le montant est fourni", () => {
-    const r = positionSchema.safeParse({
-      name: "AAPL",
-      category: "STOCK",
-      investedEur: 500,
-      boughtAt: "2026-01-02",
-      quantity: "",
-    });
-    expect(r.success).toBe(true);
+  it("rejette une date future", () => {
+    expect(
+      positionSchema.safeParse({ ...base, valueEur: 100, boughtAt: "2099-01-01" })
+        .success,
+    ).toBe(false);
   });
 });
 
-describe("valuationSchema", () => {
-  it("rejette une date future", () => {
-    const r = valuationSchema.safeParse({ date: "2099-01-01", valueEur: 100 });
-    expect(r.success).toBe(false);
+describe("depositsSchema", () => {
+  it("rejette un montant négatif", () => {
+    expect(depositsSchema.safeParse({ depositsEur: -100 }).success).toBe(false);
   });
-  it("accepte 0 comme valeur", () => {
-    const r = valuationSchema.safeParse({ date: "2026-01-01", valueEur: 0 });
-    expect(r.success).toBe(true);
+  it("accepte 0 comme montant", () => {
+    expect(depositsSchema.safeParse({ depositsEur: 0 }).success).toBe(true);
+  });
+  it("rejette un montant au-delà du plafond", () => {
+    expect(depositsSchema.safeParse({ depositsEur: 500_001 }).success).toBe(false);
   });
 });

@@ -57,6 +57,30 @@ describe("peaAntiquity", () => {
     expect(status.acquired).toBe(false);
     expect(status.yearsRemaining).toBeGreaterThan(0);
   });
+  it("antériorité restante décomptée en années pleines, pas arrondie au plafond", () => {
+    const openedAt = new Date("2025-09-25");
+    const now = new Date("2026-10-01");
+    const status = peaAntiquity(openedAt, now);
+    expect(status.acquired).toBe(false);
+    expect(status.yearsRemaining).toBe(3);
+    expect(status.remainingLabel).toBe("3 ans et 11 mois restants");
+  });
+  it("antériorité restante : moins d'un an affiche les mois", () => {
+    const openedAt = new Date("2022-09-25");
+    const now = new Date("2026-10-01");
+    const status = peaAntiquity(openedAt, now);
+    expect(status.acquired).toBe(false);
+    expect(status.yearsRemaining).toBe(0);
+    expect(status.remainingLabel).toBe("11 mois restants");
+  });
+  it("antériorité restante : moins d'un mois affiche les jours", () => {
+    const openedAt = new Date("2021-10-15");
+    const now = new Date("2026-10-01");
+    const status = peaAntiquity(openedAt, now);
+    expect(status.acquired).toBe(false);
+    expect(status.yearsRemaining).toBe(0);
+    expect(status.remainingLabel).toBe("14 jours restants");
+  });
   it("antériorité acquise après 5 ans", () => {
     const openedAt = new Date("2020-06-01");
     const now = new Date("2026-09-22");

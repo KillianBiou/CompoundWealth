@@ -3,17 +3,23 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
+import { getEtfByIsin } from "@/lib/etf-catalog";
+import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
+import { parseBrokerImport } from "@/lib/import";
+import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
   envelopeSchema,
   loginSchema,
   positionSchema,
   profileSchema,
   signupSchema,
-  valuationSchema,
+  depositsSchema,
+  preferencesSchema,
 } from "@/lib/validations";
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
 import { createSession, destroySession, getSession } from "./session";
+import { requireUserId } from "./auth";
 
 export type ActionState = {
   errors?: Record<string, string[]>;
@@ -136,6 +142,45 @@ export async function createEnvelopeAction(
   redirect(`/envelopes/${envelope.id}`);
 }
 
+export async function updatePreferencesAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const parsed = preferencesSchema.safeParse({
+    currency: str(formData, "currency"),
+    numberLocale: str(formData, "numberLocale"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+
+  await prisma.user.update({
+    where: { id: session.userId },
+    data: {
+      currency: parsed.data.currency,
+      numberLocale: parsed.data.numberLocale,
+    },
+  });
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  return { message: "Préférences enregistrées" };
+}
+
+export async function deleteEnvelopeAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  await prisma.envelope.deleteMany({
+    where: { id: envelopeId, userId: session.userId },
+  });
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+  redirect("/envelopes");
+}
+
 export async function closeEnvelopeAction(formData: FormData): Promise<void> {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -163,69 +208,38 @@ export async function createPositionAction(
   if (!envelope) return { message: "Enveloppe introuvable" };
 
   const parsed = positionSchema.safeParse({
-    name: str(formData, "name"),
-    symbol: str(formData, "symbol"),
-    category: str(formData, "category"),
-    investedEur: str(formData, "investedEur"),
+    isin: str(formData, "isin"),
+    valueEur: str(formData, "valueEur"),
     boughtAt: str(formData, "boughtAt"),
-    quantity: str(formData, "quantity"),
-    unitPriceEur: str(formData, "unitPriceEur"),
-    notes: str(formData, "notes"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { name, symbol, category, investedEur, boughtAt, quantity, unitPriceEur, notes } =
-    parsed.data;
-  const qty = quantity === "" || quantity === undefined ? null : Number(quantity);
-  const unitPrice =
-    unitPriceEur === "" || unitPriceEur === undefined ? null : eurosToCents(Number(unitPriceEur));
+  const { isin, valueEur, boughtAt } = parsed.data;
+  const etf = getEtfByIsin(isin);
+  if (!etf) return { errors: { isin: ["ETF introuvable dans le catalog"] } };
 
-  let investedCents: number | null = null;
-  if (investedEur !== "" && investedEur !== undefined) {
-    investedCents = eurosToCents(Number(investedEur));
-  } else if (qty !== null && unitPrice !== null) {
-    investedCents = Math.round(qty * unitPrice);
-  }
+  const valueCents = eurosToCents(valueEur);
+  const date = new Date(boughtAt);
 
   const position = await prisma.position.create({
     data: {
       envelopeId,
-      name,
-      symbol: symbol || null,
-      category,
-      investedCents,
-      boughtAt: new Date(boughtAt),
-      quantity: qty,
-      unitPriceCents: unitPrice,
-      notes: notes || null,
+      name: `${etf.ticker} — ${etf.name}`,
+      symbol: etf.ticker,
+      category: "ETF",
+      investedCents: null,
+      boughtAt: date,
     },
   });
 
-  // État des lieux : valorisation initiale = montant investi connu, ou fournie séparément
-  const initialValuationEur = str(formData, "initialValueEur");
-  if (
-    initialValuationEur !== "" &&
-    !Number.isNaN(Number(initialValuationEur)) &&
-    Number(initialValuationEur) >= 0
-  ) {
-    const date = new Date(boughtAt);
-    await prisma.positionValuation.upsert({
-      where: { positionId_date: { positionId: position.id, date } },
-      create: {
-        positionId: position.id,
-        date,
-        valueCents: eurosToCents(Number(initialValuationEur)),
-      },
-      update: { valueCents: eurosToCents(Number(initialValuationEur)) },
-    });
-  } else if (investedCents !== null) {
-    const date = new Date(boughtAt);
-    await prisma.positionValuation.upsert({
-      where: { positionId_date: { positionId: position.id, date } },
-      create: { positionId: position.id, date, valueCents: investedCents },
-      update: { valueCents: investedCents },
-    });
-  }
+  await prisma.positionValuation.create({
+    data: {
+      positionId: position.id,
+      date,
+      valueCents,
+      source: "manuel",
+    },
+  });
 
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
@@ -244,7 +258,7 @@ export async function deletePositionAction(formData: FormData): Promise<void> {
   revalidatePath("/dashboard");
 }
 
-export async function addEnvelopeValuationAction(
+export async function updateDepositsAction(
   _state: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
@@ -257,21 +271,199 @@ export async function addEnvelopeValuationAction(
   });
   if (!envelope) return { message: "Enveloppe introuvable" };
 
-  const parsed = valuationSchema.safeParse({
-    date: str(formData, "date"),
-    valueEur: str(formData, "valueEur"),
+  const parsed = depositsSchema.safeParse({
+    depositsEur: str(formData, "depositsEur"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const date = new Date(parsed.data.date);
-  await prisma.envelopeValuation.upsert({
-    where: { envelopeId_date: { envelopeId, date } },
-    create: { envelopeId, date, valueCents: eurosToCents(parsed.data.valueEur) },
-    update: { valueCents: eurosToCents(parsed.data.valueEur) },
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { depositsCents: eurosToCents(parsed.data.depositsEur) },
   });
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
-  return { message: "Valorisation enregistrée" };
+  return { message: "Versements mis à jour" };
+}
+
+export interface ImportPreviewPosition {
+  isin: string | null;
+  name: string;
+  category: string;
+  quantity: number;
+  investedCents: number;
+  currentValueCents: number;
+  historyPoints: number;
+}
+
+export interface ImportPreviewEnvelope {
+  type: "PEA" | "CTO";
+  name: string;
+  broker: string | null;
+  openedAt: string | null;
+  depositsCents: number;
+  positions: ImportPreviewPosition[];
+}
+
+export type ImportActionState = ActionState & {
+  preview?: ImportPreviewEnvelope[];
+  broker?: string;
+  skippedRows?: number;
+};
+
+const MAX_IMPORT_BYTES = 5_000_000;
+
+async function readImportFile(
+  formData: FormData,
+): Promise<{ content: string } | { errors: Record<string, string[]> }> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { errors: { file: ["Sélectionnez un fichier d'export"] } };
+  }
+  if (file.size > MAX_IMPORT_BYTES) {
+    return { errors: { file: ["Fichier trop volumineux (5 Mo maximum)"] } };
+  }
+  const content = await file.text();
+  if (content.trim() === "") {
+    return { errors: { file: ["Le fichier est vide"] } };
+  }
+  return { content };
+}
+
+function parseImportContent(content: string):
+  | { parsed: BrokerImport }
+  | { errors: Record<string, string[]> } {
+  try {
+    const parsed = parseBrokerImport(content);
+    if (parsed.envelopes.length === 0 || parsed.envelopes.every((e) => e.positions.length === 0)) {
+      return { errors: { file: ["Aucune transaction d'achat exploitable dans ce fichier"] } };
+    }
+    return { parsed };
+  } catch {
+    return {
+      errors: {
+        file: [
+          "Format de fichier non reconnu. Export supporté : Trade Republic (CSV des transactions).",
+        ],
+      },
+    };
+  }
+}
+
+function toPreview(parsed: BrokerImport): ImportPreviewEnvelope[] {
+  return parsed.envelopes.map((e: ImportedEnvelope) => ({
+    type: e.type,
+    name: e.name,
+    broker: e.broker,
+    openedAt: e.openedAt,
+    depositsCents: e.depositsCents,
+    positions: e.positions.map((p: ImportedPosition) => ({
+      isin: p.isin,
+      name: p.name,
+      category: p.category,
+      quantity: p.quantity,
+      investedCents: p.investedCents,
+      currentValueCents:
+        p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].valueCents : 0,
+      historyPoints: p.valuations.length,
+    })),
+  }));
+}
+
+export async function analyzeImportAction(
+  _state: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const file = await readImportFile(formData);
+  if ("errors" in file) return { errors: file.errors };
+
+  const result = parseImportContent(file.content);
+  if ("errors" in result) return { errors: result.errors };
+
+  return {
+    message: "Export analysé — vérifiez l'aperçu puis lancez l'import",
+    broker: result.parsed.broker,
+    skippedRows: result.parsed.skippedRows,
+    preview: toPreview(result.parsed),
+  };
+}
+
+export async function confirmImportAction(
+  _state: ImportActionState,
+  formData: FormData,
+): Promise<ImportActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const file = await readImportFile(formData);
+  if ("errors" in file) return { errors: file.errors };
+
+  const result = parseImportContent(file.content);
+  if ("errors" in result) return { errors: result.errors };
+
+  const created = await prisma.$transaction(async (tx) => {
+    const names: string[] = [];
+    for (const env of result.parsed.envelopes) {
+      let name = env.name;
+      let suffix = 2;
+      while (await tx.envelope.findFirst({ where: { userId: session.userId, name } })) {
+        name = `${env.name} (${suffix})`;
+        suffix += 1;
+      }
+      const envelope = await tx.envelope.create({
+        data: {
+          userId: session.userId,
+          type: env.type,
+          name,
+          broker: env.broker,
+          openedAt: env.openedAt ? new Date(env.openedAt) : null,
+          depositsCents: env.depositsCents,
+        },
+      });
+      for (const p of env.positions) {
+        const etf = p.isin ? getEtfByIsin(p.isin) : null;
+        const position = await tx.position.create({
+          data: {
+            envelopeId: envelope.id,
+            name: etf ? `${etf.ticker} — ${etf.name}` : p.name,
+            symbol: etf?.ticker ?? p.symbol,
+            category: p.category,
+            quantity: p.quantity,
+            investedCents: p.investedCents,
+            unitPriceCents: p.unitPriceCents,
+            boughtAt: new Date(p.firstBoughtAt),
+          },
+        });
+        if (p.valuations.length > 0) {
+          await tx.positionValuation.createMany({
+            data: p.valuations.map((v) => ({
+              positionId: position.id,
+              date: new Date(v.date),
+              valueCents: v.valueCents,
+              source: "import",
+            })),
+          });
+        }
+        if (p.investments.length > 0) {
+          await tx.positionInvestment.createMany({
+            data: p.investments.map((inv) => ({
+              positionId: position.id,
+              date: new Date(inv.date),
+              amountCents: inv.amountCents,
+            })),
+          });
+        }
+      }
+      names.push(name);
+    }
+    return names;
+  });
+
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+  redirect(`/envelopes?imported=${encodeURIComponent(created.join(", "))}`);
 }
 
 export async function deleteAccountAction(): Promise<void> {
@@ -280,4 +472,184 @@ export async function deleteAccountAction(): Promise<void> {
   await prisma.user.delete({ where: { id: session.userId } });
   await destroySession();
   redirect("/login");
+}
+
+const PRICE_REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
+
+export async function refreshPricesAction(envelopeId: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId },
+    include: { positions: { include: { valuations: { orderBy: { date: "desc" }, take: 1 } } } },
+  });
+  if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
+
+  if (
+    envelope.lastPriceRefreshAt &&
+    Date.now() - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS
+  ) {
+    return { errors: { form: ["Les prix viennent d'être actualisés, réessayez dans quelques minutes"] } };
+  }
+
+  const now = new Date();
+  let updated = 0;
+  const failures: string[] = [];
+  for (const [index, position] of envelope.positions.entries()) {
+    const symbol = position.symbol?.trim();
+    if (!symbol) {
+      failures.push(`${position.name} (symbole manquant)`);
+      continue;
+    }
+    if (position.quantity === null) {
+      failures.push(`${position.name} (quantité manquante)`);
+      continue;
+    }
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1000));
+    const quote = await fetchMarketQuote(symbol);
+    if (!quote.ok) {
+      failures.push(`${position.name} (${quote.reason})`);
+      continue;
+    }
+    const valueCents = Math.round(position.quantity * quote.priceCents);
+    await prisma.positionValuation.upsert({
+      where: { positionId_date: { positionId: position.id, date: now } },
+      create: { positionId: position.id, date: now, valueCents, source: "yahoo" },
+      update: { valueCents, source: "yahoo" },
+    });
+    updated += 1;
+  }
+
+  if (updated === 0) {
+    return {
+      errors: {
+        form: [
+          `Aucun prix récupéré${failures.length > 0 ? ` : ${failures.join(", ")}` : ""}`,
+        ],
+      },
+    };
+  }
+
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { lastPriceRefreshAt: now },
+  });
+
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+
+  if (failures.length > 0) {
+    return {
+      message: `${updated} prix actualisé${updated > 1 ? "s" : ""} ; échec pour : ${failures.join(", ")}`,
+    };
+  }
+  return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
+}
+
+export async function rebuildHistoryAction(envelopeId: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId },
+    include: {
+      positions: {
+        include: {
+          investments: { orderBy: { date: "asc" } },
+          valuations: { orderBy: { date: "asc" } },
+        },
+      },
+    },
+  });
+  if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
+
+  const positionsWithHistory = envelope.positions.filter((p) => p.symbol && p.investments.length > 0);
+  if (positionsWithHistory.length === 0) {
+    return {
+      errors: {
+        form: [
+          "Aucune position avec historique de versements à reconstruire (l'historique détaillé vient de l'import bancaire)",
+        ],
+      },
+    };
+  }
+
+  const failures: string[] = [];
+  let rebuilt = 0;
+  for (const [index, position] of positionsWithHistory.entries()) {
+    const symbol = position.symbol!.trim();
+    const firstDate = position.investments[0].date;
+    const lastDate = new Date();
+    const history = await fetchMarketHistory(symbol, firstDate, lastDate);
+    if (!history.ok) {
+      failures.push(`${position.name} (${history.reason})`);
+      continue;
+    }
+
+    const sharesByDay = new Map<string, number>();
+    let shares = 0;
+    let dayCursor = 0;
+    for (const point of history.points) {
+      const dayKey = point.date.toISOString().slice(0, 10);
+      while (
+        dayCursor < position.investments.length &&
+        position.investments[dayCursor].date.getTime() <= point.date.getTime()
+      ) {
+        const inv = position.investments[dayCursor];
+        const priceAtInv = history.points.find(
+          (hp) => hp.date.getTime() >= inv.date.getTime(),
+        );
+        if (priceAtInv && priceAtInv.closeCents > 0) {
+          shares += inv.amountCents / priceAtInv.closeCents;
+        }
+        dayCursor += 1;
+      }
+      sharesByDay.set(dayKey, shares);
+    }
+
+    const valuationData = history.points
+      .map((point) => ({
+        positionId: position.id,
+        date: point.date,
+        valueCents: Math.round((sharesByDay.get(point.date.toISOString().slice(0, 10)) ?? 0) * point.closeCents),
+        source: "yahoo",
+      }))
+      .filter((v) => v.valueCents > 0);
+
+    await prisma.positionValuation.deleteMany({
+      where: {
+        positionId: position.id,
+        NOT: { source: "manuel" as const },
+      },
+    });
+    if (valuationData.length > 0) {
+      await prisma.positionValuation.createMany({ data: valuationData });
+    }
+    rebuilt += 1;
+    if (index < positionsWithHistory.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  if (rebuilt === 0) {
+    return {
+      errors: {
+        form: [`Aucun historique récupéré : ${failures.join(", ")}`],
+      },
+    };
+  }
+
+  await prisma.envelope.update({
+    where: { id: envelopeId },
+    data: { lastPriceRefreshAt: new Date() },
+  });
+
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/envelopes");
+  revalidatePath("/dashboard");
+
+  if (failures.length > 0) {
+    return {
+      message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} ; échec pour : ${failures.join(", ")}`,
+    };
+  }
+  return { message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} (valorisations quotidiennes)` };
 }

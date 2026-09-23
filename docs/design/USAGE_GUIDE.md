@@ -47,7 +47,17 @@ Chaque champ peut être renseigné séparément et modifié ou effacé à tout m
 3. Renseigner : nom (ex. « PEA Bourse »), courtier (optionnel), date d'ouverture (recommandée pour le PEA : elle déclenche le compte à rebours des 5 ans).
 4. Enregistrer → l'enveloppe apparaît sur le dashboard.
 
-Pour un PEA, l'app affiche ensuite en permanence : **Versements cumulés / 150 000 €** et **Antériorité fiscale : X ans restants**.
+Pour un PEA, l'app affiche ensuite en permanence : **Versements : X / 150 000 €** — cliquez sur le badge pour ouvrir une petite modale et renseigner vos versements cumulés (avec texte explicatif) — et **Antériorité fiscale : X ans restants**.
+
+### Importer un export bancaire
+
+Plutôt que de tout saisir à la main, la page Enveloppes propose **Importer un export** :
+
+1. Déposez le **CSV des transactions** de votre courtier (ex. Trade Republic : « Compte → Historique → Exporter »).
+2. **Analysez** : le courtier est détecté automatiquement, rien n'est enregistré. L'aperçu liste les enveloppes détectées (PEA/CTO), leurs positions avec nombre de parts et montant investi, la valeur actuelle et le nombre de points d'historique reconstruits. Les lignes ignorées (dividendes, mouvements d'espèces) sont comptées et affichées.
+3. **Importez** : les enveloppes sont créées automatiquement avec — le type (PEA ou CTO selon les lignes du fichier), la date d'ouverture (premier achat), les **versements cumulés** (total investi, alimentant le compteur Versements / 150 000 € du PEA), les positions avec parts, montant investi et prix unitaire (dernier prix connu du fichier, statique pour l'instant), et le graphique d'évolution reconstruit point par point depuis l'historique des achats.
+
+> Le prix « actuel » d'une position est pour l'instant le dernier prix présent dans le fichier — une valeur statique. La connexion à des cours en temps réel viendra plus tard. Ajouter un nouvel export d'une autre banque ne demande que d'écrire un nouvel adaptateur au format du courtier.
 
 ## 3. Positions — la composition
 
@@ -55,36 +65,28 @@ Pour un PEA, l'app affiche ensuite en permanence : **Versements cumulés / 150 0
 
 Dans l'enveloppe → **+ Ajouter une position** :
 
-1. **Recherche par identifiant / ticker** (ex. `CW8`, `AAPL`, `CW8.PA`) : une liste de suggestions apparaît avec le nom, la place de cotation et le type. En sélectionnant une ligne, le nom, la catégorie et le **cours actuel** sont pré-remplis depuis une base publique (Yahoo Finance). Vous pouvez aussi tout saisir manuellement.
-2. Complétez :
-   - **Nom affiché** (requis)
-   - **Catégorie** — ETF, Action, Obligation, Fonds, Autre (auto si recherche utilisée)
-   - **Montant investi** (requis, > 0)
-   - **Date d'achat** (requis)
-   - Quantité et prix unitaire (optionnels)
+1. **Recherche par nom ou ISIN** dans le catalog des ETF éligibles au PEA (ex. `CW8`, `MSCI World`, `LU1681043599`). La liste affiche le ticker, la catégorie d'indice, le TER, le nom et l'ISIN de chaque ETF.
+2. Saisissez la **valeur actuelle de la position** (€) — pas de nombre de parts ni de cours unitaire : la valeur de la ligne à l'instant T.
+3. Renseignez la **date de l'état des lieux**.
 
-Le montant investi alimente automatiquement le « total investi » de l'enveloppe. Les montants sont en euros ; c'est la valeur que vous avez réellement investie, frais inclus.
+L'ajout se fait en deux valeurs : l'ETF depuis le catalog, la valeur en euros. Aucun montant investi historique n'est demandé — la variation et les détails de la valeur viendront plus tard.
 
 ### « J'arrive en cours » — état des lieux d'une enveloppe existante
 
-Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Cochez **« J'arrive en cours »** lors de l'ajout :
+Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Le formulaire d'ajout est pensé exactement pour ce cas :
 
-- Renseignez la **quantité détenue** et le **cours actuel** (pré-rempli si trouvé via la recherche), ou directement la **valeur totale de la ligne** à l'instant T.
+- Sélectionnez votre ETF dans la liste, puis renseignez directement la **valeur totale de la ligne** à l'instant T.
 - Aucun montant investi n'est requis : la position est créée en « état des lieux », avec sa valeur actuelle.
 - Les KPIs de gain/perte affichent alors « — » avec la mention *état des lieux* tant que les montants investis ne sont pas renseignés.
-- Vous pouvez compléter le montant investi plus tard (édition de la position) pour activer le suivi du gain.
 
 L'important est de pouvoir **commencer à suivre la valeur dès aujourd'hui** sans devoir reconstituer tout l'historique fiscal.
 
-### Suivre la valeur — les valorisations
+### Suivre la valeur — le graphique d'évolution
 
-C'est **l'action clé de l'app** : elle alimente le graphique d'évolution.
+Le graphique se construit **automatiquement** à partir des états des lieux de vos positions : chaque fois que vous ajoutez ou mettez à jour une position avec sa valeur actuelle, la courbe de l'enveloppe s'agrège tous les points.
 
-1. Enveloppe → **Ajouter une valorisation** (ou sur une position précise).
-2. Renseigner : date + valeur actuelle.
-3. Une valorisation par date : en re-saisir une à la même date remplace l'ancienne.
-
-**Rythme conseillé** : une fois par mois (ex. le 1er du mois), 30 secondes suffisent. Chaque point de la courbe vient d'une valorisation réelle — l'app n'invente jamais de valeur entre deux points.
+- Plus besoin de saisir une valorisation d'enveloppe : la valeur de l'enveloppe est la somme des dernières valeurs connues de chaque position.
+- Chaque point de la courbe vient d'une valeur réelle saisie — l'app n'invente jamais de valeur entre deux points.
 
 ## 4. Le graphique d'évolution
 
@@ -96,8 +98,8 @@ Sur chaque enveloppe (et en global sur le dashboard) :
 - **Ligne de référence** : total investi, pour visualiser d'un coup d'œil le gain cumulé.
 
 États particuliers :
-- Aucune valorisation → message « Ajoutez une première valorisation pour voir la courbe ».
-- Une seule valorisation → point unique + invitation à en ajouter d'autres.
+- Aucune position valorisée → message invitant à ajouter une première position.
+- Une seule valeur → point unique + invitation à suivre la valeur plus tard.
 
 ## 5. Dashboard — la vue d'ensemble
 
@@ -109,7 +111,7 @@ Sur chaque enveloppe (et en global sur le dashboard) :
 
 **Dois-je connecter ma banque ?** Non. CompoundWealth est volontairement manuel : aucune synchronisation, aucune donnée bancaire.
 
-**Que se passe-t-il si je me trompe sur un montant ?** Éditez la position ou la valorisation ; l'historique se recalcule.
+**Que se passe-t-il si je me trompe sur un montant ?** Supprimez et re-créez la position, ou corrigez les versements ; l'historique se recalcule.
 
 **Puis-je supprimer une enveloppe ?** Oui, avec confirmation ; elle est archivée et reste consultable, l'historique n'est jamais perdu silencieusement.
 

@@ -16,8 +16,15 @@ Webapp moderne de suivi de portefeuille d'investissement long terme — visualis
 ```bash
 pnpm install
 cp .env.example .env          # puis définissez un SESSION_SECRET fort
-pnpm prisma db push           # crée la base SQLite
+pnpm prisma db push           # crée/migre la base SQLite et régénère le client Prisma
 pnpm dev                      # http://localhost:3000
+```
+
+Après chaque `git pull` qui modifie `prisma/schema.prisma`, relancez :
+
+```bash
+pnpm prisma db push
+pnpm dev  # ou supprimez .next si le serveur dev était déjà lancé
 ```
 
 ## Commandes

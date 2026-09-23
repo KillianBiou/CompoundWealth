@@ -1,23 +1,31 @@
 import { notFound } from "next/navigation";
-import { getEnvelope } from "@/server/queries";
+import { getEnvelope, getCurrentUser } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
+import { buildEnvelopeValuations } from "@/lib/portfolio/series";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { AddPositionForm } from "./add-position-form";
-import { AddValuationForm } from "./add-valuation-form";
+import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
+import { EnvelopeDangerZone } from "./danger-zone";
+import { RefreshPricesButton } from "./refresh-prices-button";
+import { RebuildHistoryButton } from "./rebuild-history-button";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const envelope = await getEnvelope(id);
+  const [envelope, user] = await Promise.all([getEnvelope(id), getCurrentUser()]);
   if (!envelope || envelope.closedAt) notFound();
 
-  const investedCents = envelope.positions.reduce(
+  const positionsInvestedCents = envelope.positions.reduce(
     (s, p) => s + (p.investedCents ?? 0),
     0,
   );
-  const hasUnknownInvested = envelope.positions.some((p) => p.investedCents === null);
+  const depositsCents = envelope.depositsCents ?? positionsInvestedCents;
+  const investedCents = depositsCents;
+  const hasUnknownInvested =
+    envelope.depositsCents === null &&
+    envelope.positions.some((p) => p.investedCents === null);
   const positionsValue = envelope.positions.reduce(
     (s, p) =>
       s +
@@ -26,8 +34,18 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         : (p.investedCents ?? 0)),
     0,
   );
-  const valuations = envelope.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents }));
+  const valuations = buildEnvelopeValuations(envelope.positions);
   const valueCents = valuations.length > 0 ? valuations[valuations.length - 1].valueCents : positionsValue;
+  const investments = envelope.positions.flatMap((p) =>
+    p.investments.map((i) => ({ date: i.date, amountCents: i.amountCents })),
+  );
+  const lastValuationDates = envelope.positions.flatMap((p) =>
+    p.valuations.length > 0 ? [p.valuations[p.valuations.length - 1].date] : [],
+  );
+  const lastValuationDate =
+    lastValuationDates.length > 0
+      ? new Date(Math.max(...lastValuationDates.map((d) => d.getTime())))
+      : null;
   const gainCents = hasUnknownInvested ? null : valueCents - investedCents;
   const gainRatio =
     investedCents > 0 && gainCents !== null ? gainCents / investedCents : null;
@@ -90,15 +108,17 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       </Card>
 
       {envelope.type === "PEA" ? (
-        <div className="flex flex-wrap gap-2">
-          <Badge tone="accent">
-            Versements : {formatEurCents(investedCents)} / {rules.depositCapLabel}
-          </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <DepositsBadge
+            envelopeId={envelope.id}
+            depositsCents={depositsCents}
+            depositCapLabel={rules.depositCapLabel}
+          />
           {antiquity ? (
             <Badge tone={antiquity.acquired ? "positive" : "neutral"}>
               {antiquity.acquired
                 ? "Antériorité fiscale acquise ✓"
-                : `Antériorité : ${antiquity.yearsRemaining} an${antiquity.yearsRemaining! > 1 ? "s" : ""} restant${antiquity.yearsRemaining! > 1 ? "s" : ""}`}
+                : `Antériorité : ${antiquity.remainingLabel}`}
             </Badge>
           ) : (
             <Badge tone="neutral">Date d&apos;ouverture à renseigner pour l&apos;antériorité</Badge>
@@ -111,41 +131,49 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           label="Total investi"
           value={hasUnknownInvested ? `${formatEurCents(investedCents)} + ?` : formatEurCents(investedCents)}
         />
-        <Kpi label="Valeur actuelle" value={formatEurCents(valueCents)} />
+        <Kpi
+          label="Valeur actuelle"
+          value={formatEurCents(valueCents)}
+          sub={lastValuationDate ? `Actualisée le ${lastValuationDate.toLocaleDateString("fr-FR")}` : undefined}
+        />
         {gainCents !== null && gainRatio !== null ? (
-          <Kpi
-            label="Gain / perte"
-            value={formatEurCents(Math.abs(gainCents))}
-            sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
-            subTone={gainCents >= 0 ? "positive" : "negative"}
-          />
+          <div className="flex items-start justify-between gap-3">
+            <Kpi
+              label={gainCents >= 0 ? "Gain" : "Perte"}
+              value={formatEurCents(Math.abs(gainCents))}
+              sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
+              subTone={gainCents >= 0 ? "positive" : "negative"}
+            />
+            <div className="flex gap-2"><RebuildHistoryButton envelopeId={envelope.id} /><RefreshPricesButton envelopeId={envelope.id} /></div>
+          </div>
         ) : (
-          <Kpi
-            label="Gain / perte"
-            value="—"
-            sub="Complétez les montants investis pour calculer le gain"
-          />
+          <div className="flex items-start justify-between gap-3">
+            <Kpi
+              label="Gain / perte"
+              value="—"
+              sub="Complétez les montants investis pour calculer le gain"
+            />
+            <div className="flex gap-2"><RebuildHistoryButton envelopeId={envelope.id} /><RefreshPricesButton envelopeId={envelope.id} /></div>
+          </div>
         )}
       </Card>
+
 
       <Card>
         <h2 className="mb-4 font-heading text-lg font-semibold">Évolution de la valeur</h2>
         <EnvelopeChart
           valuations={valuations}
           investedCents={hasUnknownInvested ? 0 : investedCents}
+          investments={investments}
+          currency={user?.currency ?? "EUR"}
+          numberLocale={user?.numberLocale === "en" ? "en" : "fr"}
         />
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une valorisation</h2>
-          <AddValuationForm envelopeId={envelope.id} />
-        </Card>
-        <Card>
-          <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
-          <AddPositionForm envelopeId={envelope.id} />
-        </Card>
-      </div>
+      <Card>
+        <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
+        <AddPositionForm envelopeId={envelope.id} />
+      </Card>
 
       <PositionsTable
         envelopeId={envelope.id}
@@ -160,8 +188,11 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
               ? p.valuations[p.valuations.length - 1].valueCents
               : (p.investedCents ?? null),
           boughtAt: p.boughtAt,
+          valuationDate: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].date : null,
+          valuationSource: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].source : null,
         }))}
       />
+      <EnvelopeDangerZone envelopeId={envelope.id} envelopeName={envelope.name} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
-import { currentValueCents } from "@/lib/portfolio/series";
+import { buildEnvelopeValuations, currentValueCents } from "@/lib/portfolio/series";
 
 export interface EnvelopeSummary {
   id: string;
@@ -36,18 +36,21 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
   });
 
   return envelopes.map((e) => {
-    const investedCents = e.positions.reduce(
+    const positionsInvestedCents = e.positions.reduce(
       (s, p) => s + (p.investedCents ?? 0),
       0,
     );
-    const hasUnknownInvested = e.positions.some((p) => p.investedCents === null);
+    const investedCents = e.depositsCents ?? positionsInvestedCents;
     const positionsValue = e.positions.reduce(
       (s, p) => s + currentValueCents(p.valuations, p.investedCents ?? 0),
       0,
     );
-    const envelopeValue = e.valuations.length
-      ? e.valuations[e.valuations.length - 1].valueCents
+    const valuations = buildEnvelopeValuations(e.positions);
+    const envelopeValue = valuations.length
+      ? valuations[valuations.length - 1].valueCents
       : positionsValue;
+    const hasUnknownInvested =
+      e.depositsCents === null && e.positions.some((p) => p.investedCents === null);
     const gainCents = hasUnknownInvested ? null : envelopeValue - investedCents;
     return {
       id: e.id,
@@ -61,7 +64,7 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       valueCents: envelopeValue,
       gainCents,
       positionsCount: e.positions.length,
-      series: e.valuations.map((v) => ({ date: v.date, valueCents: v.valueCents })),
+      series: valuations,
     };
   });
 });
@@ -72,7 +75,10 @@ export const getEnvelope = cache(async (envelopeId: string) => {
     where: { id: envelopeId, userId },
     include: {
       positions: {
-        include: { valuations: { orderBy: { date: "asc" } } },
+        include: {
+          valuations: { orderBy: { date: "asc" } },
+          investments: { orderBy: { date: "asc" } },
+        },
         orderBy: { boughtAt: "desc" },
       },
       valuations: { orderBy: { date: "asc" } },
@@ -84,6 +90,15 @@ export const getCurrentUser = cache(async () => {
   const userId = await requireUserId();
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, age: true, job: true, salaryCents: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      age: true,
+      job: true,
+      salaryCents: true,
+      currency: true,
+      numberLocale: true,
+    },
   });
 });
