@@ -234,7 +234,7 @@ export function LivretDcaSection({
               label="Montant par versement (€)"
               htmlFor="livret-dca-amount"
               error={state?.errors?.maxAmountEur}
-              hint="Exemple : 200 € chaque mois — attention au plafond de 22 950 €"
+              hint="Exemple : 200 € chaque mois — les versements sont bloqués au plafond de 22 950 €"
             >
               <Input
                 id="livret-dca-amount"

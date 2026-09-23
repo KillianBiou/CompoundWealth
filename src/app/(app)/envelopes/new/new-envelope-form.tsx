@@ -23,7 +23,7 @@ const types: { value: EnvelopeType; title: string; description: string; recommen
     value: "LIVRET_A",
     title: "Livret A",
     description:
-      "Épargne réglementée : plafond 22 950 €, taux 1,7 %, exonérée d'impôt. Sans positions — suivi du solde et DCA.",
+      "Épargne réglementée : versements plafonnés à 22 950 € (seuls les intérêts dépassent), taux 1,7 %, exonérée d'impôt. Sans positions.",
   },
 ];
 

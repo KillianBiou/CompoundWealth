@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
-import { LIVRET_A_DEFAULT_INFLATION, LIVRET_A_RATE } from "@/lib/livret";
+import {
+  LIVRET_A_DEFAULT_INFLATION,
+  LIVRET_A_DEPOSIT_CAP_CENTS,
+  LIVRET_A_RATE,
+} from "@/lib/livret";
+import { formatEurCents } from "@/lib/money";
 import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
@@ -836,11 +841,29 @@ export async function addLivretDepositAction(
     amountEur: str(formData, "amountEur"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const amountCents = eurosToCents(parsed.data.amountEur);
+  if (amountCents > 0) {
+    const priorDeposits = await prisma.envelopeDeposit.findMany({
+      where: { envelopeId, amountCents: { gt: 0 } },
+      select: { amountCents: true },
+    });
+    const deposited = priorDeposits.reduce((s, d) => s + d.amountCents, 0);
+    if (deposited + amountCents > LIVRET_A_DEPOSIT_CAP_CENTS) {
+      const remainingCents = Math.max(0, LIVRET_A_DEPOSIT_CAP_CENTS - deposited);
+      return {
+        errors: {
+          form: [
+            `Plafond de versement dépassé : ${formatEurCents(deposited)} déjà versés sur le plafond de 22 950 €. Il reste ${formatEurCents(remainingCents)} de capacité de versement — seuls les intérêts peuvent porter le solde au-delà.`,
+          ],
+        },
+      };
+    }
+  }
   await prisma.envelopeDeposit.create({
     data: {
       envelopeId,
       date: new Date(parsed.data.date),
-      amountCents: eurosToCents(parsed.data.amountEur),
+      amountCents,
     },
   });
   revalidatePath(`/envelopes/${envelopeId}`);

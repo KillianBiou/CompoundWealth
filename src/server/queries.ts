@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
+import { windowSummaries, type DcaPricedLine } from "@/lib/dca";
 import {
   buildEnvelopeInvestedSeries,
   buildEnvelopeValuations,
@@ -40,6 +41,9 @@ export interface EnvelopeSummary {
   inflationRate?: number | null;
   /** part du solde au-dessus du plafond */
   overCapCents?: number;
+  /** DCA actif : total mensuel estimé en centimes et nombre de versements sur 1 mois */
+  dcaMonthlyCents?: number;
+  dcaMonthlyPayments?: number;
   /** projection 1 an : perte de pouvoir d'achat */
   projection?: {
     interestCents: number;
@@ -66,6 +70,7 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       },
       valuations: { orderBy: { date: "asc" } },
       deposits: { orderBy: { date: "asc" } },
+      dcaPlans: { include: { lines: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -89,8 +94,14 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       0,
     );
     const valuations = buildEnvelopeValuations(e.positions);
-    const livretSeries = e.type === "LIVRET_A" ? buildLivretBalanceSeries(livretEvents, livretRate) : [];
-    const livretValue = livretSeries.length ? livretSeries[livretSeries.length - 1].balanceCents : 0;
+    const nowTime = Date.now();
+    const livretSeriesFull =
+      e.type === "LIVRET_A" ? buildLivretBalanceSeries(livretEvents, livretRate) : [];
+    const livretCurrentPoint =
+      e.type === "LIVRET_A"
+        ? [...livretSeriesFull].reverse().find((p) => p.date.getTime() <= nowTime) ?? null
+        : null;
+    const livretValue = livretCurrentPoint ? livretCurrentPoint.balanceCents : 0;
     const envelopeValue =
       e.type === "LIVRET_A"
         ? livretValue
@@ -99,8 +110,20 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
           : positionsValue;
     const effectiveSeries: ValuationPoint[] =
       e.type === "LIVRET_A"
-        ? livretSeries.map((p) => ({ date: p.date, valueCents: p.balanceCents }))
+        ? livretSeriesFull
+            .filter((p) => p.date.getTime() <= nowTime)
+            .map((p) => ({ date: p.date, valueCents: p.balanceCents }))
         : valuations;
+    const dcaLines: DcaPricedLine[] = e.dcaPlans.flatMap((plan) =>
+      plan.lines.map((line) => ({
+        plan: { frequency: plan.frequency, startDate: plan.startDate, active: plan.active },
+        line: { isin: line.isin, maxAmountCents: line.maxAmountCents, active: line.active },
+        priceCents: null,
+      })),
+    );
+    const dcaMonthly = dcaLines.length
+      ? windowSummaries(dcaLines, e.type)[ "1m" ]
+      : { totalMaxCents: 0, totalEstimatedCents: 0, paymentsCount: 0 };
     const hasUnknownInvested =
       e.depositsCents === null && e.positions.some((p) => p.investedCents === null);
     const gainCents = hasUnknownInvested ? null : envelopeValue - investedCents;
@@ -124,12 +147,18 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
               .map((p) => ({ date: p.date, valueCents: p.depositedCents }))
           : buildEnvelopeInvestedSeries(e.positions),
       envelopeType: e.type,
+      ...(dcaMonthly.totalMaxCents > 0
+        ? {
+            dcaMonthlyCents: dcaMonthly.totalEstimatedCents,
+            dcaMonthlyPayments: dcaMonthly.paymentsCount,
+          }
+        : {}),
       ...(e.type === "LIVRET_A"
         ? (() => {
             const inflation = e.inflationRate ?? LIVRET_A_DEFAULT_INFLATION;
             const projection = projectOneYear(livretEvents, livretRate, inflation);
             return {
-              livretSeries: livretSeries.map((p) => ({
+              livretSeries: livretSeriesFull.map((p) => ({
                 date: p.date,
                 balanceCents: p.balanceCents,
                 overCapCents: p.overCapCents,
