@@ -4,7 +4,7 @@ import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "./ui";
 import { cn } from "./cn";
 
-function Sparkline({
+export function Sparkline({
   series,
   gainCents,
 }: {
