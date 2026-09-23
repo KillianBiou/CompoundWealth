@@ -76,7 +76,7 @@ export function DcaTable({ envelopeId, rows }: { envelopeId: string; rows: DcaTa
                     <input type="hidden" name="envelopeId" value={envelopeId} />
                     <button
                       type="submit"
-                      className="text-xs text-text-muted transition-colors hover:text-text-primary"
+                      className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-accent-500/50 hover:text-text-primary"
                     >
                       {row.active ? "Mettre en pause" : "Reprendre"}
                     </button>
@@ -86,7 +86,7 @@ export function DcaTable({ envelopeId, rows }: { envelopeId: string; rows: DcaTa
                     <input type="hidden" name="envelopeId" value={envelopeId} />
                     <button
                       type="submit"
-                      className="text-xs text-text-muted transition-colors hover:text-negative"
+                      className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-negative/60 hover:text-negative"
                     >
                       Supprimer
                     </button>

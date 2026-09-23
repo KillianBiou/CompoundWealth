@@ -94,6 +94,34 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[role="tab"],
+[role="option"],
+summary,
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+[title]:not(button):not(a):not([role="button"]) {
+  cursor: help;
+}
+
+.recharts-wrapper,
+.recharts-surface {
+  cursor: crosshair;
+}
+
+.recharts-tooltip-cursor {
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
