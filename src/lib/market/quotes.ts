@@ -4,9 +4,8 @@ const YAHOO_HOSTS = ["query1.finance.yahoo.com", "query2.finance.yahoo.com"];
 const YAHOO_CHART_PATH = "/v8/finance/chart";
 const YAHOO_SEARCH_PATH = "/v1/finance/search";
 const USER_AGENT =
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
 const FETCH_TIMEOUT_MS = 8000;
-const SESSION_TTL_MS = 60 * 60 * 1000;
 const RESOLUTION_TTL_MS = 24 * 60 * 60 * 1000;
 
 const symbolResolutionCache = new Map<string, { symbol: string; fetchedAt: number }>();
@@ -30,62 +29,29 @@ interface YahooChartMeta {
   regularMarketPrice?: number;
 }
 
-let sessionCookie: { value: string; fetchedAt: number } | null = null;
-
-async function getSessionCookie(force = false): Promise<string> {
-  if (
-    !force &&
-    sessionCookie &&
-    Date.now() - sessionCookie.fetchedAt < SESSION_TTL_MS
-  ) {
-    return sessionCookie.value;
-  }
-  try {
-    const response = await fetch("https://fc.yahoo.com", {
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    const cookies = (response.headers.getSetCookie?.() ?? [])
-      .map((c) => c.split(";")[0])
-      .join("; ");
-    sessionCookie = { value: cookies, fetchedAt: Date.now() };
-    return cookies;
-  } catch {
-    sessionCookie = { value: "", fetchedAt: Date.now() };
-    return "";
-  }
-}
-
 /**
- * Yahoo exige un cookie de session (fc.yahoo.com) depuis 2024, sinon l'API
- * renvoie 429. En cas de 429, on renouvelle la session une fois puis on
- * réessaie, en alternant query1/query2.
+ * L'API chart de Yahoo est ouverte sans session ; envoyer un cookie sans le
+ * crumb associé déclenche au contraire un 429. On envoie donc exactement ce
+ * qu'un curl simple envoie : un User-Agent navigateur et rien d'autre, en
+ * basculant sur query2 si query1 échoue côté réseau.
  */
 async function fetchJson(
   path: string,
   query: string,
 ): Promise<{ status: number; json: unknown } | { status: number; json: null }> {
   for (const host of YAHOO_HOSTS) {
-    let cookie = await getSessionCookie();
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const response = await fetch(`https://${host}${path}?${query}`, {
-          headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "application/json",
-            ...(cookie ? { Cookie: cookie } : {}),
-          },
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        });
-        if (response.status === 429 && attempt === 0) {
-          cookie = await getSessionCookie(true);
-          continue;
-        }
-        if (!response.ok) return { status: response.status, json: null };
-        return { status: response.status, json: await response.json() };
-      } catch {
-        break;
-      }
+    try {
+      const response = await fetch(`https://${host}${path}?${query}`, {
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) return { status: response.status, json: null };
+      return { status: response.status, json: await response.json() };
+    } catch {
+      continue;
     }
   }
   return { status: 0, json: null };
