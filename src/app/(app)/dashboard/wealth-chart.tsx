@@ -192,6 +192,9 @@ export function WealthChart({
     const investedTotalVisible = aggregateSeries(
       visibleToggles.map((t) => t.investedSeries ?? []),
     );
+    // performance sur les seules enveloppes visibles : les dépôts d'une enveloppe
+    // masquée ne doivent pas rester dans la courbe de valorisation
+    const visibleValuations = aggregateSeries(visibleToggles.map((t) => t.series));
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
@@ -202,7 +205,7 @@ export function WealthChart({
       investedTotalVisible,
       true,
     ).filter((p) => p.date >= startBoundary);
-    const performance = periodPerformance(valuations, investedTotalVisible, period);
+    const performance = periodPerformance(visibleValuations, investedTotalVisible, period);
     return {
       data: merged,
       changeCents: performance.gainCents,
