@@ -33,9 +33,12 @@ model Envelope {
   depositsCents Int?
   createdAt   DateTime           @default(now())
   lastPriceRefreshAt DateTime?
+  interestRate  Float?
+  inflationRate Float?
   positions   Position[]
   valuations  EnvelopeValuation[]
   dcaPlans    DcaPlan[]
+  deposits    EnvelopeDeposit[]
 
   @@index([userId])
 }
@@ -43,6 +46,7 @@ model Envelope {
 enum EnvelopeType {
   PEA
   CTO
+  LIVRET_A
 }
 
 enum DcaFrequency {
@@ -136,4 +140,15 @@ model DcaLine {
   createdAt      DateTime @default(now())
 
   @@index([planId])
+}
+
+model EnvelopeDeposit {
+  id          String    @id @default(cuid())
+  envelopeId  String
+  envelope    Envelope  @relation(fields: [envelopeId], references: [id], onDelete: Cascade)
+  date        DateTime
+  amountCents Int
+  createdAt   DateTime  @default(now())
+
+  @@index([envelopeId])
 }

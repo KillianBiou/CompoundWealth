@@ -24,6 +24,12 @@ export default async function DashboardPage() {
   const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
   const wealthSeries = aggregateSeries(envelopes.map((e) => e.series));
   const wealthInvestedSeries = aggregateSeries(envelopes.map((e) => e.investedSeries));
+  const savingsSeries = aggregateSeries(
+    envelopes.filter((e) => e.type === "LIVRET_A").map((e) => e.series),
+  );
+  const equitySeries = aggregateSeries(
+    envelopes.filter((e) => e.type !== "LIVRET_A").map((e) => e.series),
+  );
   const monthChange = periodChange(wealthSeries, wealthInvestedSeries, "1m");
   const yearChange = periodChange(wealthSeries, wealthInvestedSeries, "1y");
 
@@ -110,7 +116,12 @@ export default async function DashboardPage() {
               </p>
             </div>
           </div>
-          <WealthChart valuations={wealthSeries} investedPoints={wealthInvestedSeries} />
+          <WealthChart
+            valuations={wealthSeries}
+            investedPoints={wealthInvestedSeries}
+            savingsPoints={savingsSeries}
+            equityPoints={equitySeries}
+          />
         </Card>
       ) : null}
 

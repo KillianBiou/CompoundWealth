@@ -31,27 +31,30 @@ const periods: { key: PeriodKey; label: string }[] = [
 
 interface ChartPoint {
   date: number;
-  value: number | null;
+  savings: number | null;
+  equity: number | null;
   invested: number | null;
 }
 
 function mergeSeries(
-  valuations: ValuationPoint[],
+  savings: ValuationPoint[],
+  equity: ValuationPoint[],
   investedPoints: ValuationPoint[],
 ): ChartPoint[] {
   const times = [
     ...new Set([
-      ...valuations.map((v) => v.date.getTime()),
+      ...savings.map((v) => v.date.getTime()),
+      ...equity.map((v) => v.date.getTime()),
       ...investedPoints.map((v) => v.date.getTime()),
     ]),
   ].sort((a, b) => a - b);
   return times.map((time) => {
-    const value = valueAt(valuations, new Date(time));
-    const invested = valueAt(investedPoints, new Date(time));
+    const date = new Date(time);
     return {
       date: time,
-      value: valuations.length > 0 ? value / 100 : null,
-      invested: investedPoints.length > 0 ? invested / 100 : null,
+      savings: savings.length > 0 ? valueAt(savings, date) / 100 : null,
+      equity: equity.length > 0 ? valueAt(equity, date) / 100 : null,
+      invested: investedPoints.length > 0 ? valueAt(investedPoints, date) / 100 : null,
     };
   });
 }
@@ -65,8 +68,11 @@ function ChartTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
-  const value = point.value;
+  const savings = point.savings;
+  const equity = point.equity;
   const invested = point.invested;
+  const hasValue = savings !== null || equity !== null;
+  const value = hasValue ? ((savings ?? 0) + (equity ?? 0)) * 100 : null;
   const gain = value !== null && invested !== null ? value - invested : null;
   return (
     <div className="rounded-lg border border-border-cw bg-bg-elevated p-3 text-xs shadow-lg">
@@ -77,6 +83,20 @@ function ChartTooltip({
           year: "numeric",
         })}
       </p>
+      {savings !== null ? (
+        <p className="tabular-nums text-text-secondary">
+          Épargne&nbsp;:{" "}
+          <span className="font-medium" style={{ color: "var(--info)" }}>
+            {formatEurCents(savings * 100)}
+          </span>
+        </p>
+      ) : null}
+      {equity !== null ? (
+        <p className="tabular-nums text-text-secondary">
+          Actions / ETF&nbsp;:{" "}
+          <span className="font-medium text-positive">{formatEurCents(equity * 100)}</span>
+        </p>
+      ) : null}
       {invested !== null ? (
         <p className="tabular-nums text-text-secondary">
           Investi&nbsp;:{" "}
@@ -85,25 +105,14 @@ function ChartTooltip({
           </span>
         </p>
       ) : null}
-      {value !== null ? (
-        <p className="tabular-nums text-text-secondary">
-          Patrimoine&nbsp;:{" "}
-          <span className="font-semibold text-text-primary">
-            {formatEurCents(value * 100)}
-          </span>
-        </p>
-      ) : null}
       {gain !== null ? (
         <p className="mt-1 border-t border-border-cw pt-1 tabular-nums">
           Plus/moins-value&nbsp;:{" "}
           <span
-            className={cn(
-              "font-medium",
-              gain >= 0 ? "text-positive" : "text-negative",
-            )}
+            className={cn("font-medium", gain >= 0 ? "text-positive" : "text-negative")}
           >
             {gain >= 0 ? "+" : "−"}
-            {formatEurCents(Math.abs(gain * 100))}
+            {formatEurCents(Math.abs(gain))}
           </span>
         </p>
       ) : null}
@@ -114,22 +123,34 @@ function ChartTooltip({
 export function WealthChart({
   valuations,
   investedPoints,
+  savingsPoints,
+  equityPoints,
 }: {
   valuations: ValuationPoint[];
   investedPoints: ValuationPoint[];
+  savingsPoints?: ValuationPoint[];
+  equityPoints?: ValuationPoint[];
 }) {
   const [period, setPeriod] = useState<PeriodKey>("all");
 
   const { data, changeCents, changeRatio } = useMemo(() => {
+    const savings = savingsPoints ?? [];
+    const equity = equityPoints ?? [];
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
-    const merged = mergeSeries(valuations, investedPoints).filter(
+    const merged = mergeSeries(savings, equity, investedPoints).filter(
       (p) => p.date >= startBoundary,
     );
     const performance = periodPerformance(valuations, investedPoints, period);
-    return { data: merged, changeCents: performance.gainCents, changeRatio: performance.ratio };
-  }, [valuations, investedPoints, period]);
+    return {
+      data: merged,
+      changeCents: performance.gainCents,
+      changeRatio: performance.ratio,
+      savings,
+      equity,
+    };
+  }, [valuations, investedPoints, savingsPoints, equityPoints, period]);
 
   if (valuations.length === 0) {
     return (
@@ -182,9 +203,13 @@ export function WealthChart({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
-              <linearGradient id="wealthGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--positive)" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="var(--positive)" stopOpacity={0} />
+              <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--info)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--info)" stopOpacity={0.08} />
+              </linearGradient>
+              <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--positive)" stopOpacity={0.32} />
+                <stop offset="100%" stopColor="var(--positive)" stopOpacity={0.1} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
@@ -213,11 +238,24 @@ export function WealthChart({
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
             <Area
               type="monotone"
-              dataKey="value"
-              name="Patrimoine"
+              dataKey="savings"
+              stackId="wealth"
+              name="Épargne (livrets)"
+              stroke="var(--info)"
+              strokeWidth={2}
+              fill="url(#savingsGradient)"
+              isAnimationActive
+              animationDuration={400}
+              connectNulls
+            />
+            <Area
+              type="monotone"
+              dataKey="equity"
+              stackId="wealth"
+              name="Actions / ETF"
               stroke="var(--positive)"
               strokeWidth={2}
-              fill="url(#wealthGradient)"
+              fill="url(#equityGradient)"
               isAnimationActive
               animationDuration={400}
               connectNulls
@@ -225,9 +263,10 @@ export function WealthChart({
             <Line
               type="monotone"
               dataKey="invested"
-              name="Investi"
+              name="Investi (total)"
               stroke="var(--info)"
               strokeWidth={2}
+              strokeDasharray="6 3"
               dot={false}
               connectNulls
             />
