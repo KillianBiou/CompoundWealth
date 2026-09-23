@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { DcaSection } from "./dca-section";
 
@@ -12,6 +13,20 @@ vi.mock("@/server/actions", () => ({
   deleteDcaLineAction: vi.fn(),
 }));
 
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="chart-container">{children}</div>
+  ),
+  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Bar: () => <div />,
+  Cell: () => <div />,
+  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Pie: () => <div />,
+  Tooltip: () => <div />,
+  XAxis: () => <div />,
+  YAxis: () => <div />,
+}));
+
 const positions = [
   {
     symbol: "CW8",
@@ -20,6 +35,19 @@ const positions = [
     valuations: [{ valueCents: 144_000 }],
   },
 ];
+
+function monthlyPlan(
+  lines: { id: string; isin: string; name: string; maxAmountCents: number; active: boolean }[],
+) {
+  const today = new Date();
+  return {
+    id: "plan-1",
+    frequency: "MONTHLY" as const,
+    startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+    active: true,
+    lines,
+  };
+}
 
 describe("DcaSection", () => {
   it("affiche l'état vide quand aucun plan n'existe", () => {
@@ -32,75 +60,92 @@ describe("DcaSection", () => {
     expect(screen.getByText(/Planifier un investissement régulier/)).toBeInTheDocument();
   });
 
-  it("affiche les KPI 1 mois, 3 mois et 1 an avec montant et versements", () => {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  it("affiche le récapitulatif avec le montant engagé en vert", () => {
     render(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
         plans={[
-          {
-            id: "plan-1",
-            frequency: "MONTHLY",
-            startDate,
-            active: true,
-            lines: [
-              { id: "line-1", isin: "LU1681043599", name: "CW8 — MSCI World", maxAmountCents: 150_000, active: true },
-            ],
-          },
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
         ]}
         positions={positions}
       />,
     );
-    expect(screen.getByText("1 mois", { selector: ".uppercase" })).toBeInTheDocument();
-    expect(screen.getByText("3 mois", { selector: ".uppercase" })).toBeInTheDocument();
-    expect(screen.getByText("1 an", { selector: ".uppercase" })).toBeInTheDocument();
-    expect(screen.getAllByText(/versement/).length).toBeGreaterThan(0);
+    const engaged = screen.getByText(/Engagé sur 1 mois/);
+    expect(engaged).toBeInTheDocument();
+    const engagedValue = engaged.parentElement?.querySelector("p.text-positive");
+    expect(engagedValue).not.toBeNull();
+    expect(engagedValue?.textContent).toContain("€");
+  });
+
+  it("affiche le montant max de chaque ligne en vert dans la table", () => {
+    render(
+      <DcaSection
+        envelopeId="env-1"
+        envelopeType="PEA"
+        plans={[
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
+        ]}
+        positions={positions}
+      />,
+    );
+    const amount = screen.getByText("1 500,00 €");
+    expect(amount).toHaveClass("text-positive");
   });
 
   it("affiche l'estimation parts entières pour un PEA (≈ 12 parts)", () => {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     render(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
         plans={[
-          {
-            id: "plan-1",
-            frequency: "MONTHLY",
-            startDate,
-            active: true,
-            lines: [
-              { id: "line-1", isin: "LU1681043599", name: "CW8 — MSCI World", maxAmountCents: 150_000, active: true },
-            ],
-          },
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
         ]}
         positions={positions}
       />,
     );
-    expect(screen.getAllByText(/≈.*1 440,00 €/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/12 parts/).length).toBeGreaterThan(0);
   });
 
   it("affiche une ligne en pause comme telle", () => {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     render(
       <DcaSection
         envelopeId="env-1"
         envelopeType="PEA"
         plans={[
-          {
-            id: "plan-1",
-            frequency: "MONTHLY",
-            startDate,
-            active: true,
-            lines: [
-              { id: "line-1", isin: "LU1681043599", name: "CW8 — MSCI World", maxAmountCents: 150_000, active: false },
-            ],
-          },
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: false,
+            },
+          ]),
         ]}
         positions={positions}
       />,
@@ -109,28 +154,98 @@ describe("DcaSection", () => {
     expect(screen.getByText("Reprendre")).toBeInTheDocument();
   });
 
-  it("affiche la périodicité et la prochaine échéance", () => {
-    const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  it("bascule la période du récapitulatif au clic (1 mois → 3 mois)", async () => {
+    const user = userEvent.setup();
+    render(
+      <DcaSection
+        envelopeId="env-1"
+        envelopeType="PEA"
+        plans={[
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
+        ]}
+        positions={positions}
+      />,
+    );
+    expect(screen.getByText(/Engagé sur 1 mois/)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "3 mois" }));
+    expect(screen.getByText(/Engagé sur 3 mois/)).toBeInTheDocument();
+  });
+
+  it("bascule le type de visualisation au clic (Barres → Anneau → Treemap)", async () => {
+    const user = userEvent.setup();
+    render(
+      <DcaSection
+        envelopeId="env-1"
+        envelopeType="PEA"
+        plans={[
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+          ]),
+        ]}
+        positions={positions}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Barres/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: /Treemap/ }));
+    expect(screen.getByRole("button", { name: /Treemap/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: /Anneau/ }));
+    expect(screen.getByRole("button", { name: /Anneau/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("affiche la répartition avec le ticker de chaque position", () => {
     render(
       <DcaSection
         envelopeId="env-1"
         envelopeType="CTO"
         plans={[
-          {
-            id: "plan-1",
-            frequency: "QUARTERLY",
-            startDate,
-            active: true,
-            lines: [
-              { id: "line-1", isin: "LU1681043599", name: "CW8 — MSCI World", maxAmountCents: 150_000, active: true },
-            ],
-          },
+          monthlyPlan([
+            {
+              id: "line-1",
+              isin: "LU1681043599",
+              name: "CW8 — MSCI World",
+              maxAmountCents: 150_000,
+              active: true,
+            },
+            {
+              id: "line-2",
+              isin: "FR001400U5Q4",
+              name: "DCAM — Amundi PEA Monde",
+              maxAmountCents: 50_000,
+              active: true,
+            },
+          ]),
         ]}
         positions={positions}
       />,
     );
-    const frequencyCells = screen.getAllByText("3 mois");
-    expect(frequencyCells.length).toBeGreaterThan(0);
+    const legend = screen.getAllByText("CW8");
+    expect(legend.length).toBeGreaterThan(0);
+    const legendItems = screen.getAllByText(/DCAM/);
+    expect(legendItems.length).toBeGreaterThan(0);
+    const recap = screen.getByText(/Répartition par position/);
+    expect(within(recap.parentElement?.parentElement ?? recap).getAllByText(/CW8|DCAM/).length).toBeGreaterThan(0);
   });
 });

@@ -8,8 +8,9 @@ import {
   type DcaPricedLine,
 } from "@/lib/dca";
 import { formatEurCents } from "@/lib/money";
-import { Badge, Card, Kpi } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import { DcaTable, type DcaTableRow } from "./dca-table";
+import { DcaRecap } from "./dca-recap";
 import { DcaCreateDialog } from "./dca-create-dialog";
 
 export interface DcaPlanRow {
@@ -32,7 +33,12 @@ export interface DcaPlanRow {
  */
 export function referencePriceCents(
   isin: string,
-  positions: { symbol: string | null; quantity: number | null; unitPriceCents: number | null; valuations: { valueCents: number }[] }[],
+  positions: {
+    symbol: string | null;
+    quantity: number | null;
+    unitPriceCents: number | null;
+    valuations: { valueCents: number }[];
+  }[],
 ): number | null {
   for (const position of positions) {
     if (!position.symbol) continue;
@@ -46,6 +52,14 @@ export function referencePriceCents(
     if (position.unitPriceCents && position.unitPriceCents > 0) return position.unitPriceCents;
   }
   return null;
+}
+
+export interface DcaSlice {
+  ticker: string;
+  name: string;
+  maxCents: number;
+  estimatedCents: number;
+  paymentsCount: number;
 }
 
 export function DcaSection({
@@ -113,41 +127,69 @@ export function DcaSection({
     }),
   );
 
-  const kpiData = [
-    { key: "1 mois", summary: summaries["1m"] },
-    { key: "3 mois", summary: summaries["3m"] },
-    { key: "1 an", summary: summaries["1y"] },
-  ];
+  const slices = buildSlices(plans, positions, envelopeType);
 
   return (
     <Card className="p-0">
-      <div className="flex items-center justify-between p-6 pb-4">
+      <div className="flex items-center justify-between border-b border-border-cw p-6 pb-4">
         <h2 className="font-heading text-lg font-semibold">Investissements réguliers</h2>
         <Badge tone="neutral">{activeCount}</Badge>
       </div>
       {rows.length === 0 ? (
-        <p className="px-6 pb-2 text-sm text-text-secondary">
+        <p className="px-6 pb-2 pt-4 text-sm text-text-secondary">
           Aucun investissement régulier pour le moment. Planifiez votre premier DCA.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-4 px-6 pb-4 sm:grid-cols-3">
-          {kpiData.map(({ key, summary }) => (
-            <Kpi
-              key={key}
-              label={key}
-              value={formatEurCents(summary.totalEstimatedCents)}
-              sub={`${formatEurCents(summary.totalMaxCents)} max · ${summary.paymentsCount} versement${summary.paymentsCount > 1 ? "s" : ""}${summary.hasUnknownPrice ? " · prix inconnu" : ""}`}
-            />
-          ))}
-        </div>
+        <DcaRecap envelopeType={envelopeType} summaries={summaries} slices={slices} />
       )}
       {rows.length > 0 ? <DcaTable envelopeId={envelopeId} rows={rows} /> : null}
-      <DcaCreateDialog
-        envelopeId={envelopeId}
-        suggestions={buildSuggestions(positions, rows)}
-      />
+      <DcaCreateDialog envelopeId={envelopeId} suggestions={buildSuggestions(positions, rows)} />
     </Card>
   );
+}
+
+function buildSlices(
+  plans: DcaPlanRow[],
+  positions: Parameters<typeof referencePriceCents>[1],
+  envelopeType: "PEA" | "CTO",
+): DcaSlice[] {
+  const slices: DcaSlice[] = [];
+  const today = new Date();
+  for (const plan of plans) {
+    for (const line of plan.lines) {
+      if (!plan.active || !line.active) continue;
+      const etf = getEtfByIsin(line.isin);
+      const priceCents = referencePriceCents(line.isin, positions);
+      const estimate = estimateSpendCents(line.maxAmountCents, priceCents, envelopeType);
+      const yearSummary = windowSummaries(
+        [
+          {
+            plan: {
+              frequency: plan.frequency,
+              startDate: plan.startDate,
+              active: plan.active,
+            },
+            line: {
+              isin: line.isin,
+              maxAmountCents: line.maxAmountCents,
+              active: line.active,
+            },
+            priceCents,
+          },
+        ],
+        envelopeType,
+        today,
+      );
+      slices.push({
+        ticker: etf?.ticker ?? line.isin,
+        name: etf?.name ?? line.name,
+        maxCents: line.maxAmountCents,
+        estimatedCents: estimate?.estimatedCents ?? line.maxAmountCents,
+        paymentsCount: yearSummary["1y"].paymentsCount,
+      });
+    }
+  }
+  return slices;
 }
 
 function buildSuggestions(
@@ -163,5 +205,5 @@ function buildSuggestions(
     seen.add(etf.isin);
     suggestions.push({ isin: etf.isin, ticker: etf.ticker, name: etf.name });
   }
-  return suggestions.filter((s) => !rows.some((r) => r.name === s.name || r.ticker === s.ticker));
+  return suggestions.filter((s) => !rows.some((r) => r.ticker === s.ticker));
 }
