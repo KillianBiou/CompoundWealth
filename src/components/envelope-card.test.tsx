@@ -22,6 +22,7 @@ const base: EnvelopeSummary = {
   gainCents: 20_000,
   positionsCount: 2,
   series: [],
+  investedSeries: [],
 };
 
 describe("EnvelopeCard", () => {

@@ -165,3 +165,28 @@ export function aggregateSeries(
     }, 0),
   }));
 }
+
+/**
+ * Série cumulée des sommes investies pour une enveloppe : utilise l'historique
+ * détaillé des versements quand il existe (import bancaire), sinon le montant
+ * investi de la position à sa date d'achat.
+ */
+export function buildEnvelopeInvestedSeries(
+  positions: {
+    investedCents: number | null;
+    boughtAt: Date;
+    investments: { date: Date; amountCents: number }[];
+  }[],
+): ValuationPoint[] {
+  const points: { date: Date; amountCents: number }[] = [];
+  for (const position of positions) {
+    if (position.investments.length > 0) {
+      for (const investment of position.investments) {
+        points.push({ date: investment.date, amountCents: investment.amountCents });
+      }
+    } else if (position.investedCents !== null && position.investedCents > 0) {
+      points.push({ date: position.boughtAt, amountCents: position.investedCents });
+    }
+  }
+  return investedSeries(points);
+}

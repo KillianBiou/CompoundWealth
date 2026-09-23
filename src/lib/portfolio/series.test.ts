@@ -172,3 +172,59 @@ describe("aggregateSeries", () => {
     expect(aggregateSeries([[], []])).toEqual([]);
   });
 });
+
+import { buildEnvelopeInvestedSeries } from "./series";
+
+describe("buildEnvelopeInvestedSeries", () => {
+  it("utilise l'historique détaillé des versements quand il existe", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 10_000,
+        boughtAt: d("2026-01-01"),
+        investments: [
+          { date: d("2026-02-01"), amountCents: 6_000 },
+          { date: d("2026-03-01"), amountCents: 4_000 },
+        ],
+      },
+    ]);
+    expect(points).toEqual([
+      { date: d("2026-02-01"), valueCents: 6_000 },
+      { date: d("2026-03-01"), valueCents: 10_000 },
+    ]);
+  });
+
+  it("retombe sur le montant investi à la date d'achat sans historique", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 10_000,
+        boughtAt: d("2026-01-15"),
+        investments: [],
+      },
+    ]);
+    expect(points).toEqual([{ date: d("2026-01-15"), valueCents: 10_000 }]);
+  });
+
+  it("ignore les positions en état des lieux sans historique", () => {
+    expect(
+      buildEnvelopeInvestedSeries([
+        { investedCents: null, boughtAt: d("2026-01-15"), investments: [] },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("cumule les versements de plusieurs positions", () => {
+    const points = buildEnvelopeInvestedSeries([
+      {
+        investedCents: 5_000,
+        boughtAt: d("2026-01-01"),
+        investments: [{ date: d("2026-02-01"), amountCents: 5_000 }],
+      },
+      {
+        investedCents: 3_000,
+        boughtAt: d("2026-02-01"),
+        investments: [{ date: d("2026-02-01"), amountCents: 3_000 }],
+      },
+    ]);
+    expect(points).toEqual([{ date: d("2026-02-01"), valueCents: 8_000 }]);
+  });
+});
