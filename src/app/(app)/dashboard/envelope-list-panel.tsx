@@ -49,9 +49,9 @@ const kindStyles: Record<
     border: "border-info/40",
     borderStrong: "border-info/60",
     panelBg:
-      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_0%,color-mix(in_srgb,var(--info)_7%,var(--bg-elevated))_120%)]",
+      "[background:radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--info)_12%,var(--bg-elevated))_0%,color-mix(in_srgb,var(--info)_20%,var(--bg-elevated))_130%)]",
     cardBg:
-      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_30%,color-mix(in_srgb,var(--info)_5%,var(--bg-elevated))_140%)]",
+      "bg-bg-elevated [background:radial-gradient(ellipse_at_center,var(--bg-elevated)_25%,color-mix(in_srgb,var(--info)_3%,var(--bg-elevated))_150%)]",
     text: "text-info",
     toggleOn: "border-info/50",
     toggleKnobOn: "bg-info",
@@ -60,9 +60,9 @@ const kindStyles: Record<
     border: "border-positive/40",
     borderStrong: "border-positive/60",
     panelBg:
-      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_0%,color-mix(in_srgb,var(--positive)_7%,var(--bg-elevated))_120%)]",
+      "[background:radial-gradient(ellipse_at_center,color-mix(in_srgb,var(--positive)_12%,var(--bg-elevated))_0%,color-mix(in_srgb,var(--positive)_20%,var(--bg-elevated))_130%)]",
     cardBg:
-      "[background:radial-gradient(ellipse_at_center,var(--bg-elevated)_30%,color-mix(in_srgb,var(--positive)_5%,var(--bg-elevated))_140%)]",
+      "bg-bg-elevated [background:radial-gradient(ellipse_at_center,var(--bg-elevated)_25%,color-mix(in_srgb,var(--positive)_3%,var(--bg-elevated))_150%)]",
     text: "text-positive",
     toggleOn: "border-positive/50",
     toggleKnobOn: "bg-positive",
@@ -341,7 +341,7 @@ function DetailedEnvelope({
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <Link href={`/envelopes/${envelope.id}`} className="group/link min-w-0 cursor-pointer">
+        <Link href={`/envelopes/${envelope.id}`} className="group/link min-w-0 shrink-0 cursor-pointer">
           <div className="flex items-center gap-2">
             {envelope.kind === "savings" ? (
               <Landmark className="h-4 w-4 shrink-0 text-info" aria-hidden />
@@ -372,12 +372,15 @@ function DetailedEnvelope({
                 : "—"}
           </p>
         </Link>
-        <div className="flex shrink-0 items-center gap-3">
-          <Link href={`/envelopes/${envelope.id}`} className="min-w-0 flex-1 cursor-pointer">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          <Link
+            href={`/envelopes/${envelope.id}`}
+            className="min-w-0 flex-1 cursor-pointer sm:max-w-2xl"
+          >
             <Sparkline
               series={envelope.sparkSeries}
               gainCents={envelope.gainCents}
-              className="w-full min-w-32 max-w-xl sm:w-64"
+              className="h-12 w-full"
             />
           </Link>
           <EnvelopeToggle
@@ -533,9 +536,7 @@ export function EnvelopeListPanel({
         openedAt: e.openedAt,
         sparkSeries:
           e.type === "LIVRET_A" && e.livretSeries
-            ? e.livretSeries
-                .filter((p) => p.date.getTime() <= Date.now())
-                .map((p) => ({ date: p.date, valueCents: p.balanceCents }))
+            ? e.livretSeries.map((p) => ({ date: p.date, valueCents: p.balanceCents }))
             : e.series,
         valueCents: e.valueCents,
         gainCents: e.gainCents,
