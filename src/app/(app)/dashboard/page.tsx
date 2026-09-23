@@ -23,9 +23,7 @@ export default async function DashboardPage() {
   const totalGain = hasUnknown ? null : totalValue - totalInvested;
   const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
   const wealthSeries = aggregateSeries(envelopes.map((e) => e.series));
-  const wealthInvestedSeries = aggregateSeries(
-    envelopes.filter((e) => e.type !== "LIVRET_A").map((e) => e.investedSeries),
-  );
+  const wealthInvestedSeries = aggregateSeries(envelopes.map((e) => e.investedSeries));
   const monthChange = periodChange(wealthSeries, wealthInvestedSeries, "1m");
   const yearChange = periodChange(wealthSeries, wealthInvestedSeries, "1y");
   const envelopeToggles: ChartSeriesToggle[] = envelopes.map((e) => ({
