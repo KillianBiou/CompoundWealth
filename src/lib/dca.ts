@@ -181,3 +181,23 @@ export function windowSummaries(
     summarizeWindow(lines, envelopeType, start, addPeriod(start, period));
   return { "1m": build("1m"), "3m": build("3m"), "1y": build("1y") };
 }
+
+/**
+ * Prochaine date (>= aujourd'hui) tombant le jour du mois demandé.
+ * Si le mois courant est trop court, le dernier jour du mois est retenu
+ * (ex. le "31" tombe le 28/29 février).
+ */
+export function nextDateForDay(day: number, today: Date = new Date()): Date {
+  const clamped = Math.max(1, Math.min(31, Math.floor(day)));
+  const year = today.getFullYear();
+  const daysInMonth = (m: number) => new Date(year, m + 1, 0).getDate();
+  const candidate = (m: number) => {
+    const dim = daysInMonth(m);
+    return new Date(year, m, Math.min(clamped, dim));
+  };
+  for (let m = today.getMonth(); m < today.getMonth() + 2; m += 1) {
+    const date = candidate(m);
+    if (date.getTime() >= startOfDay(today).getTime()) return date;
+  }
+  return candidate(today.getMonth());
+}

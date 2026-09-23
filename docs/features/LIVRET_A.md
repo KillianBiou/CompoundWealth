@@ -22,8 +22,11 @@ sont calculés par l'application selon les règles officielles du Livret A :
 - **Capitalisation annuelle** : les intérêts de l'année sont crédités au solde au 31 décembre
   (modélisé au 1er janvier suivant).
 - **Fiscalité** : exonérée d'impôt sur le revenu et de prélèvements sociaux.
-- **Au-delà du plafond** : l'excédent ne rapporte **rien** (0 %) — signalé à l'utilisateur comme
-  très nocif pour l'épargne.
+- **Au-delà du plafond** : le plafond s'applique aux **versements** (service-public.gouv.fr,
+  art. L221-4/R221-2) — la banque refuse tout versement qui ferait dépasser 22 950 €. Le solde
+  crédité peut en revanche dépasser le plafond via les intérêts capitalisés au 31 décembre,
+  et continue alors d'être rémunéré **en totalité** au taux du livret. L'excédent refusé est
+  suivi à part (`overCapCents`) : il reste hors livret, rémunéré à un taux très faible.
 
 L'objectif pédagogique est de montrer la **non-rentabilité réelle** du livret : à horizon 1 an,
 « + X € d'intérêts (mais Y % de baisse de pouvoir d'achat) » lorsque l'inflation dépasse le
@@ -32,6 +35,16 @@ taux nominal.
 ---
 
 ## 2. Récits utilisateurs
+
+### US-L0 — Créer mon livret avec son montant actuel
+
+> En tant qu'épargnant, je veux créer mon livret en indiquant directement le montant actuellement
+> dessus, plutôt qu'une date d'ouverture.
+
+- Critères d'acceptation :
+  - [x] Formulaire de création : champ « Montant actuellement sur le livret (€) » à la place de la
+    date d'ouverture pour le type Livret A.
+  - [x] Un versement initial à la date du jour est créé automatiquement si le montant est renseigné.
 
 ### US-L1 — Suivre le solde de mon livret
 
@@ -55,8 +68,11 @@ taux nominal.
   - [x] Ligne pointillée au plafond, activée par une case « Montrer la limite » ; décochée,
     l'ordonnée se centre sur l'intervalle investi ; cochée, l'ordonnée couvre 0 → plafond × 1,05.
   - [x] Zone au-dessus du plafond signalée en rouge dans le tooltip du graphique.
-  - [x] Bandeau d'alerte rouge (rôle `alert`) si dépassement : l'excédent ne rapporte rien et
-    perd du pouvoir d'achat — « très nocif pour votre épargne ».
+  - [x] Bandeau d'alerte rouge (rôle `alert`) si dépassement : la banque refuse les versements
+    au-delà du plafond, l'excédent reste hors livret à un taux très faible — « très nocif pour
+    votre épargne ».
+  - [x] Sur le graphique, l'excédent refusé est empilé au-dessus du plafond dans une zone
+    **hachurée rouge** (pattern SVG), distincte du solde crédité.
 
 ### US-L3 — Comprendre mon rendement réel
 
@@ -73,6 +89,10 @@ taux nominal.
     −5–20), enregistrés sur l'enveloppe.
 
 ### US-L4 — Planifier des versements réguliers (DCA)
+
+> Le champ « Date de départ » est remplacé par un **Jour de départ** (1–31) : seule la périodicité
+> mensuelle importe, la première échéance est la prochaine date tombant ce jour du mois
+> (`nextDateForDay`).
 
 > En tant qu'épargnant, je veux planifier des virements réguliers vers mon livret.
 
@@ -134,8 +154,8 @@ Le DCA livret réutilise `DcaPlan`/`DcaLine` avec une ligne unique `isin = "LIVR
 | --- | --- |
 | `nextFortnightStart(date)` | Début de la quinzaine qui produit des intérêts (versement du 15 → 16 ; du 16 → 1er du mois suivant). |
 | `fortnightStart(date)` | Quinzaine contenant la date. |
-| `buildLivretBalanceSeries(events, rate, now, horizonMonths = 12)` | Série du solde quinzaine par quinzaine : versements/retraits, capitalisation au 1er janvier, intérêts = min(solde, plafond) × taux / 24, excédent `overCapCents` non rémunéré, cumul `depositedCents`. |
-| `projectOneYear(events, rate, inflation, now)` | Projection pédagogique : intérêts attendus, solde en euros constants (/(1+inflation)), variation réelle et taux réel. |
+| `buildLivretBalanceSeries(events, rate, now, horizonMonths = 12)` | Série du solde quinzaine par quinzaine : versements (refusés au-delà du plafond, excédent `overCapCents` hors livret), retraits (consomment d'abord l'excédent), capitalisation au 1er janvier, intérêts = solde × taux / 24 (le solde capitalisé peut dépasser le plafond), cumul `depositedCents`. |
+| `projectOneYear(events, rate, inflation, now)` | Projection pédagogique : intérêts attendus (solde × taux), perte de valeur brute due à l'inflation seule (`inflationLossCents`), solde en euros constants (/(1+inflation)), variation réelle nette et taux réel. |
 
 **Solde actuel** = dernier point de la série **≤ maintenant** (et non la projection).
 **Valeur d'enveloppe** = ce solde ; **investi** = cumul des versements nets (hors intérêts).

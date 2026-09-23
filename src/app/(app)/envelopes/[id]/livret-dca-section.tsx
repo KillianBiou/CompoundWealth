@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { useActionState } from "react";
 import { Plus } from "lucide-react";
 import { createLivretDcaAction, deleteDcaLineAction, toggleDcaLineAction, type ActionState } from "@/server/actions";
-import { DCA_FREQUENCY_LABELS, nextOccurrence, type DcaFrequency } from "@/lib/dca";
+import {
+  DCA_FREQUENCY_LABELS,
+  nextDateForDay,
+  nextOccurrence,
+  type DcaFrequency,
+} from "@/lib/dca";
 import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Card, Field, Input, Modal, Select } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
@@ -42,6 +47,7 @@ export function LivretDcaSection({
   plans: LivretDcaRow[];
 }) {
   const [open, setOpen] = useState(false);
+  const [startDay, setStartDay] = useState("");
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   const [state, action, formPending] = useActionState<ActionState, FormData>(
@@ -50,7 +56,14 @@ export function LivretDcaSection({
   );
   useActionToast(state, () => setOpen(false));
 
-  const today = new Date().toISOString().slice(0, 10);
+  const startDayNumber = Number(startDay);
+  const startDate =
+    startDay.trim() !== "" &&
+    Number.isFinite(startDayNumber) &&
+    startDayNumber >= 1 &&
+    startDayNumber <= 31
+      ? nextDateForDay(startDayNumber).toISOString().slice(0, 10)
+      : "";
 
   return (
     <Card className="p-0">
@@ -159,7 +172,10 @@ export function LivretDcaSection({
 
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          setStartDay(String(new Date().getDate()));
+        }}
         className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-border-cw px-6 py-3 text-sm text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-secondary"
       >
         <Plus className="h-4 w-4" aria-hidden />
@@ -193,9 +209,25 @@ export function LivretDcaSection({
                   htmlFor="livret-dca-start"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Date de départ
+                  Jour de départ
                 </label>
-                <Input id="livret-dca-start" name="startDate" type="date" defaultValue={today} required />
+                <Input
+                  id="livret-dca-start"
+                  name="startDate"
+                  type="number"
+                  min="1"
+                  max="31"
+                  inputMode="numeric"
+                  placeholder="Ex. 5"
+                  value={startDay}
+                  onChange={(e) => setStartDay(e.target.value)}
+                  required
+                />
+                {startDate ? (
+                  <p className="mt-1 text-xs text-text-muted">
+                    Premier versement le {new Date(startDate).toLocaleDateString("fr-FR")}
+                  </p>
+                ) : null}
               </div>
             </div>
             <Field

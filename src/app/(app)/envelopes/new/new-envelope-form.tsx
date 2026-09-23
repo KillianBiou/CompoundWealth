@@ -125,20 +125,37 @@ export function NewEnvelopeForm() {
         <Field label="Courtier" htmlFor="broker" error={state?.errors?.broker} hint="Optionnel">
           <Input id="broker" name="broker" placeholder="Ex. Trade Republic" />
         </Field>
-        <Field
-          label="Date d'ouverture"
-          htmlFor="openedAt"
-          error={state?.errors?.openedAt}
-          hint={
-            type === "PEA"
-              ? "Recommandée pour le PEA (antériorité fiscale)"
-              : type === "LIVRET_A"
-                ? "Utilisée pour le calcul des intérêts par quinzaine"
+        {type === "LIVRET_A" ? (
+          <Field
+            label="Montant actuellement sur le livret (€)"
+            htmlFor="initialAmountEur"
+            error={state?.errors?.initialAmountEur}
+            hint="Créera un versement initial à la date du jour"
+          >
+            <Input
+              id="initialAmountEur"
+              name="initialAmountEur"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              placeholder="10 000,00"
+            />
+          </Field>
+        ) : (
+          <Field
+            label="Date d'ouverture"
+            htmlFor="openedAt"
+            error={state?.errors?.openedAt}
+            hint={
+              type === "PEA"
+                ? "Recommandée pour le PEA (antériorité fiscale)"
                 : "Optionnelle"
-          }
-        >
-          <Input id="openedAt" name="openedAt" type="date" />
-        </Field>
+            }
+          >
+            <Input id="openedAt" name="openedAt" type="date" />
+          </Field>
+        )}
       </div>
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
         {pending ? "Création…" : "Créer l'enveloppe"}

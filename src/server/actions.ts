@@ -124,15 +124,17 @@ export async function createEnvelopeAction(
   const session = await getSession();
   if (!session) return { message: "Session expirée" };
 
+  const initialAmountRaw = str(formData, "initialAmountEur");
   const parsed = envelopeSchema.safeParse({
     type: str(formData, "type"),
     name: str(formData, "name"),
     broker: str(formData, "broker"),
     openedAt: str(formData, "openedAt"),
+    ...(initialAmountRaw !== "" ? { initialAmountEur: initialAmountRaw } : {}),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { type, name, broker, openedAt } = parsed.data;
+  const { type, name, broker, openedAt, initialAmountEur } = parsed.data;
   const envelope = await prisma.envelope.create({
     data: {
       userId: session.userId,
@@ -145,6 +147,15 @@ export async function createEnvelopeAction(
         : {}),
     },
   });
+  if (type === "LIVRET_A" && initialAmountEur !== undefined && initialAmountEur > 0) {
+    await prisma.envelopeDeposit.create({
+      data: {
+        envelopeId: envelope.id,
+        date: new Date(),
+        amountCents: eurosToCents(initialAmountEur),
+      },
+    });
+  }
   revalidatePath("/envelopes");
   revalidatePath("/dashboard");
   redirect(`/envelopes/${envelope.id}`);

@@ -43,8 +43,11 @@ export function fortnightStart(date: Date): Date {
 
 /**
  * Solde du livret au fil du temps, quinzaine par quinzaine : chaque quinzaine
- * rapporte taux × solde rémunéré / 24, crédité au solde le 31 décembre
- * (capitalisation annuelle). Au-delà du plafond, l'excédent rapporte 0 %.
+ * rapporte taux × solde / 24, crédité au solde le 31 décembre (capitalisation
+ * annuelle). Le plafond de 22 950 € s'applique aux versements : la banque
+ * refuserait un versement au-delà — l'excédent reste hors livret
+ * (`overCapCents`, ≈ 0 %). Le solde crédité peut dépasser le plafond via les
+ * intérêts capitalisés, et continue alors d'être rémunéré en totalité.
  */
 export function buildLivretBalanceSeries(
   events: LivretEvent[],
@@ -60,6 +63,7 @@ export function buildLivretBalanceSeries(
   let balance = 0;
   let accruedInterest = 0;
   let deposited = 0;
+  let overflow = 0;
   let eventIndex = 0;
   let cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   let guard = 0;
@@ -70,8 +74,19 @@ export function buildLivretBalanceSeries(
       eventIndex < sorted.length &&
       nextFortnightStart(sorted[eventIndex].date).getTime() <= cursor.getTime()
     ) {
-      balance += sorted[eventIndex].amountCents;
-      deposited += sorted[eventIndex].amountCents;
+      const amount = sorted[eventIndex].amountCents;
+      deposited += amount;
+      if (amount >= 0) {
+        const allowed = Math.max(0, Math.min(amount, LIVRET_A_DEPOSIT_CAP_CENTS - balance));
+        balance += allowed;
+        overflow += amount - allowed;
+      } else {
+        const withdrawal = -amount;
+        const fromOverflow = Math.min(overflow, withdrawal);
+        overflow -= fromOverflow;
+        const fromBalance = withdrawal - fromOverflow;
+        balance = Math.max(0, balance - fromBalance);
+      }
       eventIndex += 1;
     }
     // capitalisation annuelle : les intérêts de l'année passée sont crédités au 1er janvier
@@ -79,12 +94,11 @@ export function buildLivretBalanceSeries(
       balance += Math.round(accruedInterest);
       accruedInterest = 0;
     }
-    const remunerated = Math.min(balance, LIVRET_A_DEPOSIT_CAP_CENTS);
-    accruedInterest += (remunerated * rate) / FORTNIGHTS_PER_YEAR;
+    accruedInterest += (balance * rate) / FORTNIGHTS_PER_YEAR;
     points.push({
       date: new Date(cursor),
       balanceCents: balance,
-      overCapCents: Math.max(0, balance - LIVRET_A_DEPOSIT_CAP_CENTS),
+      overCapCents: overflow,
       depositedCents: deposited,
     });
     cursor = addFortnight(cursor);
@@ -99,6 +113,8 @@ export interface LivretProjection {
   overCapCents: number;
   /** intérêts attendus sur l'année à venir */
   interestCents: number;
+  /** perte de valeur brute due à l'inflation seule, hors intérêts */
+  inflationLossCents: number;
   /** solde projeté à horizon 1 an, en euros constants (pouvoir d'achat actuel) */
   realBalanceCents: number;
   /** variation réelle du pouvoir d'achat : négatif = perte */
@@ -108,10 +124,10 @@ export interface LivretProjection {
 }
 
 /**
- * Projection à 1 an : intérêts sur le solde rémunéré au taux du livret, puis
+ * Projection à 1 an : intérêts sur le solde au taux du livret (le solde
+ * capitalisé peut dépasser le plafond et reste intégralement rémunéré), puis
  * conversion en euros constants via l'inflation — pour révéler la perte (ou le
- * gain) de pouvoir d'achat. Pédagogique : 1,7 % nominal vs 2 % d'inflation =
- * pouvoir d'achat en baisse.
+ * gain) de pouvoir d'achat, et la perte de valeur brute due à l'inflation seule.
  */
 export function projectOneYear(
   events: LivretEvent[],
@@ -125,15 +141,16 @@ export function projectOneYear(
   const current =
     [...series].reverse().find((p) => p.date.getTime() <= nowFortnight.getTime()) ??
     series[series.length - 1];
-  const remunerated = Math.min(current.balanceCents, LIVRET_A_DEPOSIT_CAP_CENTS);
-  const interestCents = Math.round(remunerated * rate);
+  const interestCents = Math.round(current.balanceCents * rate);
   const nominalEnd = current.balanceCents + interestCents;
   const realBalance = Math.round(nominalEnd / (1 + inflation));
   const realChange = realBalance - current.balanceCents;
+  const inflationLossCents = Math.round(current.balanceCents * (1 - 1 / (1 + inflation)));
   return {
     balanceCents: current.balanceCents,
     overCapCents: current.overCapCents,
     interestCents,
+    inflationLossCents,
     realBalanceCents: realBalance,
     realChangeCents: realChange,
     realRate: current.balanceCents > 0 ? realChange / current.balanceCents : 0,

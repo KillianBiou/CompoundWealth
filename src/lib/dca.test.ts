@@ -3,6 +3,7 @@ import {
   addMonths,
   advanceOccurrence,
   estimateSpendCents,
+  nextDateForDay,
   nextOccurrence,
   occurrencesIn,
   summarizeWindow,
@@ -161,5 +162,28 @@ describe("windowSummaries", () => {
     expect(summaries["3m"].paymentsCount).toBe(4);
     expect(summaries["1y"].paymentsCount).toBe(13);
     expect(summaries["1m"].totalMaxCents).toBe(300_000);
+  });
+});
+
+describe("nextDateForDay", () => {
+  it("retourne le jour du mois courant s'il est à venir", () => {
+    const result = nextDateForDay(15, d("2026-09-05"));
+    expect(result.toISOString().slice(0, 10)).toBe("2026-09-15");
+  });
+  it("passe au mois suivant si le jour est passé", () => {
+    const result = nextDateForDay(3, d("2026-09-20"));
+    expect(result.toISOString().slice(0, 10)).toBe("2026-10-03");
+  });
+  it("retourne aujourd'hui si le jour est aujourd'hui", () => {
+    const result = nextDateForDay(20, d("2026-09-20"));
+    expect(result.toISOString().slice(0, 10)).toBe("2026-09-20");
+  });
+  it("clamp le 31 sur un mois de 30 jours", () => {
+    const result = nextDateForDay(31, d("2026-09-05"));
+    expect(result.toISOString().slice(0, 10)).toBe("2026-09-30");
+  });
+  it("clamp le 31 sur février", () => {
+    const result = nextDateForDay(31, d("2027-02-01"));
+    expect(result.toISOString().slice(0, 10)).toBe("2027-02-28");
   });
 });

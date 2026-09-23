@@ -22,9 +22,11 @@ export interface LivretPointRow {
 
 interface ChartPoint {
   date: number;
+  /** solde crédité sur le livret (hors excédent refusé) */
   balance: number;
+  /** excédent empilé au-dessus du solde (zone rouge hachurée) */
+  overCapOnly: number;
   overCap: number;
-  nominalProjection?: number | null;
 }
 
 function ChartTooltip({
@@ -46,14 +48,15 @@ function ChartTooltip({
         })}
       </p>
       <p className="tabular-nums text-text-secondary">
-        Solde :{" "}
+        Solde du livret :{" "}
         <span className="font-semibold text-text-primary">
           {formatEurCents(point.balance * 100)}
         </span>
       </p>
       {point.overCap > 0 ? (
         <p className="mt-1 rounded bg-negative/10 px-1.5 py-1 tabular-nums text-negative">
-          {formatEurCents(point.overCap * 100)} au-dessus du plafond — non rémunérés
+          {formatEurCents(point.overCap * 100)} refusés au-delà du plafond — hors livret,
+          rémunération très faible
         </p>
       ) : null}
     </div>
@@ -74,6 +77,7 @@ export function LivretChart({
       series.map((p) => ({
         date: p.date.getTime(),
         balance: p.balanceCents / 100,
+        overCapOnly: p.overCapCents / 100,
         overCap: p.overCapCents / 100,
       })),
     [series],
@@ -103,7 +107,7 @@ export function LivretChart({
         </label>
         {hasOverCap ? (
           <span className="rounded-full bg-negative/10 px-2.5 py-0.5 text-xs font-medium text-negative">
-            ⚠ Solde au-dessus du plafond — la part excédentaire ne rapporte rien
+            ⚠ Versements refusés au-delà du plafond — hors livret
           </span>
         ) : null}
       </div>
@@ -115,6 +119,16 @@ export function LivretChart({
                 <stop offset="0%" stopColor="var(--info)" stopOpacity={0.25} />
                 <stop offset="100%" stopColor="var(--info)" stopOpacity={0} />
               </linearGradient>
+              <pattern
+                id="overCapHatch"
+                patternUnits="userSpaceOnUse"
+                width="8"
+                height="8"
+                patternTransform="rotate(45)"
+              >
+                <rect width="8" height="8" fill="var(--negative)" fillOpacity={0.12} />
+                <line x1="0" y1="0" x2="0" y2="8" stroke="var(--negative)" strokeWidth="2.5" />
+              </pattern>
             </defs>
             <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
             <XAxis
@@ -131,7 +145,11 @@ export function LivretChart({
               axisLine={false}
             />
             <YAxis
-              domain={showCap ? [0, LIVRET_A_DEPOSIT_CAP_CENTS / 100 * 1.05] : ["auto", "auto"]}
+              domain={
+                showCap
+                  ? [0, (LIVRET_A_DEPOSIT_CAP_CENTS / 100) * 1.05]
+                  : ["auto", "auto"]
+              }
               tickFormatter={(v: number) => formatMoneyCentsCompact(v * 100)}
               stroke="var(--text-muted)"
               fontSize={12}
@@ -143,13 +161,29 @@ export function LivretChart({
             <Area
               type="stepAfter"
               dataKey="balance"
+              stackId="livret"
               name="Solde"
               stroke="var(--info)"
               strokeWidth={2}
               fill="url(#livretGradient)"
               isAnimationActive
               animationDuration={400}
+              connectNulls
             />
+            {hasOverCap ? (
+              <Area
+                type="stepAfter"
+                dataKey="overCapOnly"
+                stackId="livret"
+                name="Hors livret (refusé)"
+                stroke="var(--negative)"
+                strokeWidth={1.5}
+                fill="url(#overCapHatch)"
+                isAnimationActive
+                animationDuration={400}
+                connectNulls
+              />
+            ) : null}
             {showCap ? (
               <ReferenceLine
                 y={LIVRET_A_DEPOSIT_CAP_CENTS / 100}
