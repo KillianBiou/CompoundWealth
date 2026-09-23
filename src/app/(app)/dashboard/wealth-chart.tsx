@@ -34,14 +34,18 @@ interface ChartPoint {
   date: number;
   savings: number | null;
   equity: number | null;
+  /** investi hors épargne (ligne pointillée) */
   invested: number | null;
   investedDisplay: number | null;
+  /** investi total, épargne incluse (performance et tooltip) */
+  investedTotal: number | null;
 }
 
 function mergeSeries(
   savings: ValuationPoint[],
   equity: ValuationPoint[],
   investedPoints: ValuationPoint[],
+  investedTotalPoints: ValuationPoint[],
   investedOffset: boolean,
 ): ChartPoint[] {
   const times = [
@@ -49,6 +53,7 @@ function mergeSeries(
       ...savings.map((v) => v.date.getTime()),
       ...equity.map((v) => v.date.getTime()),
       ...investedPoints.map((v) => v.date.getTime()),
+      ...investedTotalPoints.map((v) => v.date.getTime()),
     ]),
   ].sort((a, b) => a - b);
   return times.map((time) => {
@@ -56,6 +61,10 @@ function mergeSeries(
     const savingsValue = savings.length > 0 ? valueAt(savings, date) / 100 : null;
     const investedValue =
       investedPoints.length > 0 ? valueAt(investedPoints, date) / 100 : null;
+    const investedTotalValue =
+      investedTotalPoints.length > 0
+        ? valueAt(investedTotalPoints, date) / 100
+        : investedValue;
     return {
       date: time,
       savings: savingsValue,
@@ -67,6 +76,7 @@ function mergeSeries(
           : investedOffset
             ? investedValue + (savingsValue ?? 0)
             : investedValue,
+      investedTotal: investedTotalValue,
     };
   });
 }
@@ -82,7 +92,7 @@ function ChartTooltip({
   const point = payload[0].payload;
   const savings = point.savings;
   const equity = point.equity;
-  const invested = point.invested;
+  const invested = point.investedTotal;
   const hasValue = savings !== null || equity !== null;
   const value = hasValue ? ((savings ?? 0) + (equity ?? 0)) * 100 : null;
   const gain = value !== null && invested !== null ? value - invested : null;
@@ -179,13 +189,20 @@ export function WealthChart({
         .filter((t) => t.kind === "equity")
         .map((t) => t.investedSeries ?? []),
     );
+    const investedTotalVisible = aggregateSeries(
+      visibleToggles.map((t) => t.investedSeries ?? []),
+    );
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
     const startBoundary =
       series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
-    const merged = mergeSeries(savings, equity, investedVisible, true).filter(
-      (p) => p.date >= startBoundary,
-    );
-    const performance = periodPerformance(valuations, investedVisible, period);
+    const merged = mergeSeries(
+      savings,
+      equity,
+      investedVisible,
+      investedTotalVisible,
+      true,
+    ).filter((p) => p.date >= startBoundary);
+    const performance = periodPerformance(valuations, investedTotalVisible, period);
     return {
       data: merged,
       changeCents: performance.gainCents,

@@ -106,4 +106,59 @@ describe("WealthChart ordre d'empilement", () => {
     expect(areaRenders.find((r) => r.dataKey === "savings")?.hide).toBe(true);
     expect(areaRenders.find((r) => r.dataKey === "equity")?.hide).toBe(false);
   });
+
+  it("la performance « hors versements » inclut l'investi d'épargne : un dépôt livret n'est pas compté comme du gain", () => {
+    areaRenders.length = 0;
+    // Épargne : dépôt de 20 000 € à mi-période, puis 500 € d'intérêts
+    const savingsInvested: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 0 },
+      { date: new Date(now - 15 * day), valueCents: 2_000_000 },
+    ];
+    const savingsSeriesWithDeposit: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 0 },
+      { date: new Date(now - 15 * day), valueCents: 2_000_000 },
+      { date: new Date(now), valueCents: 2_050_000 },
+    ];
+    // Actions : 9 000 € investis, valent 9 500 € en fin de période (+500 €)
+    const equityInvested: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+    ];
+    const equitySeriesFinal: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+      { date: new Date(now), valueCents: 950_000 },
+    ];
+    // Patrimoine total = épargne + actions
+    const totalValuations: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+      { date: new Date(now - 15 * day), valueCents: 2_900_000 },
+      { date: new Date(now), valueCents: 3_000_000 },
+    ];
+    render(
+      <WealthChart
+        valuations={totalValuations}
+        envelopeToggles={[
+          {
+            id: "livret",
+            label: "Livret A",
+            kind: "savings",
+            series: savingsSeriesWithDeposit,
+            investedSeries: savingsInvested,
+          },
+          {
+            id: "pea",
+            label: "PEA",
+            kind: "equity",
+            series: equitySeriesFinal,
+            investedSeries: equityInvested,
+          },
+        ]}
+        visible={{ livret: true, pea: true }}
+        onToggleEnvelope={vi.fn()}
+      />,
+    );
+    // Gain réel : 500 € d'intérêts livret + 500 € de plus-value actions = 1 000 €
+    expect(screen.getByText(/1[\s\u00A0\u202F]000,00[\s\u00A0\u202F]€/)).toBeInTheDocument();
+    // Ancien bug : les 20 000 € de dépôt livret comptaient comme gain (+21 000 €)
+    expect(screen.queryByText(/21[\s\u00A0\u202F]000,00[\s\u00A0\u202F]€/)).not.toBeInTheDocument();
+  });
 });
