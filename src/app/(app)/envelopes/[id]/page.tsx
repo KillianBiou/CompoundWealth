@@ -3,11 +3,20 @@ import { getEnvelope, getCurrentUser } from "@/server/queries";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import { buildEnvelopeValuations } from "@/lib/portfolio/series";
+import {
+  buildLivretBalanceSeries,
+  projectOneYear,
+  LIVRET_A_DEFAULT_INFLATION,
+  LIVRET_A_RATE,
+  type LivretEvent,
+} from "@/lib/livret";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 import { DcaSection } from "./dca-section";
+import { LivretSection } from "./livret-section";
+import { LivretDcaSection } from "./livret-dca-section";
 import { EnvelopeDangerZone } from "./danger-zone";
 import { RefreshPricesButton } from "./refresh-prices-button";
 import { RebuildHistoryButton } from "./rebuild-history-button";
@@ -54,6 +63,77 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
     envelope.type === "PEA" && envelope.openedAt
       ? peaAntiquity(envelope.openedAt)
       : null;
+
+  if (envelope.type === "LIVRET_A") {
+    const livretEvents: LivretEvent[] = envelope.deposits.map((dep) => ({
+      date: dep.date,
+      amountCents: dep.amountCents,
+    }));
+    const rate = envelope.interestRate ?? LIVRET_A_RATE;
+    const inflation = envelope.inflationRate ?? LIVRET_A_DEFAULT_INFLATION;
+    const livretSeries = buildLivretBalanceSeries(livretEvents, rate);
+    const nowTime = new Date().getTime();
+    const currentPoint =
+      [...livretSeries].reverse().find((p) => p.date.getTime() <= nowTime) ?? null;
+    const balanceCents = currentPoint ? currentPoint.balanceCents : 0;
+    const projection = projectOneYear(livretEvents, rate, inflation);
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="font-heading text-2xl font-semibold">{envelope.name}</h1>
+              <Badge tone="accent">Livret A</Badge>
+            </div>
+            <p className="mt-1 text-sm text-text-secondary">
+              {envelope.broker ? `${envelope.broker} · ` : ""}
+              {envelope.openedAt
+                ? `Ouvert le ${envelope.openedAt.toLocaleDateString("fr-FR")}`
+                : "Date d'ouverture non renseignée"}
+            </p>
+          </div>
+        </div>
+        <LivretSection
+          envelopeId={envelope.id}
+          deposits={envelope.deposits.map((dep) => ({
+            id: dep.id,
+            date: dep.date,
+            amountCents: dep.amountCents,
+          }))}
+          series={livretSeries}
+          balanceCents={balanceCents}
+          interestRate={envelope.interestRate}
+          inflationRate={envelope.inflationRate}
+          projection={
+            projection
+              ? {
+                  interestCents: projection.interestCents,
+                  inflationLossCents: projection.inflationLossCents,
+                  overCapCents: projection.overCapCents,
+                  realBalanceCents: projection.realBalanceCents,
+                  realChangeCents: projection.realChangeCents,
+                  realRate: projection.realRate,
+                }
+              : null
+          }
+        />
+        <LivretDcaSection
+          envelopeId={envelope.id}
+          plans={envelope.dcaPlans.flatMap((plan) =>
+            plan.lines.map((line) => ({
+              lineId: line.id,
+              planId: plan.id,
+              frequency: plan.frequency,
+              startDate: plan.startDate,
+              maxAmountCents: line.maxAmountCents,
+              active: plan.active && line.active,
+            })),
+          )}
+        />
+        <EnvelopeDangerZone envelopeId={envelope.id} envelopeName={envelope.name} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

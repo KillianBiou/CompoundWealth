@@ -36,11 +36,41 @@ const notFuture = z
   .string()
   .refine((v) => Date.parse(v) <= Date.now() + 86_400_000, "La date ne peut pas être dans le futur");
 
-export const envelopeSchema = z.object({
-  type: z.enum(["PEA", "CTO"]),
-  name: z.string().trim().min(1, "Le nom est requis").max(80, "80 caractères maximum"),
-  broker: z.string().trim().max(80).optional().or(z.literal("")),
-  openedAt: isoDateOptional,
+export const envelopeSchema = z
+  .object({
+    type: z.enum(["PEA", "CTO", "LIVRET_A"]),
+    name: z.string().trim().min(1, "Le nom est requis").max(80, "80 caractères maximum"),
+    broker: z.string().trim().max(80).optional().or(z.literal("")),
+    openedAt: isoDateOptional,
+    initialAmountEur: z.coerce
+      .number()
+      .min(0, "Le montant doit être positif")
+      .max(500_000, "Montant trop élevé")
+      .optional(),
+  })
+  .refine((v) => v.type !== "LIVRET_A" || v.initialAmountEur === undefined || v.initialAmountEur >= 0, {
+    message: "Le montant initial doit être positif",
+    path: ["initialAmountEur"],
+  });
+
+export const livretSettingsSchema = z.object({
+  interestRate: z.coerce
+    .number()
+    .min(0, "Le taux doit être positif")
+    .max(15, "Taux peu plausible (15 % maximum)"),
+  inflationRate: z.coerce
+    .number()
+    .min(-5, "Inflation peu plausible")
+    .max(20, "Inflation peu plausible"),
+});
+
+export const livretDepositSchema = z.object({
+  date: notFuture,
+  amountEur: z.coerce
+    .number()
+    .refine((v) => v !== 0, "Le montant ne peut pas être nul")
+    .min(-500_000, "Montant trop élevé")
+    .max(500_000, "Montant trop élevé"),
 });
 
 export const positionSchema = z
@@ -113,5 +143,17 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 export type EnvelopeInput = z.infer<typeof envelopeSchema>;
 export type PositionInput = z.infer<typeof positionSchema>;
 export type DepositsInput = z.infer<typeof depositsSchema>;
+export type LivretSettingsInput = z.infer<typeof livretSettingsSchema>;
+export type LivretDepositInput = z.infer<typeof livretDepositSchema>;
+export const createLivretDcaSchema = z.object({
+  frequency: dcaFrequencySchema,
+  startDate: isoDate,
+  maxAmountEur: z.coerce
+    .number()
+    .positive("Le montant doit être supérieur à 0")
+    .max(1_000_000, "Montant trop élevé"),
+});
+
 export type CreateDcaInput = z.infer<typeof createDcaSchema>;
+export type CreateLivretDcaInput = z.infer<typeof createLivretDcaSchema>;
 export type PreferencesInput = z.infer<typeof preferencesSchema>;

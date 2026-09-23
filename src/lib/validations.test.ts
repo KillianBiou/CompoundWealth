@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   createDcaSchema,
+  createLivretDcaSchema,
+  livretSettingsSchema,
   depositsSchema,
   envelopeSchema,
   positionSchema,
@@ -141,5 +143,42 @@ describe("createDcaSchema", () => {
         true,
       );
     }
+  });
+});
+
+describe("createLivretDcaSchema", () => {
+  it("valide un versement mensuel", () => {
+    const parsed = createLivretDcaSchema.safeParse({
+      frequency: "MONTHLY",
+      startDate: "2026-03-10",
+      maxAmountEur: 200,
+    });
+    expect(parsed.success).toBe(true);
+  });
+  it("rejette un montant nul", () => {
+    const parsed = createLivretDcaSchema.safeParse({
+      frequency: "MONTHLY",
+      startDate: "2026-03-10",
+      maxAmountEur: 0,
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("livretSettingsSchema", () => {
+  it("accepte des taux exprimés en pourcentage (1.5)", () => {
+    const parsed = livretSettingsSchema.safeParse({
+      interestRate: 1.5,
+      inflationRate: 2,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.interestRate).toBe(1.5);
+  });
+  it("rejette un taux peu plausible (> 15 %)", () => {
+    const parsed = livretSettingsSchema.safeParse({
+      interestRate: 25,
+      inflationRate: 2,
+    });
+    expect(parsed.success).toBe(false);
   });
 });

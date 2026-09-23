@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { createDcaAction, type ActionState } from "@/server/actions";
 import { getEtfByIsin, searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-catalog";
-import { DCA_FREQUENCY_LABELS, type DcaFrequency } from "@/lib/dca";
+import { DCA_FREQUENCY_LABELS, nextDateForDay, type DcaFrequency } from "@/lib/dca";
 import { Badge, Button, Input, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { useActionToast } from "@/components/use-action-toast";
@@ -27,7 +27,7 @@ export function DcaCreateDialog({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"plan" | "single">("plan");
   const [frequency, setFrequency] = useState<DcaFrequency>("MONTHLY");
-  const [startDate, setStartDate] = useState("");
+  const [startDay, setStartDay] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [query, setQuery] = useState("");
   const [pendingAdd, setPendingAdd] = useState(false);
@@ -70,7 +70,11 @@ export function DcaCreateDialog({
     (s) => !lines.some((l) => l.isin === s.isin),
   );
 
-  const today = new Date().toISOString().slice(0, 10);
+  const startDayNumber = Number(startDay);
+  const startDate =
+    startDay.trim() !== "" && Number.isFinite(startDayNumber) && startDayNumber >= 1 && startDayNumber <= 31
+      ? nextDateForDay(startDayNumber).toISOString().slice(0, 10)
+      : "";
 
   if (!open) {
     return (
@@ -80,7 +84,7 @@ export function DcaCreateDialog({
           setOpen(true);
           setMode("plan");
           setFrequency("MONTHLY");
-          setStartDate(today);
+          setStartDay(String(new Date().getDate()));
           resetDraft();
         }}
         className="flex w-full items-center justify-center gap-2 border-t border-border-cw px-6 py-3 text-sm text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-secondary"
@@ -166,15 +170,24 @@ export function DcaCreateDialog({
                   htmlFor="dca-start"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Date de départ
+                  Jour de départ
                 </label>
                 <Input
                   id="dca-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  type="number"
+                  min="1"
+                  max="31"
+                  inputMode="numeric"
+                  placeholder="Ex. 5"
+                  value={startDay}
+                  onChange={(e) => setStartDay(e.target.value)}
                   required
                 />
+                {startDate ? (
+                  <p className="mt-1 text-xs text-text-muted">
+                    Premier versement le {new Date(startDate).toLocaleDateString("fr-FR")}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -310,8 +323,11 @@ export function DcaCreateDialog({
             }}
             frequency={frequency}
             setFrequency={setFrequency}
-            startDate={startDate}
-            setStartDate={setStartDate}
+            startDay={startDay}
+            setStartDay={setStartDay}
+            firstDateLabel={
+              startDate ? new Date(startDate).toLocaleDateString("fr-FR") : null
+            }
             lines={lines}
             updateAmount={updateAmount}
             suggestions={visibleSuggestions}
@@ -374,8 +390,9 @@ function SingleModeFields({
   onPick,
   frequency,
   setFrequency,
-  startDate,
-  setStartDate,
+  startDay,
+  setStartDay,
+  firstDateLabel,
   lines,
   updateAmount,
   suggestions,
@@ -389,8 +406,9 @@ function SingleModeFields({
   onPick: (etf: EtfCatalogEntry) => void;
   frequency: DcaFrequency;
   setFrequency: (v: DcaFrequency) => void;
-  startDate: string;
-  setStartDate: (v: string) => void;
+  startDay: string;
+  setStartDay: (v: string) => void;
+  firstDateLabel: string | null;
   lines: LineDraft[];
   updateAmount: (isin: string, value: string) => void;
   suggestions: { isin: string; ticker: string; name: string }[];
@@ -517,15 +535,24 @@ function SingleModeFields({
             htmlFor="dca-single-start"
             className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
           >
-            Date de départ
+            Jour de départ
           </label>
           <Input
             id="dca-single-start"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            type="number"
+            min="1"
+            max="31"
+            inputMode="numeric"
+            placeholder="Ex. 5"
+            value={startDay}
+            onChange={(e) => setStartDay(e.target.value)}
             required
           />
+          {firstDateLabel ? (
+            <p className="mt-1 text-xs text-text-muted">
+              Premier versement le {firstDateLabel}
+            </p>
+          ) : null}
         </div>
       </div>
       {suggestions.length > 0 ? (
