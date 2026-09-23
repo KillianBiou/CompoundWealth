@@ -5,7 +5,6 @@ import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import { buildEnvelopeValuations } from "@/lib/portfolio/series";
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
-import { AddPositionForm } from "./add-position-form";
 import { DepositsBadge } from "./deposits-form";
 import { PositionsTable } from "./positions-table";
 import { EnvelopeDangerZone } from "./danger-zone";
@@ -168,11 +167,6 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           currency={user?.currency ?? "EUR"}
           numberLocale={user?.numberLocale === "en" ? "en" : "fr"}
         />
-      </Card>
-
-      <Card>
-        <h2 className="mb-4 font-heading text-lg font-semibold">Ajouter une position</h2>
-        <AddPositionForm envelopeId={envelope.id} />
       </Card>
 
       <PositionsTable

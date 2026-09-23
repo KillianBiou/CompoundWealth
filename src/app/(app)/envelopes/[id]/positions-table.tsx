@@ -1,6 +1,7 @@
 import { deletePositionAction } from "@/server/actions";
 import { formatEurCents } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
+import { AddPositionRow } from "./add-position-row";
 
 const categoryLabels: Record<string, string> = {
   ETF: "ETF",
@@ -42,9 +43,12 @@ export function PositionsTable({
         <Badge tone="neutral">{positions.length}</Badge>
       </div>
       {positions.length === 0 ? (
-        <p className="px-6 pb-6 text-sm text-text-secondary">
-          Aucune position pour le moment. Ajoutez votre premier ETF ou action ci-dessus.
-        </p>
+        <>
+          <p className="px-6 pb-2 text-sm text-text-secondary">
+            Aucune position pour le moment. Ajoutez votre premier ETF.
+          </p>
+          <AddPositionRow envelopeId={envelopeId} />
+        </>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -113,6 +117,7 @@ export function PositionsTable({
           </table>
         </div>
       )}
+      {positions.length > 0 ? <AddPositionRow envelopeId={envelopeId} /> : null}
     </Card>
   );
 }

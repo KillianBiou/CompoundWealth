@@ -51,23 +51,23 @@ describe("envelopeSchema", () => {
 
 describe("positionSchema", () => {
   const base = { isin: "LU1681043599", boughtAt: "2026-01-15" };
-  it("accepte un ISIN du catalog avec une valeur positive", () => {
+  it("accepte un ISIN du catalog avec un nombre de parts positif", () => {
     expect(
-      positionSchema.safeParse({ ...base, valueEur: 1250.5 }).success,
+      positionSchema.safeParse({ ...base, quantity: 12.5 }).success,
     ).toBe(true);
   });
   it("rejette un ISIN hors catalog", () => {
     expect(
-      positionSchema.safeParse({ ...base, isin: "US0378331005", valueEur: 100 }).success,
+      positionSchema.safeParse({ ...base, isin: "US0378331005", quantity: 10 }).success,
     ).toBe(false);
   });
-  it("rejette une valeur nulle ou négative", () => {
-    expect(positionSchema.safeParse({ ...base, valueEur: 0 }).success).toBe(false);
-    expect(positionSchema.safeParse({ ...base, valueEur: -10 }).success).toBe(false);
+  it("rejette un nombre de parts nul ou négatif", () => {
+    expect(positionSchema.safeParse({ ...base, quantity: 0 }).success).toBe(false);
+    expect(positionSchema.safeParse({ ...base, quantity: -10 }).success).toBe(false);
   });
   it("rejette une date future", () => {
     expect(
-      positionSchema.safeParse({ ...base, valueEur: 100, boughtAt: "2099-01-01" })
+      positionSchema.safeParse({ ...base, quantity: 10, boughtAt: "2099-01-01" })
         .success,
     ).toBe(false);
   });

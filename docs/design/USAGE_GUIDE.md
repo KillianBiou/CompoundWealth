@@ -63,23 +63,15 @@ Plutôt que de tout saisir à la main, la page Enveloppes propose **Importer un 
 
 ### Ajouter une position
 
-Dans l'enveloppe → **+ Ajouter une position** :
+Dans l'enveloppe, en bas de la table des positions → **+ Ajouter une position** :
 
 1. **Recherche par nom ou ISIN** dans le catalog des ETF éligibles au PEA (ex. `CW8`, `MSCI World`, `LU1681043599`). La liste affiche le ticker, la catégorie d'indice, le TER, le nom et l'ISIN de chaque ETF.
-2. Saisissez la **valeur actuelle de la position** (€) — pas de nombre de parts ni de cours unitaire : la valeur de la ligne à l'instant T.
-3. Renseignez la **date de l'état des lieux**.
+2. Saisissez le **nombre de parts**.
+3. Renseignez la **date d'achat**.
 
-L'ajout se fait en deux valeurs : l'ETF depuis le catalog, la valeur en euros. Aucun montant investi historique n'est demandé — la variation et les détails de la valeur viendront plus tard.
+L'application va chercher le **prix d'achat à cette date** (clôture du jour, source Yahoo Finance) et recrée l'historique quotidien de la ligne depuis la date d'achat : montant investi, valorisation jour par jour, plus-value — tout est calculé automatiquement.
 
-### « J'arrive en cours » — état des lieux d'une enveloppe existante
-
-Vous avez déjà un PEA ou un CTO chez votre courtier, avec des lignes en portefeuille dont vous ne connaissez pas nécessairement le montant investi historique ? Le formulaire d'ajout est pensé exactement pour ce cas :
-
-- Sélectionnez votre ETF dans la liste, puis renseignez directement la **valeur totale de la ligne** à l'instant T.
-- Aucun montant investi n'est requis : la position est créée en « état des lieux », avec sa valeur actuelle.
-- Les KPIs de gain/perte affichent alors « — » avec la mention *état des lieux* tant que les montants investis ne sont pas renseignés.
-
-L'important est de pouvoir **commencer à suivre la valeur dès aujourd'hui** sans devoir reconstituer tout l'historique fiscal.
+Si l'ETF est déjà présent dans la liste, les parts sont **ajoutées à la ligne existante** (nouvel investissement daté, prix moyen recalculé) au lieu de créer un doublon.
 
 ### Suivre la valeur — le graphique d'évolution
 

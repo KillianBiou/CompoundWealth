@@ -194,6 +194,59 @@ export async function closeEnvelopeAction(formData: FormData): Promise<void> {
   redirect("/envelopes");
 }
 
+/**
+ * Reconstruit les valorisations quotidiennes d'une position a partir de son
+ * historique d'investissements (parts accumulees par jour, x cours de clôture
+ * Yahoo). Une seule requête par position via fetchMarketHistory.
+ */
+async function rebuildPositionValuations(
+  position: { id: string; symbol: string; investments: { date: Date; amountCents: number }[] },
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const firstDate = position.investments[0].date;
+  const history = await fetchMarketHistory(position.symbol, firstDate, new Date());
+  if (!history.ok) return { ok: false, reason: history.reason };
+  const sharesByDay = new Map<string, number>();
+  let shares = 0;
+  let dayCursor = 0;
+  for (const point of history.points) {
+    const dayKey = point.date.toISOString().slice(0, 10);
+    while (
+      dayCursor < position.investments.length &&
+      position.investments[dayCursor].date.getTime() <= point.date.getTime()
+    ) {
+      const inv = position.investments[dayCursor];
+      const priceAtInv = history.points.find(
+        (hp) => hp.date.getTime() >= inv.date.getTime(),
+      );
+      if (priceAtInv && priceAtInv.closeCents > 0) {
+        shares += inv.amountCents / priceAtInv.closeCents;
+      }
+      dayCursor += 1;
+    }
+    sharesByDay.set(dayKey, shares);
+  }
+  const valuationData = history.points
+    .map((point) => ({
+      positionId: position.id,
+      date: point.date,
+      valueCents: Math.round(
+        (sharesByDay.get(point.date.toISOString().slice(0, 10)) ?? 0) * point.closeCents,
+      ),
+      source: "yahoo",
+    }))
+    .filter((v) => v.valueCents > 0);
+  await prisma.positionValuation.deleteMany({
+    where: {
+      positionId: position.id,
+      NOT: { source: "manuel" as const },
+    },
+  });
+  if (valuationData.length > 0) {
+    await prisma.positionValuation.createMany({ data: valuationData });
+  }
+  return { ok: true };
+}
+
 export async function createPositionAction(
   _state: ActionState,
   formData: FormData,
@@ -209,17 +262,88 @@ export async function createPositionAction(
 
   const parsed = positionSchema.safeParse({
     isin: str(formData, "isin"),
-    valueEur: str(formData, "valueEur"),
+    quantity: str(formData, "quantity"),
     boughtAt: str(formData, "boughtAt"),
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { isin, valueEur, boughtAt } = parsed.data;
+  const { isin, quantity, boughtAt } = parsed.data;
   const etf = getEtfByIsin(isin);
   if (!etf) return { errors: { isin: ["ETF introuvable dans le catalog"] } };
 
-  const valueCents = eurosToCents(valueEur);
   const date = new Date(boughtAt);
+  const symbol = etf.yahooSymbol ?? etf.ticker;
+  const history = await fetchMarketHistory(symbol, date, new Date());
+  if (!history.ok) {
+    return {
+      errors: {
+        form: [
+          `Prix d'achat introuvable pour ${etf.ticker} à cette date (${history.reason})`,
+        ],
+      },
+    };
+  }
+  const pricePoint = history.points.find(
+    (p) => p.date.getTime() >= date.getTime(),
+  );
+  if (!pricePoint) {
+    return {
+      errors: {
+        form: [
+          `Aucun cours disponible pour ${etf.ticker} à la date du ${date.toLocaleDateString("fr-FR")}`,
+        ],
+      },
+    };
+  }
+  const amountCents = Math.round(quantity * pricePoint.closeCents);
+
+  const existing = await prisma.position.findFirst({
+    where: { envelopeId, symbol: etf.ticker },
+    include: { investments: true, valuations: true },
+  });
+
+  if (existing) {
+    const totalQuantity = (existing.quantity ?? 0) + quantity;
+    const totalInvested =
+      (existing.investedCents ?? 0) +
+      existing.investments.reduce((s, inv) => s + inv.amountCents, 0) +
+      amountCents;
+    await prisma.$transaction([
+      prisma.positionInvestment.create({
+        data: { positionId: existing.id, date, amountCents },
+      }),
+      prisma.position.update({
+        where: { id: existing.id },
+        data: {
+          quantity: totalQuantity,
+          investedCents: totalInvested,
+          unitPriceCents: Math.round(totalInvested / totalQuantity),
+          boughtAt:
+            existing.boughtAt.getTime() > date.getTime() ? date : existing.boughtAt,
+        },
+      }),
+    ]);
+    const rebuilt = await rebuildPositionValuations({
+      id: existing.id,
+      symbol: existing.symbol ?? etf.ticker,
+      investments: [
+        ...existing.investments.map((inv) => ({
+          date: inv.date,
+          amountCents: inv.amountCents,
+        })),
+        { date, amountCents },
+      ].sort((a, b) => a.date.getTime() - b.date.getTime()),
+    });
+    if (!rebuilt.ok) {
+      revalidatePath(`/envelopes/${envelopeId}`);
+      return {
+        message: `Position regroupée, mais historique non reconstruit (${rebuilt.reason})`,
+      };
+    }
+    revalidatePath(`/envelopes/${envelopeId}`);
+    revalidatePath("/dashboard");
+    return { message: `${quantity} parts ajoutées à ${etf.ticker}` };
+  }
 
   const position = await prisma.position.create({
     data: {
@@ -227,23 +351,35 @@ export async function createPositionAction(
       name: `${etf.ticker} — ${etf.name}`,
       symbol: etf.ticker,
       category: "ETF",
-      investedCents: null,
+      quantity,
+      investedCents: amountCents,
+      unitPriceCents: pricePoint.closeCents,
       boughtAt: date,
     },
   });
 
-  await prisma.positionValuation.create({
-    data: {
-      positionId: position.id,
-      date,
-      valueCents,
-      source: "manuel",
-    },
+  await prisma.positionInvestment.create({
+    data: { positionId: position.id, date, amountCents },
   });
+
+  const valuationData = history.points
+    .filter((p) => p.date.getTime() >= pricePoint.date.getTime())
+    .map((p) => ({
+      positionId: position.id,
+      date: p.date,
+      valueCents: Math.round(quantity * p.closeCents),
+      source: "yahoo",
+    }))
+    .filter((v) => v.valueCents > 0);
+  if (valuationData.length > 0) {
+    await prisma.positionValuation.createMany({ data: valuationData });
+  }
 
   revalidatePath(`/envelopes/${envelopeId}`);
   revalidatePath("/dashboard");
-  return { message: "Position ajoutée" };
+  return {
+    message: `Position ajoutée : ${quantity} parts × ${(pricePoint.closeCents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`,
+  };
 }
 
 export async function deletePositionAction(formData: FormData): Promise<void> {
@@ -575,53 +711,17 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
   const failures: string[] = [];
   let rebuilt = 0;
   for (const [index, position] of positionsWithHistory.entries()) {
-    const symbol = position.symbol!.trim();
-    const firstDate = position.investments[0].date;
-    const lastDate = new Date();
-    const history = await fetchMarketHistory(symbol, firstDate, lastDate);
-    if (!history.ok) {
-      failures.push(`${position.name} (${history.reason})`);
-      continue;
-    }
-
-    const sharesByDay = new Map<string, number>();
-    let shares = 0;
-    let dayCursor = 0;
-    for (const point of history.points) {
-      const dayKey = point.date.toISOString().slice(0, 10);
-      while (
-        dayCursor < position.investments.length &&
-        position.investments[dayCursor].date.getTime() <= point.date.getTime()
-      ) {
-        const inv = position.investments[dayCursor];
-        const priceAtInv = history.points.find(
-          (hp) => hp.date.getTime() >= inv.date.getTime(),
-        );
-        if (priceAtInv && priceAtInv.closeCents > 0) {
-          shares += inv.amountCents / priceAtInv.closeCents;
-        }
-        dayCursor += 1;
-      }
-      sharesByDay.set(dayKey, shares);
-    }
-
-    const valuationData = history.points
-      .map((point) => ({
-        positionId: position.id,
-        date: point.date,
-        valueCents: Math.round((sharesByDay.get(point.date.toISOString().slice(0, 10)) ?? 0) * point.closeCents),
-        source: "yahoo",
-      }))
-      .filter((v) => v.valueCents > 0);
-
-    await prisma.positionValuation.deleteMany({
-      where: {
-        positionId: position.id,
-        NOT: { source: "manuel" as const },
-      },
+    const result = await rebuildPositionValuations({
+      id: position.id,
+      symbol: position.symbol!.trim(),
+      investments: position.investments.map((inv) => ({
+        date: inv.date,
+        amountCents: inv.amountCents,
+      })),
     });
-    if (valuationData.length > 0) {
-      await prisma.positionValuation.createMany({ data: valuationData });
+    if (!result.ok) {
+      failures.push(`${position.name} (${result.reason})`);
+      continue;
     }
     rebuilt += 1;
     if (index < positionsWithHistory.length - 1) {

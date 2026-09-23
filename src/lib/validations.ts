@@ -49,10 +49,10 @@ export const positionSchema = z
       .string()
       .trim()
       .refine((v) => getEtfByIsin(v) !== null, "Choisissez un ETF dans la liste"),
-    valueEur: z.coerce
+    quantity: z.coerce
       .number()
-      .positive("La valeur doit être supérieure à 0")
-      .max(100_000_000, "Valeur trop élevée"),
+      .positive("Le nombre de parts doit être supérieur à 0")
+      .max(1_000_000, "Nombre de parts trop élevé"),
     boughtAt: notFuture,
   });
 
