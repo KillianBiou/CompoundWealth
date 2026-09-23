@@ -615,7 +615,10 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
       .filter((v) => v.valueCents > 0);
 
     await prisma.positionValuation.deleteMany({
-      where: { positionId: position.id, source: { in: ["import" as const, "yahoo" as const] } },
+      where: {
+        positionId: position.id,
+        NOT: { source: "manuel" as const },
+      },
     });
     if (valuationData.length > 0) {
       await prisma.positionValuation.createMany({ data: valuationData });
