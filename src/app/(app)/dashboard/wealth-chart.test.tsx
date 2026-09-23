@@ -161,4 +161,61 @@ describe("WealthChart ordre d'empilement", () => {
     // Ancien bug : les 20 000 € de dépôt livret comptaient comme gain (+21 000 €)
     expect(screen.queryByText(/21[\s\u00A0\u202F]000,00[\s\u00A0\u202F]€/)).not.toBeInTheDocument();
   });
+
+  it("décocher une enveloppe retire aussi ses dépôts du calcul de performance", () => {
+    // Dépôt de 20 000 € sur le livret à mi-période, 500 € d'intérêts ensuite
+    const savingsInvested: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 0 },
+      { date: new Date(now - 15 * day), valueCents: 2_000_000 },
+    ];
+    const savingsSeriesWithDeposit: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 0 },
+      { date: new Date(now - 15 * day), valueCents: 2_000_000 },
+      { date: new Date(now), valueCents: 2_050_000 },
+    ];
+    // Actions : 9 000 € investis, valent 9 500 € en fin de période (+500 €)
+    const equityInvested: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+    ];
+    const equitySeriesFinal: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+      { date: new Date(now), valueCents: 950_000 },
+    ];
+    const totalValuations: ValuationPoint[] = [
+      { date: new Date(now - 30 * day), valueCents: 900_000 },
+      { date: new Date(now - 15 * day), valueCents: 2_900_000 },
+      { date: new Date(now), valueCents: 3_000_000 },
+    ];
+    // Livret A décoché : seules les actions sont visibles
+    render(
+      <WealthChart
+        valuations={totalValuations}
+        envelopeToggles={[
+          {
+            id: "livret",
+            label: "Livret A",
+            kind: "savings",
+            series: savingsSeriesWithDeposit,
+            investedSeries: savingsInvested,
+          },
+          {
+            id: "pea",
+            label: "PEA",
+            kind: "equity",
+            series: equitySeriesFinal,
+            investedSeries: equityInvested,
+          },
+        ]}
+        visible={{ livret: false, pea: true }}
+        onToggleEnvelope={vi.fn()}
+      />,
+    );
+    // Gain réel des actions seules : +500 € (9 500 - 9 000)
+    expect(screen.getByText(/500,00[\s\u00A0\u202F]€/)).toBeInTheDocument();
+    // Ancien bug : les dépôts livret restaient dans la valorisation et comptaient comme gain
+    expect(screen.queryByText(/2[\s\u00A0\u202F]?050,00[\s\u00A0\u202F]€/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/1[\s\u00A0\u202F]000,00[\s\u00A0\u202F]€/),
+    ).not.toBeInTheDocument();
+  });
 });
