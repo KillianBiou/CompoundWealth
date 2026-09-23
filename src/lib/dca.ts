@@ -1,6 +1,6 @@
 export type DcaFrequency = "BIWEEKLY" | "MONTHLY" | "BIMONTHLY" | "QUARTERLY";
 
-export type EnvelopeType = "PEA" | "CTO";
+export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A";
 
 export const DCA_FREQUENCY_LABELS: Record<DcaFrequency, string> = {
   BIWEEKLY: "2 semaines",
@@ -103,7 +103,7 @@ export function estimateSpendCents(
   envelopeType: EnvelopeType,
 ): SpendEstimate | null {
   if (priceCents === null || priceCents <= 0) return null;
-  if (envelopeType === "CTO") {
+  if (envelopeType === "CTO" || envelopeType === "LIVRET_A") {
     return { estimatedCents: maxAmountCents, quantity: maxAmountCents / priceCents, remainderCents: 0 };
   }
   const quantity = Math.floor(maxAmountCents / priceCents);

@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
+import { LIVRET_A_DEFAULT_INFLATION, LIVRET_A_RATE } from "@/lib/livret";
 import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
   createDcaSchema,
+  createLivretDcaSchema,
   envelopeSchema,
+  livretDepositSchema,
+  livretSettingsSchema,
   loginSchema,
   positionSchema,
   profileSchema,
@@ -136,6 +140,9 @@ export async function createEnvelopeAction(
       name,
       broker: broker || null,
       openedAt: openedAt ? new Date(openedAt) : null,
+      ...(type === "LIVRET_A"
+        ? { interestRate: LIVRET_A_RATE, inflationRate: LIVRET_A_DEFAULT_INFLATION }
+        : {}),
     },
   });
   revalidatePath("/envelopes");
@@ -435,6 +442,44 @@ export async function createDcaAction(
         ? `DCA créé : ${plan.lines[0].name}`
         : `Plan DCA créé : ${lines.length} titres`,
   };
+}
+
+export async function createLivretDcaAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const envelopeId = str(formData, "envelopeId");
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId: session.userId, type: "LIVRET_A" },
+  });
+  if (!envelope) return { message: "Livret introuvable" };
+  const parsed = createLivretDcaSchema.safeParse({
+    frequency: str(formData, "frequency"),
+    startDate: str(formData, "startDate"),
+    maxAmountEur: str(formData, "maxAmountEur"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const { frequency, startDate, maxAmountEur } = parsed.data;
+  await prisma.dcaPlan.create({
+    data: {
+      envelopeId,
+      frequency,
+      startDate: new Date(startDate),
+      active: true,
+      lines: {
+        create: {
+          isin: "LIVRET",
+          name: "Versement",
+          maxAmountCents: eurosToCents(maxAmountEur),
+          active: true,
+        },
+      },
+    },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  return { message: "Versement régulier planifié" };
 }
 
 export async function toggleDcaLineAction(formData: FormData): Promise<void> {
@@ -762,6 +807,81 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
     };
   }
   return { message: `${updated} prix actualisé${updated > 1 ? "s" : ""}` };
+}
+
+export async function addLivretDepositAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const envelopeId = str(formData, "envelopeId");
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId: session.userId, type: "LIVRET_A" },
+  });
+  if (!envelope) return { errors: { form: ["Livret introuvable"] } };
+  const parsed = livretDepositSchema.safeParse({
+    date: str(formData, "date"),
+    amountEur: str(formData, "amountEur"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  await prisma.envelopeDeposit.create({
+    data: {
+      envelopeId,
+      date: new Date(parsed.data.date),
+      amountCents: eurosToCents(parsed.data.amountEur),
+    },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  return { message: "Versement enregistré" };
+}
+
+export async function deleteLivretDepositAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const depositId = str(formData, "depositId");
+  const envelopeId = str(formData, "envelopeId");
+  const deposit = await prisma.envelopeDeposit.findFirst({
+    where: { id: depositId, envelope: { userId: session.userId, type: "LIVRET_A" } },
+  });
+  if (!deposit) return { errors: { form: ["Versement introuvable"] } };
+  await prisma.envelopeDeposit.delete({ where: { id: deposit.id } });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/dashboard");
+  return { message: "Versement supprimé" };
+}
+
+export async function updateLivretSettingsAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const envelopeId = str(formData, "envelopeId");
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId: session.userId, type: "LIVRET_A" },
+  });
+  if (!envelope) return { errors: { form: ["Livret introuvable"] } };
+  const parsed = livretSettingsSchema.safeParse({
+    interestRate: str(formData, "interestRate"),
+    inflationRate: str(formData, "inflationRate"),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  await prisma.envelope.update({
+    where: { id: envelope.id },
+    data: {
+      interestRate: parsed.data.interestRate / 100,
+      inflationRate: parsed.data.inflationRate / 100,
+    },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/dashboard");
+  return { message: "Paramètres du livret mis à jour" };
 }
 
 /**

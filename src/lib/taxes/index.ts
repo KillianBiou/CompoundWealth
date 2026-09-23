@@ -1,4 +1,4 @@
-export type EnvelopeType = "PEA" | "CTO";
+export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A";
 
 export interface TaxBreakdown {
   label: string;
@@ -55,6 +55,24 @@ export const ENVELOPE_RULES: Record<EnvelopeType, EnvelopeFiscalRules> = {
       `Avant 5 ans : flat tax de ${pct(FLAT_TAX_2026)} (${pct(INCOME_TAX_RATE)} d'impôt sur le revenu + ${pct(SOCIAL_LEVIES_2026)} de prélèvements sociaux). Un retrait entraîne la clôture du plan (sauf cas légaux).`,
       `Après 5 ans : exonération d'impôt sur le revenu, seuls les prélèvements sociaux (${pct(SOCIAL_LEVIES_2026)}) restent dus sur les gains.`,
       "Plafond de versements : 150 000 € (hors plus-values ; la valorisation peut dépasser ce montant).",
+    ],
+  },
+  LIVRET_A: {
+    depositCapCents: 2_295_000,
+    incomeTaxAfter5Years: 0,
+    incomeTaxBefore5Years: 0,
+    socialLevies: 0,
+    flatTax: 0,
+    flatTaxBreakdown: [],
+    withdrawalBefore5YearsCloses: false,
+    depositCapLabel: "22 950 €",
+    incomeTaxIsDurationBased: false,
+    badges: ["Intérêts exonérés d'IR et de prélèvements sociaux"],
+    details: [
+      "Taux fixé par l'État, révisé chaque 1er février et 1er août (1,7 % depuis le 1er août 2026).",
+      "Plafond de versements : 22 950 € — au-delà, l'excédent ne rapporte rien.",
+      "Intérêts calculés par quinzaine (24 par an), capitalisés le 31 décembre.",
+      "Un seul Livret A par personne ; disponibilité immédiate, sans risque de perte en capital.",
     ],
   },
   CTO: {
