@@ -8,6 +8,7 @@ import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
 import { parseBrokerImport } from "@/lib/import";
 import type { BrokerImport, ImportedEnvelope, ImportedPosition } from "@/lib/import";
 import {
+  createDcaSchema,
   envelopeSchema,
   loginSchema,
   positionSchema,
@@ -380,6 +381,87 @@ export async function createPositionAction(
   return {
     message: `Position ajoutée : ${quantity} parts × ${(pricePoint.closeCents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`,
   };
+}
+
+export async function createDcaAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+  const envelopeId = str(formData, "envelopeId");
+  const envelope = await prisma.envelope.findFirst({
+    where: { id: envelopeId, userId: session.userId },
+  });
+  if (!envelope) return { message: "Enveloppe introuvable" };
+  const rawLines = formData.getAll("lines").map((v) => String(v));
+  const parsed = createDcaSchema.safeParse({
+    frequency: str(formData, "frequency"),
+    startDate: str(formData, "startDate"),
+    lines: rawLines.map((line) => {
+      try {
+        return JSON.parse(line) as { isin: string; maxAmountEur: number | string };
+      } catch {
+        return { isin: "invalide", maxAmountEur: "invalide" };
+      }
+    }),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const { frequency, startDate, lines } = parsed.data;
+  const plan = await prisma.dcaPlan.create({
+    data: {
+      envelopeId,
+      frequency,
+      startDate: new Date(startDate),
+      active: true,
+      lines: {
+        create: lines.map((line) => {
+          const etf = getEtfByIsin(line.isin)!;
+          return {
+            isin: etf.isin,
+            name: `${etf.ticker} — ${etf.name}`,
+            maxAmountCents: eurosToCents(line.maxAmountEur),
+            active: true,
+          };
+        }),
+      },
+    },
+    include: { lines: true },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  return {
+    message:
+      lines.length === 1
+        ? `DCA créé : ${plan.lines[0].name}`
+        : `Plan DCA créé : ${lines.length} titres`,
+  };
+}
+
+export async function toggleDcaLineAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const lineId = String(formData.get("lineId") ?? "");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  const line = await prisma.dcaLine.findFirst({
+    where: { id: lineId, plan: { envelope: { userId: session.userId } } },
+  });
+  if (!line) return;
+  await prisma.dcaLine.update({
+    where: { id: line.id },
+    data: { active: !line.active },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+}
+
+export async function deleteDcaLineAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const lineId = String(formData.get("lineId") ?? "");
+  const envelopeId = String(formData.get("envelopeId") ?? "");
+  await prisma.dcaLine.deleteMany({
+    where: { id: lineId, plan: { envelope: { userId: session.userId } } },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
 }
 
 export async function deletePositionAction(formData: FormData): Promise<void> {

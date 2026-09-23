@@ -110,3 +110,22 @@ Sur chaque enveloppe (et en global sur le dashboard) :
 **L'app me dit-elle quoi acheter ?** Non. CompoundWealth mesure et montre ; il ne recommande rien et n'exécute aucun ordre.
 
 **Mes données sont-elles sécurisées ?** Vos données sont chiffrées en transit et le mot de passe est stocké haché. Vous pouvez supprimer votre compte et toutes vos données à tout moment (réglages → Danger zone).
+
+## 7. Investissements réguliers — le DCA
+
+### Planifier un investissement régulier
+
+Dans l'enveloppe, sous la table des positions, la carte **« Investissements réguliers »** regroupe vos versements programmés :
+
+- **Trois repères d'un coup d'œil** : 1 mois, 3 mois et 1 an — combien d'€ seront engagés et en combien de versements.
+- **La table détaillée** : titre, montant max, périodicité (2 semaines, 1 mois, 2 mois, 3 mois) et prochaine échéance calculée automatiquement.
+- **Parts entières (PEA)** : un PEA n'achète que des parts entières. Sur un budget de 1 500 € pour un ETF à 120 €, seuls 1 440 € sont dépensés (12 parts) — l'application affiche l'estimation `≈ 1 440 € · 12 parts` sous le montant max. Sur un CTO, les parts fractionnaires dépensent tout le budget.
+
+**Créer un plan** — bouton **+ Planifier un investissement régulier** :
+
+1. Mode **Plan périodique** : choisissez la périodicité et la date de départ (ex. le 2 octobre), puis ajoutez tous les titres avec leur montant maximal. Un clic sur une **suggestion grisée** (un ETF déjà détenu dans l'enveloppe) l'ajoute à la liste. À la confirmation, un DCA est créé pour chaque titre.
+2. Mode **Titre unique** : pour un ETF précis — recherchez-le, saisissez le montant max, la périodicité et la date de départ.
+
+**Gérer** : chaque ligne peut être **mise en pause / reprise** ou **supprimée** ; les KPI se recalculent immédiatement.
+
+> Le DCA est une donnée de **planification** : rien n'est exécuté automatiquement à l'échéance, aucun achat n'est enregistré dans le patrimoine. Ces versements alimentent les calculs d'exposition et de projection à venir.

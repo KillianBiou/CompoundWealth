@@ -1,7 +1,7 @@
 # Fonctionnalité — Investissements réguliers (DCA)
 
 **ID** : FEAT-DCA-001
-**Statut** : Spécifié (non implémenté)
+**Statut** : Implémenté (V1 — planification, sans exécution automatique)
 **Jalons associés** : DCA-1 à DCA-4 — voir [docs/PLAN.md](../PLAN.md)
 
 ---
