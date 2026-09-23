@@ -102,6 +102,20 @@ function ChartTooltip({
           </span>
         </p>
       ) : null}
+      {invested !== null && value !== null ? (
+        <p className="tabular-nums">
+          Plus/moins-value&nbsp;: {" "}
+          <span
+            className={cn(
+              "font-medium",
+              value - invested >= 0 ? "text-positive" : "text-negative",
+            )}
+          >
+            {value - invested >= 0 ? "+" : "−"}
+            {formatMoneyCents(Math.abs((value - invested) * 100), currency, locale)}
+          </span>
+        </p>
+      ) : null}
       {value !== null ? (
         <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
           Valeur totale&nbsp;:{" "}
