@@ -30,6 +30,7 @@ export default async function DashboardPage() {
   const totalGain = hasUnknown ? null : totalValue - totalInvested;
   const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
   const wealthSeries = aggregateSeries(envelopes.map((e) => e.series));
+  const wealthInvestedSeries = aggregateSeries(envelopes.map((e) => e.investedSeries));
   const monthChange = periodChange(wealthSeries, 30);
   const yearChange = periodChange(wealthSeries, 365);
 
@@ -111,7 +112,7 @@ export default async function DashboardPage() {
               </p>
             </div>
           </div>
-          <WealthChart valuations={wealthSeries} />
+          <WealthChart valuations={wealthSeries} investedPoints={wealthInvestedSeries} />
         </Card>
       ) : null}
 

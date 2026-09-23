@@ -5,12 +5,19 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { buildEnvelopeSeries, type PeriodKey, type ValuationPoint } from "@/lib/portfolio/series";
+import {
+  buildEnvelopeSeries,
+  valueAt,
+  type PeriodKey,
+  type ValuationPoint,
+} from "@/lib/portfolio/series";
 import { formatEurCents, formatMoneyCentsCompact } from "@/lib/money";
 import { cn } from "@/components/cn";
 
@@ -24,6 +31,28 @@ const periods: { key: PeriodKey; label: string }[] = [
 interface ChartPoint {
   date: number;
   value: number | null;
+  invested: number | null;
+}
+
+function mergeSeries(
+  valuations: ValuationPoint[],
+  investedPoints: ValuationPoint[],
+): ChartPoint[] {
+  const times = [
+    ...new Set([
+      ...valuations.map((v) => v.date.getTime()),
+      ...investedPoints.map((v) => v.date.getTime()),
+    ]),
+  ].sort((a, b) => a - b);
+  return times.map((time) => {
+    const value = valueAt(valuations, new Date(time));
+    const invested = valueAt(investedPoints, new Date(time));
+    return {
+      date: time,
+      value: valuations.length > 0 ? value / 100 : null,
+      invested: investedPoints.length > 0 ? invested / 100 : null,
+    };
+  });
 }
 
 function ChartTooltip({
@@ -35,41 +64,75 @@ function ChartTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
-  if (point.value === null) return null;
+  const value = point.value;
+  const invested = point.invested;
+  const gain = value !== null && invested !== null ? value - invested : null;
   return (
     <div className="rounded-lg border border-border-cw bg-bg-elevated p-3 text-xs shadow-lg">
-      <p className="mb-1 font-medium text-text-primary">
+      <p className="mb-2 font-medium text-text-primary">
         {new Date(point.date).toLocaleDateString("fr-FR", {
           day: "numeric",
           month: "long",
           year: "numeric",
         })}
       </p>
-      <p className="tabular-nums text-text-secondary">
-        Patrimoine :{" "}
-        <span className="font-semibold text-text-primary">
-          {formatEurCents(point.value * 100)}
-        </span>
-      </p>
+      {invested !== null ? (
+        <p className="tabular-nums text-text-secondary">
+          Investi&nbsp;:{" "}
+          <span className="font-medium" style={{ color: "var(--info)" }}>
+            {formatEurCents(invested * 100)}
+          </span>
+        </p>
+      ) : null}
+      {value !== null ? (
+        <p className="tabular-nums text-text-secondary">
+          Patrimoine&nbsp;:{" "}
+          <span className="font-semibold text-text-primary">
+            {formatEurCents(value * 100)}
+          </span>
+        </p>
+      ) : null}
+      {gain !== null ? (
+        <p className="mt-1 border-t border-border-cw pt-1 tabular-nums">
+          Plus/moins-value&nbsp;:{" "}
+          <span
+            className={cn(
+              "font-medium",
+              gain >= 0 ? "text-positive" : "text-negative",
+            )}
+          >
+            {gain >= 0 ? "+" : "−"}
+            {formatEurCents(Math.abs(gain * 100))}
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }
 
-export function WealthChart({ valuations }: { valuations: ValuationPoint[] }) {
+export function WealthChart({
+  valuations,
+  investedPoints,
+}: {
+  valuations: ValuationPoint[];
+  investedPoints: ValuationPoint[];
+}) {
   const [period, setPeriod] = useState<PeriodKey>("all");
 
   const { data, changeCents, changeRatio } = useMemo(() => {
     const series = buildEnvelopeSeries(valuations, 0, null, new Date(), period);
-    const points: ChartPoint[] = series.map((p) => ({
-      date: p.date.getTime(),
-      value: p.valueCents / 100,
-    }));
+    const startBoundary =
+      series.length > 0 ? series[0].date.getTime() : Number.NEGATIVE_INFINITY;
+    const merged = mergeSeries(valuations, investedPoints).filter(
+      (p) => p.date >= startBoundary,
+    );
     const first = series.length > 0 ? series[0].valueCents : null;
     const last = series.length > 0 ? series[series.length - 1].valueCents : null;
-    const change = first !== null && last !== null && series.length > 1 ? last - first : null;
+    const change =
+      first !== null && last !== null && series.length > 1 ? last - first : null;
     const ratio = change !== null && first && first > 0 ? change / first : null;
-    return { data: points, changeCents: change, changeRatio: ratio };
-  }, [valuations, period]);
+    return { data: merged, changeCents: change, changeRatio: ratio };
+  }, [valuations, investedPoints, period]);
 
   if (valuations.length === 0) {
     return (
@@ -118,7 +181,7 @@ export function WealthChart({ valuations }: { valuations: ValuationPoint[] }) {
           </p>
         ) : null}
       </div>
-      <div className="h-64" aria-label="Évolution du patrimoine">
+      <div className="h-64" aria-label="Évolution du patrimoine et de l'investi">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
@@ -150,6 +213,7 @@ export function WealthChart({ valuations }: { valuations: ValuationPoint[] }) {
               width={64}
             />
             <Tooltip content={<ChartTooltip />} />
+            <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
             <Area
               type="monotone"
               dataKey="value"
@@ -159,6 +223,15 @@ export function WealthChart({ valuations }: { valuations: ValuationPoint[] }) {
               fill="url(#wealthGradient)"
               isAnimationActive
               animationDuration={400}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="invested"
+              name="Investi"
+              stroke="var(--info)"
+              strokeWidth={2}
+              dot={false}
               connectNulls
             />
           </AreaChart>
