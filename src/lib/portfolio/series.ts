@@ -190,3 +190,64 @@ export function buildEnvelopeInvestedSeries(
   }
   return investedSeries(points);
 }
+
+export interface PeriodPerformanceResult {
+  /** gain réel sur la période : variation de valeur moins les versements de la période */
+  gainCents: number | null;
+  /** gain rapporté au capital investi (début de période, sinon total investi) */
+  ratio: number | null;
+}
+
+/**
+ * Performance d'une période par rapport au capital investi, et non à la
+ * première valeur de la courbe (qui démarre près de zéro et gonfle le %).
+ * Pour « tout l'historique » : gain = valeur actuelle − total investi.
+ * Pour une sous-période : gain = Δvaleur − Δinvesti (les versements de la
+ * période sont exclus), rapporté à l'investi en début de période.
+ */
+export function periodPerformance(
+  valuations: ValuationPoint[],
+  invested: ValuationPoint[],
+  period: PeriodKey,
+  now: Date = new Date(),
+): PeriodPerformanceResult {
+  const sortedValuations = [...valuations].sort(
+    (a, b) => a.date.getTime() - b.date.getTime(),
+  );
+  if (sortedValuations.length === 0) return { gainCents: null, ratio: null };
+  const sortedInvested = [...invested].sort(
+    (a, b) => a.date.getTime() - b.date.getTime(),
+  );
+  const valueEnd = sortedValuations[sortedValuations.length - 1].valueCents;
+
+  if (sortedInvested.length === 0) {
+    const first = sortedValuations[0].valueCents;
+    const gainCents = sortedValuations.length > 1 ? valueEnd - first : null;
+    return {
+      gainCents,
+      ratio: gainCents !== null && first > 0 ? gainCents / first : null,
+    };
+  }
+
+  const investedEnd = sortedInvested[sortedInvested.length - 1].valueCents;
+  const days = PERIOD_DAYS[period];
+  let valueStart = 0;
+  let investedStart = 0;
+  if (days !== null) {
+    const cutoff = now.getTime() - days * 24 * 60 * 60 * 1000;
+    const lastValuationBefore = sortedValuations.findLast(
+      (v) => v.date.getTime() <= cutoff,
+    );
+    valueStart = lastValuationBefore ? lastValuationBefore.valueCents : 0;
+    const lastInvestedBefore = sortedInvested.findLast(
+      (v) => v.date.getTime() <= cutoff,
+    );
+    investedStart = lastInvestedBefore ? lastInvestedBefore.valueCents : 0;
+  }
+  const gainCents = valueEnd - valueStart - (investedEnd - investedStart);
+  const denominator = investedStart > 0 ? investedStart : investedEnd;
+  return {
+    gainCents,
+    ratio: denominator > 0 ? gainCents / denominator : null,
+  };
+}

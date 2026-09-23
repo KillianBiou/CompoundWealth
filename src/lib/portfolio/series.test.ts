@@ -228,3 +228,56 @@ describe("buildEnvelopeInvestedSeries", () => {
     expect(points).toEqual([{ date: d("2026-02-01"), valueCents: 8_000 }]);
   });
 });
+
+import { periodPerformance } from "./series";
+
+describe("periodPerformance", () => {
+  const now = d("2026-12-31");
+  const valuations = [
+    { date: d("2026-01-01"), valueCents: 10_000 },
+    { date: d("2026-06-30"), valueCents: 60_000 },
+    { date: d("2026-12-31"), valueCents: 130_000 },
+  ];
+  const invested = [
+    { date: d("2026-01-01"), valueCents: 10_000 },
+    { date: d("2026-06-30"), valueCents: 110_000 },
+  ];
+
+  it("sur tout l'historique : gain = valeur finale − total investi", () => {
+    const result = periodPerformance(valuations, invested, "all", now);
+    expect(result.gainCents).toBe(130_000 - 110_000);
+    expect(result.ratio).toBeCloseTo(20_000 / 110_000, 5);
+  });
+
+  it("sur 6 mois : exclut les versements de la période du gain", () => {
+    const investedLate = [
+      { date: d("2026-01-01"), valueCents: 10_000 },
+      { date: d("2026-08-01"), valueCents: 110_000 },
+    ];
+    const result = periodPerformance(valuations, investedLate, "6m", now);
+    // Δvaleur = 70 000, Δinvesti = 100 000 → gain = −30 000 sur 10 000 investis au début
+    expect(result.gainCents).toBe(130_000 - 60_000 - (110_000 - 10_000));
+    expect(result.ratio).toBe(-30_000 / 10_000);
+  });
+
+  it("sans historique d'investissement : repli sur la variation de valeur", () => {
+    const result = periodPerformance(valuations, [], "all", now);
+    expect(result.gainCents).toBe(130_000 - 10_000);
+    expect(result.ratio).toBeCloseTo(120_000 / 10_000, 5);
+  });
+
+  it("retourne null sans valorisations", () => {
+    expect(periodPerformance([], [], "all", now)).toEqual({ gainCents: null, ratio: null });
+  });
+
+  it("période sans point antérieur : part de 0 investi", () => {
+    const short = [
+      { date: d("2026-12-02"), valueCents: 5_000 },
+      { date: d("2026-12-31"), valueCents: 7_000 },
+    ];
+    const shortInvested = [{ date: d("2026-12-05"), valueCents: 5_000 }];
+    const result = periodPerformance(short, shortInvested, "1m", now);
+    expect(result.gainCents).toBe(7_000 - 0 - 5_000);
+    expect(result.ratio).toBeCloseTo(2_000 / 5_000, 5);
+  });
+});

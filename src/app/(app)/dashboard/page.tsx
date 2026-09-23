@@ -1,25 +1,18 @@
 import { Plus } from "lucide-react";
 import { getEnvelopeSummaries } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
-import { aggregateSeries } from "@/lib/portfolio/series";
+import { aggregateSeries, periodPerformance } from "@/lib/portfolio/series";
 import { Badge, ButtonLink, Card, Kpi } from "@/components/ui";
 import { EnvelopeCard } from "@/components/envelope-card";
 import { WealthChart } from "./wealth-chart";
 import { RefreshAllButton } from "./refresh-all-button";
 
-function periodChange(series: { date: Date; valueCents: number }[], days: number) {
-  if (series.length < 2) return null;
-  const now = series[series.length - 1].date.getTime();
-  const cutoff = now - days * 24 * 60 * 60 * 1000;
-  let startValue: number | null = null;
-  for (const point of series) {
-    if (point.date.getTime() <= cutoff) startValue = point.valueCents;
-    else break;
-  }
-  const start = startValue ?? series[0].valueCents;
-  const last = series[series.length - 1].valueCents;
-  if (start === 0) return null;
-  return (last - start) / start;
+function periodChange(
+  valuations: { date: Date; valueCents: number }[],
+  invested: { date: Date; valueCents: number }[],
+  period: "1m" | "1y",
+) {
+  return periodPerformance(valuations, invested, period);
 }
 
 export default async function DashboardPage() {
@@ -31,8 +24,8 @@ export default async function DashboardPage() {
   const gainRatio = totalGain !== null && totalInvested > 0 ? totalGain / totalInvested : null;
   const wealthSeries = aggregateSeries(envelopes.map((e) => e.series));
   const wealthInvestedSeries = aggregateSeries(envelopes.map((e) => e.investedSeries));
-  const monthChange = periodChange(wealthSeries, 30);
-  const yearChange = periodChange(wealthSeries, 365);
+  const monthChange = periodChange(wealthSeries, wealthInvestedSeries, "1m");
+  const yearChange = periodChange(wealthSeries, wealthInvestedSeries, "1y");
 
   if (envelopes.length === 0) {
     return (
@@ -96,19 +89,24 @@ export default async function DashboardPage() {
             <div>
               <h2 className="font-heading text-lg font-semibold">Évolution du patrimoine</h2>
               <p className="mt-0.5 text-xs text-text-muted">
-                {monthChange !== null ? (
+                {monthChange.ratio !== null ? (
                   <>
                     1 mois :{" "}
-                    <span className={monthChange >= 0 ? "text-positive" : "text-negative"}>
-                      {formatPercent(monthChange)}
+                    <span className={monthChange.ratio >= 0 ? "text-positive" : "text-negative"}>
+                      {formatPercent(monthChange.ratio)}
                     </span>
                     {" · "}
                   </>
                 ) : null}
                 1 an :{" "}
-                <span className={yearChange !== null ? (yearChange >= 0 ? "text-positive" : "text-negative") : ""}>
-                  {yearChange !== null ? formatPercent(yearChange) : "historique insuffisant"}
-                </span>
+                {yearChange.ratio !== null ? (
+                  <span className={yearChange.ratio >= 0 ? "text-positive" : "text-negative"}>
+                    {formatPercent(yearChange.ratio)}
+                  </span>
+                ) : (
+                  "historique insuffisant"
+                )}
+                <span className="ml-1">(hors versements)</span>
               </p>
             </div>
           </div>
