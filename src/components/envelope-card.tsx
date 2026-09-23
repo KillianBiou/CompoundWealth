@@ -4,7 +4,7 @@ import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "./ui";
 import { cn } from "./cn";
 
-function Sparkline({
+export function Sparkline({
   series,
   gainCents,
 }: {
@@ -54,6 +54,10 @@ function Sparkline({
 export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
   const gain = envelope.gainCents;
   const gainRatio = envelope.investedCents > 0 && gain !== null ? gain / envelope.investedCents : null;
+  const isLivret = envelope.type === "LIVRET_A";
+  const sparkSeries = isLivret && envelope.livretSeries
+    ? envelope.livretSeries.map((p) => ({ date: p.date, valueCents: p.balanceCents }))
+    : envelope.series;
   return (
     <Link href={`/envelopes/${envelope.id}`} className="group block">
       <Card className="h-full transition-colors group-hover:border-accent-500/50">
@@ -67,7 +71,17 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
               {envelope.broker ? ` · ${envelope.broker}` : ""}
             </p>
           </div>
-          <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type}</Badge>
+          <Badge
+            tone={
+              envelope.type === "PEA"
+                ? "positive"
+                : envelope.type === "LIVRET_A"
+                  ? "neutral"
+                  : "warning"
+            }
+          >
+            {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+          </Badge>
         </div>
         <div className="mt-4 flex items-end justify-between gap-4">
           <div className="min-w-0">
@@ -95,18 +109,32 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
             )}
           </div>
           <div className="shrink-0">
-            <Sparkline series={envelope.series} gainCents={gain} />
+            <Sparkline series={sparkSeries} gainCents={gain} />
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-border-cw/60 pt-3">
           <p className="text-xs text-text-muted">
-            {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""}
-            {envelope.investedCents > 0 ? (
-              <span className="text-text-secondary">
-                {" "}
-                · investi {formatEurCents(envelope.investedCents)}
-              </span>
-            ) : null}
+            {isLivret ? (
+              <>
+                Livret A
+                {envelope.overCapCents && envelope.overCapCents > 0 ? (
+                  <span className="text-negative">
+                    {" "}
+                    · {formatEurCents(envelope.overCapCents)} au-dessus du plafond
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""}
+                {envelope.investedCents > 0 ? (
+                  <span className="text-text-secondary">
+                    {" "}
+                    · investi {formatEurCents(envelope.investedCents)}
+                  </span>
+                ) : null}
+              </>
+            )}
           </p>
           <p className="text-xs font-medium text-text-muted transition-colors group-hover:text-accent-500">
             Détails →

@@ -23,6 +23,7 @@ const base: EnvelopeSummary = {
   positionsCount: 2,
   series: [],
   investedSeries: [],
+  envelopeType: "PEA",
 };
 
 describe("EnvelopeCard", () => {

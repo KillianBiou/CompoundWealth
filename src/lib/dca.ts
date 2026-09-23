@@ -1,6 +1,6 @@
 export type DcaFrequency = "BIWEEKLY" | "MONTHLY" | "BIMONTHLY" | "QUARTERLY";
 
-export type EnvelopeType = "PEA" | "CTO";
+export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A";
 
 export const DCA_FREQUENCY_LABELS: Record<DcaFrequency, string> = {
   BIWEEKLY: "2 semaines",
@@ -103,7 +103,7 @@ export function estimateSpendCents(
   envelopeType: EnvelopeType,
 ): SpendEstimate | null {
   if (priceCents === null || priceCents <= 0) return null;
-  if (envelopeType === "CTO") {
+  if (envelopeType === "CTO" || envelopeType === "LIVRET_A") {
     return { estimatedCents: maxAmountCents, quantity: maxAmountCents / priceCents, remainderCents: 0 };
   }
   const quantity = Math.floor(maxAmountCents / priceCents);
@@ -180,4 +180,24 @@ export function windowSummaries(
   const build = (period: "1m" | "3m" | "1y") =>
     summarizeWindow(lines, envelopeType, start, addPeriod(start, period));
   return { "1m": build("1m"), "3m": build("3m"), "1y": build("1y") };
+}
+
+/**
+ * Prochaine date (>= aujourd'hui) tombant le jour du mois demandé.
+ * Si le mois courant est trop court, le dernier jour du mois est retenu
+ * (ex. le "31" tombe le 28/29 février).
+ */
+export function nextDateForDay(day: number, today: Date = new Date()): Date {
+  const clamped = Math.max(1, Math.min(31, Math.floor(day)));
+  const year = today.getFullYear();
+  const daysInMonth = (m: number) => new Date(year, m + 1, 0).getDate();
+  const candidate = (m: number) => {
+    const dim = daysInMonth(m);
+    return new Date(year, m, Math.min(clamped, dim));
+  };
+  for (let m = today.getMonth(); m < today.getMonth() + 2; m += 1) {
+    const date = candidate(m);
+    if (date.getTime() >= startOfDay(today).getTime()) return date;
+  }
+  return candidate(today.getMonth());
 }
