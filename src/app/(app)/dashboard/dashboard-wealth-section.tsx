@@ -13,14 +13,12 @@ import {
 
 export function DashboardWealthSection({
   wealthSeries,
-  wealthInvestedSeries,
   envelopeToggles,
   envelopes,
   monthChangeRatio,
   yearChangeRatio,
 }: {
   wealthSeries: { date: Date; valueCents: number }[];
-  wealthInvestedSeries: { date: Date; valueCents: number }[];
   envelopeToggles: ChartSeriesToggle[];
   envelopes: EnvelopeSummary[];
   monthChangeRatio: number | null;
@@ -79,7 +77,6 @@ export function DashboardWealthSection({
           </div>
           <WealthChart
             valuations={wealthSeries}
-            investedPoints={wealthInvestedSeries}
             envelopeToggles={envelopeToggles}
             visible={visible}
             onToggleEnvelope={onToggleEnvelope}

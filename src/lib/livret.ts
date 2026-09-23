@@ -57,22 +57,26 @@ export function buildLivretBalanceSeries(
 ): LivretPoint[] {
   const sorted = [...events].sort((a, b) => a.date.getTime() - b.date.getTime());
   if (sorted.length === 0) return [];
-  const start = nextFortnightStart(sorted[0].date);
+  // le solde est visible dès la quinzaine du versement ; la production
+  // d'intérêts ne commence qu'à la quinzaine suivante (règle des livrets)
+  const start = fortnightStart(sorted[0].date);
   const end = new Date(now.getFullYear(), now.getMonth() + horizonMonths + 1, 1);
   const points: LivretPoint[] = [];
   let balance = 0;
   let accruedInterest = 0;
   let deposited = 0;
   let overflow = 0;
+  let producingBalance = 0;
   let eventIndex = 0;
+  let producingIndex = 0;
   let cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
   let guard = 0;
   while (cursor.getTime() <= end.getTime() && guard < 10_000) {
     guard += 1;
-    // versements/retraits dont la production d'intérêts a commencé
+    // versements/retraits visibles dans le solde dès leur quinzaine
     while (
       eventIndex < sorted.length &&
-      nextFortnightStart(sorted[eventIndex].date).getTime() <= cursor.getTime()
+      fortnightStart(sorted[eventIndex].date).getTime() <= cursor.getTime()
     ) {
       const amount = sorted[eventIndex].amountCents;
       deposited += amount;
@@ -89,12 +93,26 @@ export function buildLivretBalanceSeries(
       }
       eventIndex += 1;
     }
+    // part du solde qui produit des intérêts (quinzaine suivante)
+    while (
+      producingIndex < sorted.length &&
+      nextFortnightStart(sorted[producingIndex].date).getTime() <= cursor.getTime()
+    ) {
+      const amount = sorted[producingIndex].amountCents;
+      if (amount >= 0) {
+        const allowed = Math.max(0, Math.min(amount, LIVRET_A_DEPOSIT_CAP_CENTS - producingBalance));
+        producingBalance += allowed;
+      } else {
+        producingBalance = Math.max(0, producingBalance + amount);
+      }
+      producingIndex += 1;
+    }
     // capitalisation annuelle : les intérêts de l'année passée sont crédités au 1er janvier
     if (points.length > 0 && cursor.getMonth() === 0 && cursor.getDate() === 1) {
       balance += Math.round(accruedInterest);
       accruedInterest = 0;
     }
-    accruedInterest += (balance * rate) / FORTNIGHTS_PER_YEAR;
+    accruedInterest += (producingBalance * rate) / FORTNIGHTS_PER_YEAR;
     points.push({
       date: new Date(cursor),
       balanceCents: balance,

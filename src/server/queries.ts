@@ -44,6 +44,12 @@ export interface EnvelopeSummary {
   /** DCA actif : total mensuel estimé en centimes et nombre de versements sur 1 mois */
   dcaMonthlyCents?: number;
   dcaMonthlyPayments?: number;
+  /** positions triées par valeur décroissante (vue détaillée du dashboard) */
+  topPositions?: {
+    name: string;
+    symbol: string | null;
+    valueCents: number;
+  }[];
   /** projection 1 an : perte de pouvoir d'achat */
   projection?: {
     interestCents: number;
@@ -62,6 +68,8 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
     include: {
       positions: {
         select: {
+          name: true,
+          symbol: true,
           investedCents: true,
           boughtAt: true,
           valuations: { orderBy: { date: "asc" } },
@@ -99,7 +107,9 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       e.type === "LIVRET_A" ? buildLivretBalanceSeries(livretEvents, livretRate) : [];
     const livretCurrentPoint =
       e.type === "LIVRET_A"
-        ? [...livretSeriesFull].reverse().find((p) => p.date.getTime() <= nowTime) ?? null
+        ? ([...livretSeriesFull].reverse().find((p) => p.date.getTime() <= nowTime) ??
+          livretSeriesFull[0] ??
+          null)
         : null;
     const livretValue = livretCurrentPoint ? livretCurrentPoint.balanceCents : 0;
     const envelopeValue =
@@ -127,6 +137,16 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
     const hasUnknownInvested =
       e.depositsCents === null && e.positions.some((p) => p.investedCents === null);
     const gainCents = hasUnknownInvested ? null : envelopeValue - investedCents;
+    const topPositions =
+      e.type === "LIVRET_A"
+        ? []
+        : e.positions
+            .map((p) => ({
+              name: p.name,
+              symbol: p.symbol,
+              valueCents: currentValueCents(p.valuations, p.investedCents ?? 0),
+            }))
+            .sort((a, b) => b.valueCents - a.valueCents);
     return {
       id: e.id,
       type: e.type,
@@ -139,6 +159,7 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
       valueCents: envelopeValue,
       gainCents,
       positionsCount: e.positions.length,
+      topPositions,
       series: effectiveSeries,
       investedSeries:
         e.type === "LIVRET_A"

@@ -8,6 +8,7 @@ import {
   LIVRET_A_DEFAULT_INFLATION,
   LIVRET_A_DEPOSIT_CAP_CENTS,
   LIVRET_A_RATE,
+  fortnightStart,
 } from "@/lib/livret";
 import { formatEurCents } from "@/lib/money";
 import { fetchMarketHistory, fetchMarketQuote } from "@/lib/market/quotes";
@@ -156,7 +157,7 @@ export async function createEnvelopeAction(
     await prisma.envelopeDeposit.create({
       data: {
         envelopeId: envelope.id,
-        date: new Date(),
+        date: fortnightStart(new Date()),
         amountCents: eurosToCents(initialAmountEur),
       },
     });
