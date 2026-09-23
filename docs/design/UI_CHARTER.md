@@ -102,6 +102,9 @@ Contrastes : tout couple texte/fond respecte **WCAG AA** (≥ 4.5:1 pour le text
 | Badge fiscal CTO / flat tax | `--warning` translucide |
 | Focus clavier | contour 2px `--accent-500`, offset 2px |
 | Erreur de formulaire | `--negative` + message texte explicite (jamais la couleur seule) |
+| Montant d'argent engagé / investi (DCA, positions) | `--positive` vert, `font-semibold`, `tabular-nums` |
+| Montant engagé non investi (reliquat parts entières) | `--warning` ambre |
+| Échéance à venir (compte à rebours DCA) | `--accent-500` corail, texte 12px sous la date |
 
 Le corail joue donc un double rôle maîtrisé : **identité** (CTA, focus) et **sémantique de perte** (variations), sans conflit car jamais sur les mêmes éléments.
 
@@ -111,6 +114,7 @@ Le corail joue donc un double rôle maîtrisé : **identité** (CTA, focus) et *
 - **KPI** : libellé 13px secondaire au-dessus, valeur 28–32px primaire, variation en dessous avec flèche ↗/↘ colorée.
 - **Graphique d'évolution** : courbe 2px, dégradé vertical subtil sous la courbe (accent 12 % → transparent), ligne pointillée horizontale pour le « total investi », tooltip sombre au survol. Axe Y en k€/M€ abrégé.
 - **Formulaire** : labels au-dessus, un champ par ligne mobile, deux colonnes desktop ; erreurs en dessous du champ ; bouton principal en bas-droite, action destructive à gauche en `--negative` outline.
+- **Section DCA** : en-tête de table sur fond `--bg-subtle/50` avec bordure basse 2px, lignes séparées par 1px et hover `--bg-subtle/30`. Récapitulatif « Engagé sur X mois » : bloc bordé `--positive/25` fond `--positive/5`, montant en H3 vert. Sélecteur de période en tabs segmentés ; répartition par position en barres horizontales / anneau / treemap (palette catégorielle 8 teintes), légende en chips ticker + montant compact.
 - **Badges fiscaux** : chips translucides avec texte court (« Exonéré IR après 5 ans », « Flat tax 31,4 % ») — cliquables vers l'explication.
 
 ## 7. Iconographie & illustrations

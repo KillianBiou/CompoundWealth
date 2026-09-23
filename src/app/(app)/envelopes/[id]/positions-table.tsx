@@ -53,7 +53,7 @@ export function PositionsTable({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-t border-border-cw text-left text-xs uppercase tracking-wide text-text-muted">
+              <tr className="border-b-2 border-border-cw bg-bg-subtle/50 text-left text-xs uppercase tracking-wide text-text-muted">
                 <th className="px-6 py-3 font-medium">Nom</th>
                 <th className="px-4 py-3 font-medium">Catégorie</th>
                 <th className="px-4 py-3 text-right font-medium">Investi</th>
@@ -64,7 +64,7 @@ export function PositionsTable({
             </thead>
             <tbody>
               {positions.map((p) => (
-                <tr key={p.id} className="border-t border-border-cw/60">
+                <tr key={p.id} className="border-b border-border-cw/40 transition-colors hover:bg-bg-subtle/30">
                   <td className="px-6 py-3">
                     <span className="font-medium text-text-primary">{p.name}</span>
                     {p.symbol ? (
@@ -76,14 +76,16 @@ export function PositionsTable({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.investedCents !== null ? (
-                      formatEurCents(p.investedCents)
+                      <span className="font-semibold text-positive">
+                        {formatEurCents(p.investedCents)}
+                      </span>
                     ) : (
                       <span className="italic text-text-muted">état des lieux</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.currentValueCents !== null ? (
-                      <span>
+                      <span className="font-semibold text-text-primary">
                         {formatEurCents(p.currentValueCents)}
                         {p.valuationDate ? (
                           <span className="block text-xs font-normal text-text-muted">
