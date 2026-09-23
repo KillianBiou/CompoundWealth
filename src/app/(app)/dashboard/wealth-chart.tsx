@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import {
   buildEnvelopeSeries,
+  periodPerformance,
   valueAt,
   type PeriodKey,
   type ValuationPoint,
@@ -126,12 +127,8 @@ export function WealthChart({
     const merged = mergeSeries(valuations, investedPoints).filter(
       (p) => p.date >= startBoundary,
     );
-    const first = series.length > 0 ? series[0].valueCents : null;
-    const last = series.length > 0 ? series[series.length - 1].valueCents : null;
-    const change =
-      first !== null && last !== null && series.length > 1 ? last - first : null;
-    const ratio = change !== null && first && first > 0 ? change / first : null;
-    return { data: merged, changeCents: change, changeRatio: ratio };
+    const performance = periodPerformance(valuations, investedPoints, period);
+    return { data: merged, changeCents: performance.gainCents, changeRatio: performance.ratio };
   }, [valuations, investedPoints, period]);
 
   if (valuations.length === 0) {
@@ -174,10 +171,10 @@ export function WealthChart({
             {changeRatio !== null ? (
               <span className="ml-1 font-normal text-text-secondary">
                 ({changeRatio >= 0 ? "+" : "−"}
-                {(Math.abs(changeRatio) * 100).toFixed(1).replace(".", ",")} %)
+                {(Math.abs(changeRatio) * 100).toFixed(1).replace(".", ",")} % du capital investi)
               </span>
             ) : null}
-            <span className="ml-1 font-normal text-text-muted">sur la période</span>
+            <span className="ml-1 font-normal text-text-muted">hors versements</span>
           </p>
         ) : null}
       </div>
