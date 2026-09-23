@@ -13,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "CompoundWealth — Suivi de portefeuille long terme",
+  title: "CompoundedWealth — Suivi de portefeuille long terme",
   description:
     "Suivez la croissance de votre patrimoine investi (PEA, CTO), enveloppe par enveloppe, et laissez les intérêts composés travailler.",
 };
