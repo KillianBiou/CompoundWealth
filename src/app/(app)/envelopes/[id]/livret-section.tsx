@@ -8,7 +8,7 @@ import {
   updateLivretSettingsAction,
   type ActionState,
 } from "@/server/actions";
-import { LIVRET_A_DEPOSIT_CAP_CENTS, LIVRET_A_DEFAULT_INFLATION, LIVRET_A_RATE } from "@/lib/livret";
+import { LIVRET_A_DEFAULT_INFLATION, LIVRET_A_RATE } from "@/lib/livret";
 import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Card, Field, Input } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
@@ -22,7 +22,12 @@ export interface LivretDepositRow {
 }
 
 function pctLabel(rate: number): string {
-  return `${(rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
+  const pct = toPercentValue(rate);
+  return `${pct.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`;
+}
+
+function toPercentValue(rate: number): number {
+  return Math.round(rate * 100 * 100) / 100;
 }
 
 export function LivretSection({
@@ -42,15 +47,19 @@ export function LivretSection({
   inflationRate: number | null;
   projection: {
     interestCents: number;
+    inflationLossCents: number;
+    overCapCents: number;
     realBalanceCents: number;
     realChangeCents: number;
     realRate: number;
   } | null;
 }) {
   const [showCap, setShowCap] = useState(false);
+  const [depositDate, setDepositDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [depositAmount, setDepositAmount] = useState("");
   const rate = interestRate ?? LIVRET_A_RATE;
   const inflation = inflationRate ?? LIVRET_A_DEFAULT_INFLATION;
-  const overCapCents = Math.max(0, balanceCents - LIVRET_A_DEPOSIT_CAP_CENTS);
+  const overCapCents = projection?.overCapCents ?? 0;
   const totalDeposits = deposits.reduce((s, d) => s + d.amountCents, 0);
 
   const [depositState, depositAction, depositPending] = useActionState<ActionState, FormData>(
@@ -74,12 +83,13 @@ export function LivretSection({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />
           <div>
             <p className="text-sm font-semibold text-negative">
-              {formatEurCents(overCapCents)} au-dessus du plafond de 22 950 €
+              {formatEurCents(overCapCents)} hors livret — au-delà du plafond de versement de 22 950 €
             </p>
             <p className="mt-0.5 text-xs text-text-secondary">
-              Cette somme ne bénéficie pas du taux du Livret A — elle ne rapporte{" "}
-              <strong>rien</strong> et perd du pouvoir d&apos;achat avec l&apos;inflation. Très
-              nocif pour votre épargne : transférez-la vers un placement rémunéré.
+              La banque refuse tout versement au-delà du plafond : cette somme reste sur votre
+              compte courant, rémunérée à un taux très faible (voire nul). Très nocif pour votre
+              épargne : placez-la sur un support rémunéré (autre livret réglementé, fonds
+              euros…).
             </p>
           </div>
         </div>
@@ -150,14 +160,19 @@ export function LivretSection({
           <TrendingDown className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
           <p className="text-sm text-text-secondary">
             <strong className="text-warning">Perte de pouvoir d&apos;achat :</strong> à taux de{" "}
-            {pctLabel(rate)} contre une inflation de {pctLabel(inflation)}, votre livret rapporte{" "}
-            <span className="text-positive">+{formatEurCents(projection.interestCents)}</span>{" "}
-            d&apos;intérêts sur un an mais votre épargne vaut{" "}
-            <span className="text-negative">
-              {formatEurCents(Math.abs(projection.realChangeCents))} de moins
+            {pctLabel(rate)} contre une inflation de {pctLabel(inflation)}, l&apos;inflation
+            détruit{" "}
+            <span className="font-semibold text-negative">
+              −{formatEurCents(projection.inflationLossCents)}
             </span>{" "}
-            en euros constants ({(projection.realRate * 100).toFixed(1).replace(".", ",")} % de
-            baisse réelle). Le livret protège la liquidité, pas la croissance.
+            de valeur en un an, quand les intérêts n&apos;en rapportent que{" "}
+            <span className="text-positive">+{formatEurCents(projection.interestCents)}</span>.
+            Bilan net :{" "}
+            <span className="font-semibold text-negative">
+              −{formatEurCents(Math.abs(projection.realChangeCents))}
+            </span>{" "}
+            de pouvoir d&apos;achat ({(projection.realRate * 100).toFixed(1).replace(".", ",")} %).
+            Le livret protège la liquidité, pas la croissance.
           </p>
         </div>
       ) : null}
@@ -179,14 +194,21 @@ export function LivretSection({
           <h2 className="font-heading text-lg font-semibold">Versements et retraits</h2>
           <form action={depositAction} className="mt-4 space-y-3" noValidate>
             <input type="hidden" name="envelopeId" value={envelopeId} />
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="flex-1">
+            <div className="flex items-end gap-3">
+              <div className="w-40 shrink-0">
                 <Field
                   label="Date"
                   htmlFor="livret-deposit-date"
                   error={depositState?.errors?.date}
                 >
-                  <Input id="livret-deposit-date" name="date" type="date" required />
+                  <Input
+                    id="livret-deposit-date"
+                    name="date"
+                    type="date"
+                    value={depositDate}
+                    onChange={(e) => setDepositDate(e.target.value)}
+                    required
+                  />
                 </Field>
               </div>
               <div className="flex-1">
@@ -202,6 +224,16 @@ export function LivretSection({
                     step="0.01"
                     inputMode="decimal"
                     placeholder="500,00"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    className={cn(
+                      depositAmount.trim() !== "" &&
+                        Number(depositAmount) < 0 &&
+                        "border-negative/60 text-negative",
+                      depositAmount.trim() !== "" &&
+                        Number(depositAmount) > 0 &&
+                        "border-positive/60 text-positive",
+                    )}
                     required
                   />
                 </Field>
@@ -212,10 +244,23 @@ export function LivretSection({
                 {depositState.errors.form[0]}
               </p>
             ) : null}
-            <Button type="submit" disabled={depositPending}>
+            <button
+              type="submit"
+              disabled={depositPending}
+              className={cn(
+                "flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors disabled:cursor-wait disabled:opacity-50",
+                Number(depositAmount) < 0
+                  ? "bg-negative hover:bg-negative/85"
+                  : "bg-positive hover:bg-positive/85",
+              )}
+            >
               <PiggyBank className="h-4 w-4" aria-hidden />
-              {depositPending ? "Enregistrement…" : "Enregistrer le mouvement"}
-            </Button>
+              {depositPending
+                ? "Enregistrement…"
+                : Number(depositAmount) < 0
+                  ? "Enregistrer le retrait"
+                  : "Enregistrer le versement"}
+            </button>
           </form>
           {deposits.length > 0 ? (
             <ul className="mt-5 space-y-1.5 border-t border-border-cw/60 pt-4">
@@ -255,7 +300,7 @@ export function LivretSection({
                 step="0.01"
                 min="0"
                 inputMode="decimal"
-                defaultValue={(rate * 100).toString()}
+                defaultValue={toPercentValue(rate).toString()}
                 required
               />
             </Field>
@@ -271,7 +316,7 @@ export function LivretSection({
                 type="number"
                 step="0.01"
                 inputMode="decimal"
-                defaultValue={(inflation * 100).toString()}
+                defaultValue={toPercentValue(inflation).toString()}
                 required
               />
             </Field>

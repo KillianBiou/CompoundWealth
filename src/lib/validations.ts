@@ -36,12 +36,22 @@ const notFuture = z
   .string()
   .refine((v) => Date.parse(v) <= Date.now() + 86_400_000, "La date ne peut pas être dans le futur");
 
-export const envelopeSchema = z.object({
-  type: z.enum(["PEA", "CTO", "LIVRET_A"]),
-  name: z.string().trim().min(1, "Le nom est requis").max(80, "80 caractères maximum"),
-  broker: z.string().trim().max(80).optional().or(z.literal("")),
-  openedAt: isoDateOptional,
-});
+export const envelopeSchema = z
+  .object({
+    type: z.enum(["PEA", "CTO", "LIVRET_A"]),
+    name: z.string().trim().min(1, "Le nom est requis").max(80, "80 caractères maximum"),
+    broker: z.string().trim().max(80).optional().or(z.literal("")),
+    openedAt: isoDateOptional,
+    initialAmountEur: z.coerce
+      .number()
+      .min(0, "Le montant doit être positif")
+      .max(500_000, "Montant trop élevé")
+      .optional(),
+  })
+  .refine((v) => v.type !== "LIVRET_A" || v.initialAmountEur === undefined || v.initialAmountEur >= 0, {
+    message: "Le montant initial doit être positif",
+    path: ["initialAmountEur"],
+  });
 
 export const livretSettingsSchema = z.object({
   interestRate: z.coerce

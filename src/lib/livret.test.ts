@@ -41,21 +41,37 @@ describe("buildLivretBalanceSeries", () => {
     expect(afterNewYear!.balanceCents).toBe(10_144);
   });
 
-  it("ne rémunère pas le solde au-dessus du plafond", () => {
-    const base = projectOneYear(
-      [{ date: d("2026-01-01"), amountCents: LIVRET_A_DEPOSIT_CAP_CENTS }],
-      0.015,
-      0.02,
-      d("2026-06-01"),
-    )!;
-    const over = projectOneYear(
-      [{ date: d("2026-01-01"), amountCents: LIVRET_A_DEPOSIT_CAP_CENTS + 500_000 }],
-      0.015,
-      0.02,
-      d("2026-06-01"),
-    )!;
-    expect(over.interestCents).toBe(base.interestCents);
-    expect(over.overCapCents).toBe(500_000);
+  it("refuse les versements au-delà du plafond : l'excédent reste hors livret (≈ 0 %)", () => {
+    const events: LivretEvent[] = [
+      { date: d("2026-01-01"), amountCents: LIVRET_A_DEPOSIT_CAP_CENTS },
+      { date: d("2026-01-05"), amountCents: 500_000 },
+    ];
+    const series = buildLivretBalanceSeries(events, 0.015, d("2026-06-01"), 0);
+    const last = series[series.length - 1];
+    expect(last.balanceCents).toBe(LIVRET_A_DEPOSIT_CAP_CENTS);
+    expect(last.overCapCents).toBe(500_000);
+  });
+
+  it("rémunère intégralement un solde dépassant le plafond grâce aux intérêts capitalisés", () => {
+    const events: LivretEvent[] = [{ date: d("2025-01-01"), amountCents: LIVRET_A_DEPOSIT_CAP_CENTS }];
+    const series = buildLivretBalanceSeries(events, 0.015, d("2027-03-01"), 2);
+    const overCapPoint = series.find((p) => p.balanceCents > LIVRET_A_DEPOSIT_CAP_CENTS);
+    expect(overCapPoint).toBeDefined();
+    const interest = overCapPoint!.balanceCents - LIVRET_A_DEPOSIT_CAP_CENTS;
+    expect(interest).toBeGreaterThan(0);
+    expect(overCapPoint!.overCapCents).toBe(0);
+  });
+
+  it("un retrait consomme d'abord l'excédent hors plafond", () => {
+    const events: LivretEvent[] = [
+      { date: d("2026-01-01"), amountCents: LIVRET_A_DEPOSIT_CAP_CENTS },
+      { date: d("2026-01-05"), amountCents: 500_000 },
+      { date: d("2026-02-01"), amountCents: -300_000 },
+    ];
+    const series = buildLivretBalanceSeries(events, 0.015, d("2026-06-01"), 0);
+    const last = series[series.length - 1];
+    expect(last.overCapCents).toBe(200_000);
+    expect(last.balanceCents).toBe(LIVRET_A_DEPOSIT_CAP_CENTS);
   });
 
   it("ajoute les versements à la quinzaine suivant leur dépôt", () => {

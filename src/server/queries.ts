@@ -43,6 +43,8 @@ export interface EnvelopeSummary {
   /** projection 1 an : perte de pouvoir d'achat */
   projection?: {
     interestCents: number;
+    inflationLossCents: number;
+    overCapCents: number;
     realBalanceCents: number;
     realChangeCents: number;
     realRate: number;
@@ -138,6 +140,8 @@ export const getEnvelopeSummaries = cache(async (): Promise<EnvelopeSummary[]> =
               projection: projection
                 ? {
                     interestCents: projection.interestCents,
+                    inflationLossCents: projection.inflationLossCents,
+                    overCapCents: projection.overCapCents,
                     realBalanceCents: projection.realBalanceCents,
                     realChangeCents: projection.realChangeCents,
                     realRate: projection.realRate,

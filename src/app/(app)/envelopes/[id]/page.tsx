@@ -108,6 +108,8 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             projection
               ? {
                   interestCents: projection.interestCents,
+                  inflationLossCents: projection.inflationLossCents,
+                  overCapCents: projection.overCapCents,
                   realBalanceCents: projection.realBalanceCents,
                   realChangeCents: projection.realChangeCents,
                   realRate: projection.realRate,
