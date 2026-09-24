@@ -227,6 +227,9 @@ export async function closeEnvelopeAction(formData: FormData): Promise<void> {
 async function rebuildPositionValuations(
   position: { id: string; symbol: string; investments: { date: Date; amountCents: number }[] },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (getEtfByIsin(position.symbol)?.isPrivate) {
+    return { ok: false, reason: "fonds non coté : historique manuel uniquement" };
+  }
   const firstDate = position.investments[0].date;
   const history = await fetchMarketHistory(position.symbol, firstDate, new Date());
   if (!history.ok) return { ok: false, reason: history.reason };
@@ -678,7 +681,7 @@ export interface ImportPreviewPosition {
 }
 
 export interface ImportPreviewEnvelope {
-  type: "PEA" | "CTO";
+  type: "PEA" | "CTO" | "PRIV";
   name: string;
   broker: string | null;
   openedAt: string | null;
@@ -1210,7 +1213,9 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
   });
   if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
 
-  const positionsWithHistory = envelope.positions.filter((p) => p.symbol && p.investments.length > 0);
+  const positionsWithHistory = envelope.positions.filter(
+    (p) => p.symbol && p.investments.length > 0 && !getEtfByIsin(p.symbol)?.isPrivate,
+  );
   if (positionsWithHistory.length === 0) {
     return {
       errors: {
