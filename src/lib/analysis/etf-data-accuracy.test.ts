@@ -132,10 +132,11 @@ describe("répartitions distantes — intégrité", () => {
           weights[i - 1] + 1e-9,
         );
       }
-      // top 10 plausible : < 90 % du fonds (thématique étroit type défense)
-      // et > 0,5 % (fonds obligataire très diversifié)
+      // top 10 plausible : <= 100 % du fonds (thématique étroit type
+      // tech européenne : 10 valeurs couvrent déjà ~90 %) et > 0,5 %
+      // (fonds obligataire très diversifié)
       const top10 = weights.reduce((s, w) => s + w, 0);
-      expect(top10, `${detail.isin} top10 ${top10}`).toBeLessThan(0.9);
+      expect(top10, `${detail.isin} top10 ${top10}`).toBeLessThanOrEqual(1.0);
       expect(top10, `${detail.isin} top10 ${top10}`).toBeGreaterThan(0.005);
     }
   });
@@ -145,8 +146,22 @@ describe("répartitions distantes — intégrité", () => {
     expect(iwda).not.toBeNull();
     const other = iwda!.countries.find((c) => c.name === "Other");
     expect(other).toBeDefined();
-    expect(other!.weight).toBeGreaterThan(0.1);
-    expect(other!.weight).toBeLessThan(0.3);
+    // liste complète des pays : Other = reste réel (~8 %), pas 18 % du top 4
+    expect(other!.weight).toBeGreaterThan(0.02);
+    expect(other!.weight).toBeLessThan(0.15);
+  });
+  it("les répartitions complètes dépassent le top 4 des pays", () => {
+    const iwda = getEtfDetailByIsin("IE00B4L5Y983");
+    expect(iwda).not.toBeNull();
+    // liste AJAX complète : plus de pays nommés que les 4 du repli
+    expect(iwda!.countries.length).toBeGreaterThanOrEqual(9);
+    const named = iwda!.countries.filter((c) => c.name !== "Other");
+    expect(named.length).toBeGreaterThan(4);
+    // les pays étendus sont plausibles (Suisse ~2-3 %)
+    const ch = named.find((c) => c.name === "Switzerland");
+    expect(ch).toBeDefined();
+    expect(ch!.weight).toBeGreaterThan(0.01);
+    expect(ch!.weight).toBeLessThan(0.05);
   });
 });
 
@@ -162,9 +177,11 @@ describe("identités de référence — données distantes exactes", () => {
     expect(iwda!.domicile).toBe("Ireland");
     expect(iwda!.holdingsCount).not.toBeNull();
     expect(iwda!.holdingsCount!).toBeGreaterThan(1000);
-    // Apple et NVIDIA en tête du MSCI World
-    expect(iwda!.topHoldings[0]?.name).toBe("Apple");
-    expect(["NVIDIA Corp.", "Microsoft Corp"]).toContain(iwda!.topHoldings[1]?.name);
+    // NVIDIA et Apple en tête du MSCI World (données émetteur 2026)
+    expect(["NVIDIA", "Apple"]).toContain(iwda!.topHoldings[0]?.name);
+    expect(iwda!.topHoldings.slice(0, 2).map((h) => h.name)).toContain("Apple");
+    // 25 valeurs détaillées via l'API émetteur
+    expect(iwda!.topHoldings.length).toBeGreaterThanOrEqual(20);
     // ~69 % États-Unis
     const us = iwda!.countries.find((c) => c.name === "United States");
     expect(us!.weight).toBeGreaterThan(0.65);
