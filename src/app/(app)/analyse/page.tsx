@@ -6,6 +6,7 @@ import {
   getRegionAnalysis,
   getSectorAnalysis,
   getAnalysisPositions,
+  getEtfDetailsByIsin,
 } from "@/server/analysis";
 import { getEnvelopeSummaries } from "@/server/queries";
 import { aggregateSeries } from "@/lib/portfolio/series";
@@ -56,6 +57,7 @@ export default async function AnalysePage() {
       sectors={sectors}
       regions={regions}
       simulatorDefaults={simulatorDefaults}
+      etfDetails={getEtfDetailsByIsin()}
     />
   );
 }
