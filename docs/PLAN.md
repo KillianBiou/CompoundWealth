@@ -8,7 +8,7 @@
 
 ## 1. Vision
 
-CompoundWealth est une webapp moderne et claire de suivi de portefeuille, inspirée des meilleurs trackers du marché (Finary, Kubera, Sharesight, Snowball Analytics, Capitally), mais centrée sur **l'investissement long terme et les intérêts composés** — pas sur le trading. L'utilisateur visualise la croissance de son patrimoine investi, enveloppe par enveloppe, sans complexité inutile.
+CompoundWealth est une webapp moderne et claire de suivi de portefeuille, inspirée des meilleurs trackers du marché (competition, Kubera, Sharesight, Snowball Analytics, Capitally), mais centrée sur **l'investissement long terme et les intérêts composés** — pas sur le trading. L'utilisateur visualise la croissance de son patrimoine investi, enveloppe par enveloppe, sans complexité inutile.
 
 Voir : [docs/features/MVP.md](features/MVP.md), [docs/design/UI_CHARTER.md](design/UI_CHARTER.md).
 
