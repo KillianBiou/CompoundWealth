@@ -219,3 +219,52 @@ describe("WealthChart ordre d'empilement", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("ChartTooltip plus/moins-value", () => {
+  it("soustrait l'investi de la valeur dans la même unité : pas de facteur 100", async () => {
+    const { ChartTooltip } = await import("./wealth-chart");
+    render(
+      <ChartTooltip
+        active
+        payload={[
+          {
+            payload: {
+              date: Date.now(),
+              savings: 8_000,
+              equity: 26_252.34,
+              invested: null,
+              investedDisplay: null,
+              investedTotal: 33_523.65,
+            },
+          },
+        ]}
+      />,
+    );
+    // Valeur 34 252,34 € − investi 33 523,65 € = +728,69 €
+    expect(screen.getByText(/\+728,69/)).toBeInTheDocument();
+    // Ancien bug : centimes de la valeur − euros de l'investi → « +33 917,10 € »
+    expect(screen.queryByText(/917,10/)).not.toBeInTheDocument();
+  });
+
+  it("garde une plus/moins-value négative quand la valeur est sous l'investi", async () => {
+    const { ChartTooltip } = await import("./wealth-chart");
+    render(
+      <ChartTooltip
+        active
+        payload={[
+          {
+            payload: {
+              date: Date.now(),
+              savings: null,
+              equity: 9_000,
+              invested: null,
+              investedDisplay: null,
+              investedTotal: 10_000,
+            },
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText(/1[\s\u00A0\u202F]000,00/)).toBeInTheDocument();
+  });
+});
