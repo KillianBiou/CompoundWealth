@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Landmark, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Landmark, Settings, LogOut, LineChart } from "lucide-react";
 import { logoutAction } from "@/server/actions";
 import { Button } from "./ui";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/envelopes", label: "Enveloppes", icon: Landmark },
+  { href: "/analyse", label: "Analyse", icon: LineChart },
   { href: "/settings", label: "Réglages", icon: Settings },
 ];
 

@@ -71,6 +71,7 @@ model Position {
   createdAt      DateTime            @default(now())
   valuations     PositionValuation[]
   investments   PositionInvestment[]
+  cashIncomes    CashIncome[]
 
   @@index([envelopeId])
 }
@@ -113,6 +114,18 @@ model PositionInvestment {
   date        DateTime
   amountCents Int
 
+  @@index([positionId])
+}
+
+model CashIncome {
+  id          String   @id @default(cuid())
+  positionId  String
+  position    Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  date        DateTime
+  /** montant net reçu en centimes (dividende, intérêt) */
+  amountCents Int
+  /** DIVIDEND, INTEREST_PAYMENT, ... */
+  kind        String
   @@index([positionId])
 }
 

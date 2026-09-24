@@ -735,6 +735,16 @@ export async function confirmImportAction(
             })),
           });
         }
+        if (p.cashIncomes?.length > 0) {
+          await tx.cashIncome.createMany({
+            data: p.cashIncomes.map((income) => ({
+              positionId: position.id,
+              date: new Date(income.date),
+              amountCents: income.amountCents,
+              kind: income.kind,
+            })),
+          });
+        }
       }
       names.push(name);
     }
