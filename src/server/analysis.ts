@@ -4,7 +4,8 @@ import { requireUserId } from "./auth";
 import { currentValueCents } from "@/lib/portfolio/series";
 import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
-import { getEtfDetailByIsin, getEtfDetailByTicker } from "@/lib/analysis/etf-detail";
+import type { EtfDetail } from "@/lib/analysis/etf-detail";
+import { getEtfDetailByIsin, getEtfDetailByTicker, getAllEtfDetails } from "@/lib/analysis/etf-detail";
 import {
   analyzeFees,
   analyzeIncome,
@@ -124,6 +125,18 @@ export const getRegionAnalysis = cache(async (): Promise<DiversificationResult> 
   const positions = await getAnalysisPositions();
   return analyzeRegions(positions);
 });
+
+/**
+ * Détails CSV complets des ETF, indexés par ISIN — passés au client pour le
+ * panneau latéral de détail (frais, identifiants, répartitions, holdings).
+ */
+export function getEtfDetailsByIsin(): Record<string, EtfDetail> {
+  const byIsin: Record<string, EtfDetail> = {};
+  for (const detail of getAllEtfDetails()) {
+    byIsin[detail.isin] = detail;
+  }
+  return byIsin;
+}
 
 /** Épargne mensuelle moyenne (12 mois glissants) depuis les versements réels. */
 export const getAverageMonthlySavingsCents = cache(async (): Promise<number | null> => {

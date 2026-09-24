@@ -18,10 +18,13 @@ describe("parseEtfDetailCsv", () => {
     expect(details.length).toBeGreaterThanOrEqual(120);
     const wpea = getEtfDetailByIsin("IE0002XZSHO1");
     expect(wpea).not.toBeNull();
-    expect(wpea!.ter).toBeCloseTo(0.0025, 6);
+    expect(wpea!.ter).toBeCloseTo(0.002, 6);
     expect(wpea!.distributing).toBe(false);
     expect(wpea!.userHolding).toBe(true);
     expect(wpea!.region).toBe("World");
+    expect(wpea!.topHoldings.length).toBeGreaterThan(0);
+    expect(wpea!.countries.length).toBeGreaterThan(0);
+    expect(wpea!.sectors.length).toBeGreaterThan(0);
   });
 
   it("convertit les pourcents en fractions (TER 0,25 → 0,0025)", () => {
