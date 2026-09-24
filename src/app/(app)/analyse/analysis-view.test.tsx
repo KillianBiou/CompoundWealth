@@ -5,7 +5,7 @@ import type {
   DiversificationResult,
   FeeAnalysisResult,
   IncomeAnalysisResult,
-  SimulationResult,
+  SimulatorDefaults,
 } from "@/lib/analysis/scanners";
 
 vi.mock("recharts", () => ({
@@ -14,8 +14,11 @@ vi.mock("recharts", () => ({
   ),
   BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Bar: () => <div />,
   Line: () => <div />,
+  Pie: () => <div />,
+  Cell: () => <div />,
   CartesianGrid: () => <div />,
   XAxis: () => <div />,
   YAxis: () => <div />,
@@ -108,23 +111,14 @@ const regions: DiversificationResult = {
   totalCents: 100_000_00,
 };
 
-const simulation: SimulationResult = {
-  points: [
-    { year: 2026, nominalCents: 100_000_00, realCents: 100_000_00 },
-    { year: 2046, nominalCents: 189_000_00, realCents: 127_000_00 },
-  ],
-  fireYear: 2041,
-  milestones: [
-    { label: "100 k€", targetCents: 10_000_000, year: 2027 },
-    { label: "500 k€", targetCents: 50_000_000, year: null },
-  ],
-  finalNominalCents: 189_000_00,
-  finalRealCents: 127_000_00,
-  sensitivity: [
-    { annualReturn: 0.03, monthlySavingsCents: 500_00, finalCents: 150_000_00 },
-    { annualReturn: 0.05, monthlySavingsCents: 500_00, finalCents: 189_000_00 },
-    { annualReturn: 0.08, monthlySavingsCents: 500_00, finalCents: 250_000_00 },
-  ],
+const simulatorDefaults: SimulatorDefaults = {
+  investedWealthCents: 70_000_00,
+  savingsWealthCents: 30_000_00,
+  monthlySavingsCents: 1_150_00,
+  monthlyDcaCents: 300_00,
+  equityReturn: 0.07,
+  savingsReturn: 0.03,
+  returnSource: "historique",
 };
 
 function renderView() {
@@ -134,9 +128,7 @@ function renderView() {
       income={income}
       sectors={sectors}
       regions={regions}
-      simulation={simulation}
-      totalWealthCents={100_000_00}
-      monthlySavingsCents={1_150_00}
+      simulatorDefaults={simulatorDefaults}
       monthlyExpensesCents={1_500_00}
     />,
   );
@@ -163,7 +155,7 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText("Frais"));
     expect(screen.getByText("Scanner de frais")).toBeInTheDocument();
     expect(screen.getByText("MSCI World Swap PEA")).toBeInTheDocument();
-    expect(screen.getByText(/Manque à gagner 20 ans/)).toBeInTheDocument();
+    expect(screen.getByText(/Impact estimé sur 20 ans/)).toBeInTheDocument();
   });
 
   it("ferme le panneau au clic sur Fermer", () => {

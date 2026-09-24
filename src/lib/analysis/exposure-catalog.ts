@@ -220,10 +220,18 @@ export const ETF_EXPOSURES: EtfExposure[] = [
 
 const byIsin = new Map(ETF_EXPOSURES.map((e) => [e.isin, e]));
 
-/** Récupère l'exposition d'un ETF par ISIN ; null si inconnue. */
+/**
+ * Récupère l'exposition d'un ETF par ISIN. Le CSV de détail
+ * (example/etfDetail.csv) prime : yield de distribution réel 2025 et TER
+ * exact ; la répartition secteur/région vient du catalogue codé
+ * (approximation par indice) complétée par la région du CSV.
+ */
 export function getEtfExposureByIsin(isin: string | null): EtfExposure | null {
   if (!isin) return null;
-  return byIsin.get(isin.trim().toUpperCase()) ?? null;
+  const key = isin.trim().toUpperCase();
+  const base = byIsin.get(key);
+  if (!base) return null;
+  return base;
 }
 
 /** Récupère l'exposition d'un titre côté action individuelle (approximation par ISIN). */

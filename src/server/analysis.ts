@@ -4,6 +4,7 @@ import { requireUserId } from "./auth";
 import { currentValueCents } from "@/lib/portfolio/series";
 import { getEtfByIsin } from "@/lib/etf-catalog";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
+import { getEtfDetailByIsin } from "@/lib/analysis/etf-detail";
 import {
   analyzeFees,
   analyzeIncome,
@@ -59,6 +60,7 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
     for (const position of envelope.positions) {
       const isin = isinOf(position);
       const etf = isin ? getEtfByIsin(isin) : null;
+      const detail = isin ? getEtfDetailByIsin(isin) : null;
       const valueCents = currentValueCents(position.valuations, position.investedCents ?? 0);
       positions.push({
         id: position.id,
@@ -70,7 +72,7 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
         category: position.category,
         valueCents,
         investedCents: position.investedCents,
-        ter: etf?.ter ?? null,
+        ter: detail?.ter ?? etf?.ter ?? null,
         boughtAt: position.boughtAt,
         investments: position.investments.map((inv) => ({
           date: inv.date,

@@ -4,6 +4,7 @@ import {
   type RegionKey,
   type Sector,
 } from "./exposure-catalog";
+import { getEtfDetailByIsin } from "./etf-detail";
 
 /* -------------------------------------------------------------------------- */
 /*                                                                            */
@@ -225,11 +226,15 @@ export function analyzeIncome(
     const cash = position.cashIncomeCents.filter((c) => c.date.getTime() >= cutoff.getTime());
     const cash12ForPosition = cash.reduce((s, c) => s + c.amountCents, 0);
     cash12 += cash12ForPosition;
+    const detail = getEtfDetailByIsin(position.isin);
     const exposure =
       position.isStock
         ? getStockExposure(position.isin)
         : getEtfExposureByIsin(position.isin);
-    const estimatedYield = exposure?.dividendYield ?? 0;
+    const estimatedYield =
+      detail?.dividendYield2025 !== null && detail?.dividendYield2025 !== undefined
+        ? detail.dividendYield2025
+        : (exposure?.dividendYield ?? 0);
     const capitalizedEstimate = Math.round(position.valueCents * estimatedYield);
     if (capitalizedEstimate > 0) {
       capitalized += capitalizedEstimate;
@@ -562,4 +567,177 @@ export function estimateMonthlyExpenses(
   if (salaryCents === null || salaryCents <= 0) return null;
   if (averageMonthlySavingsCents === null) return salaryCents * 0.8;
   return Math.max(0, salaryCents - averageMonthlySavingsCents);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                 Performance passée et paramètres par défaut                 */
+/* -------------------------------------------------------------------------- */
+
+/** Rendement actions long terme par défaut quand l'historique est insuffisant. */
+export const DEFAULT_EQUITY_RETURN = 0.07;
+
+/**
+ * CAGR réel du portefeuille actions depuis les valuations : part de la
+ * performance qui n'est pas expliquée par les versements. On neutralise les
+ * flux : rendement = (V_fin − Σ versements postérieurs au début) / V_début,
+ * annualisé. Retourne null si l'historique est trop court (< 6 mois) ou
+ * trop petit.
+ */
+export function historicalCagr(
+  valuations: { date: Date; valueCents: number }[],
+  invested: { date: Date; valueCents: number }[],
+  now: Date = new Date(),
+): number | null {
+  if (valuations.length < 2) return null;
+  const sorted = [...valuations].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const start = sorted[0];
+  const months = (now.getTime() - start.date.getTime()) / (30.44 * 24 * 3600 * 1000);
+  if (months < 6 || start.valueCents <= 0) return null;
+  const end = sorted[sorted.length - 1];
+  // approche flux nettoyés : gain réel = V_end − V_start − versements sur la période
+  const investedStart = valueAtOr(invested, start.date, 0);
+  const investedEnd = valueAtOr(invested, now, 0);
+  const flows = investedEnd - investedStart;
+  const realGain = end.valueCents - start.valueCents - flows;
+  if (start.valueCents <= 0) return null;
+  const totalReturn = realGain / start.valueCents;
+  const years = Math.max(months / 12, 0.5);
+  const cagr = Math.pow(1 + totalReturn, 1 / years) - 1;
+  if (!Number.isFinite(cagr)) return null;
+  return Math.max(-0.5, Math.min(0.25, cagr));
+}
+
+function valueAtOr(
+  points: { date: Date; valueCents: number }[],
+  date: Date,
+  fallback: number,
+): number {
+  let current = fallback;
+  for (const p of points) {
+    if (p.date.getTime() <= date.getTime()) current = p.valueCents;
+    else break;
+  }
+  return current;
+}
+
+/**
+ * Paramètres par défaut du simulateur : investissements actuels + DCA actif
+ * + performance passée réelle si exploitable, sinon moyenne long terme
+ * (actions ~7 %/an, livret à son taux contractuel).
+ */
+export interface SimulatorDefaults {
+  /** patrimoine investi (actions/ETF) actuel, centimes */
+  investedWealthCents: number;
+  /** épargne réglementée (livrets) actuelle, centimes */
+  savingsWealthCents: number;
+  /** épargne mensuelle totale (versements réels + DCA actif estimé), centimes */
+  monthlySavingsCents: number;
+  /** part investie (DCA) de l'épargne mensuelle, centimes */
+  monthlyDcaCents: number;
+  /** rendement annuel des investissements, fraction */
+  equityReturn: number;
+  /** rendement annuel de l'épargne (livret), fraction */
+  savingsReturn: number;
+  /** source du rendement actions : historique réel ou moyenne long terme */
+  returnSource: "historique" | "moyenne";
+}
+
+export function buildSimulatorDefaults(params: {
+  positions: AnalysisPosition[];
+  /** valuations patrimoine investi (actions) agrégées */
+  equityValuations: { date: Date; valueCents: number }[];
+  /** cumul investi agrégé (actions) */
+  equityInvested: { date: Date; valueCents: number }[];
+  /** DCA actif : total mensuel estimé en centimes (toutes enveloppes actions) */
+  dcaMonthlyCents: number;
+  /** taux du livret (fraction), pour l'épargne */
+  savingsRate: number;
+  now?: Date;
+}): SimulatorDefaults {
+  const now = params.now ?? new Date();
+  const investedWealthCents = params.positions
+    .filter((p) => p.envelopeType !== "LIVRET_A" && p.valueCents > 0)
+    .reduce((s, p) => s + p.valueCents, 0);
+  const savingsWealthCents = params.positions
+    .filter((p) => p.envelopeType === "LIVRET_A")
+    .reduce((s, p) => s + p.valueCents, 0);
+  const realSavingsMonthly = averageMonthlySavings(params.positions, now) ?? 0;
+  const monthlySavingsCents = realSavingsMonthly + params.dcaMonthlyCents;
+  const monthlyDcaCents = params.dcaMonthlyCents;
+  const cagr = historicalCagr(params.equityValuations, params.equityInvested, now);
+  return {
+    investedWealthCents,
+    savingsWealthCents,
+    monthlySavingsCents,
+    monthlyDcaCents,
+    equityReturn: cagr ?? DEFAULT_EQUITY_RETURN,
+    savingsReturn: params.savingsRate,
+    returnSource: cagr !== null ? "historique" : "moyenne",
+  };
+}
+
+/**
+ * Simulation à deux compartiments : investissement (actions, rendement
+ * composé) et épargne (livret, rendement simple annualisé). L'épargne
+ * mensuelle est répartie selon la part DCA : le DCA va à l'investissement,
+ * le reste à l'épargne — jamais l'inverse.
+ */
+export interface TwoTrackSimulationPoint {
+  year: number;
+  investedCents: number;
+  savingsCents: number;
+  totalCents: number;
+  totalRealCents: number;
+}
+
+export function simulateTwoTracks(params: {
+  investedWealthCents: number;
+  savingsWealthCents: number;
+  monthlyInvestedCents: number;
+  monthlySavingsCents: number;
+  equityReturn: number;
+  savingsReturn: number;
+  inflation: number;
+  horizonYears: number;
+}): { points: TwoTrackSimulationPoint[]; fireYear: number | null } {
+  const {
+    investedWealthCents,
+    savingsWealthCents,
+    monthlyInvestedCents,
+    monthlySavingsCents,
+    equityReturn,
+    savingsReturn,
+    inflation,
+    horizonYears,
+  } = params;
+  const equityMonthly = Math.pow(1 + equityReturn, 1 / 12) - 1;
+  const savingsMonthly = savingsReturn / 12;
+  let invested = investedWealthCents;
+  let savings = savingsWealthCents;
+  const startYear = new Date().getFullYear();
+  const points: TwoTrackSimulationPoint[] = [
+    {
+      year: startYear,
+      investedCents: Math.round(invested),
+      savingsCents: Math.round(savings),
+      totalCents: Math.round(invested + savings),
+      totalRealCents: Math.round(invested + savings),
+    },
+  ];
+
+  for (let year = 1; year <= horizonYears; year += 1) {
+    for (let month = 1; month <= 12; month += 1) {
+      invested = invested * (1 + equityMonthly) + monthlyInvestedCents;
+      savings = savings * (1 + savingsMonthly) + monthlySavingsCents;
+    }
+    const total = invested + savings;
+    points.push({
+      year: startYear + year,
+      investedCents: Math.round(invested),
+      savingsCents: Math.round(savings),
+      totalCents: Math.round(total),
+      totalRealCents: Math.round(total / Math.pow(1 + inflation, year)),
+    });
+  }
+  return { points, fireYear: null };
 }

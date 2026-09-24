@@ -1,43 +1,47 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/session";
-import { getFeeAnalysis } from "@/server/analysis";
-import { getIncomeAnalysis } from "@/server/analysis";
-import { getSectorAnalysis } from "@/server/analysis";
-import { getRegionAnalysis } from "@/server/analysis";
-import { getAverageMonthlySavingsCents } from "@/server/analysis";
-import { getEstimatedMonthlyExpensesCents } from "@/server/analysis";
+import {
+  getEstimatedMonthlyExpensesCents,
+  getFeeAnalysis,
+  getIncomeAnalysis,
+  getRegionAnalysis,
+  getSectorAnalysis,
+  getAnalysisPositions,
+} from "@/server/analysis";
 import { getEnvelopeSummaries } from "@/server/queries";
-import { simulateWealth } from "@/lib/analysis/scanners";
+import { aggregateSeries } from "@/lib/portfolio/series";
+import { LIVRET_A_RATE } from "@/lib/livret";
+import { buildSimulatorDefaults } from "@/lib/analysis/scanners";
 import { AnalysisPageView } from "./analysis-view";
-import type { SimulationResult } from "@/lib/analysis/scanners";
 
 export default async function AnalysePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [fees, income, sectors, regions, avgSavings, monthlyExpenses, envelopes] =
+  const [fees, income, sectors, regions, monthlyExpenses, positions, envelopes] =
     await Promise.all([
       getFeeAnalysis(),
       getIncomeAnalysis(),
       getSectorAnalysis(),
       getRegionAnalysis(),
-      getAverageMonthlySavingsCents(),
       getEstimatedMonthlyExpensesCents(),
+      getAnalysisPositions(),
       getEnvelopeSummaries(),
     ]);
 
-  const totalWealthCents = envelopes.reduce((s, e) => s + e.valueCents, 0);
-  const simulationDefaults = {
-    currentWealthCents: totalWealthCents,
-    monthlySavingsCents: avgSavings ?? 0,
-    monthlyExpensesCents: monthlyExpenses ?? 0,
-  };
-  const simulation: SimulationResult = simulateWealth({
-    ...simulationDefaults,
-    annualReturn: 0.05,
-    inflation: 0.02,
-    horizonYears: 20,
-    withdrawalRate: 0.04,
+  const equityEnvelopes = envelopes.filter((e) => e.type !== "LIVRET_A");
+  const equityValuations = aggregateSeries(equityEnvelopes.map((e) => e.series));
+  const equityInvested = aggregateSeries(equityEnvelopes.map((e) => e.investedSeries));
+  const dcaMonthlyCents = equityEnvelopes.reduce((s, e) => s + (e.dcaMonthlyCents ?? 0), 0);
+  const savingsRate =
+    envelopes.find((e) => e.type === "LIVRET_A")?.interestRate ?? LIVRET_A_RATE;
+
+  const simulatorDefaults = buildSimulatorDefaults({
+    positions,
+    equityValuations,
+    equityInvested,
+    dcaMonthlyCents,
+    savingsRate,
   });
 
   return (
@@ -46,9 +50,7 @@ export default async function AnalysePage() {
       income={income}
       sectors={sectors}
       regions={regions}
-      simulation={simulation}
-      totalWealthCents={totalWealthCents}
-      monthlySavingsCents={avgSavings}
+      simulatorDefaults={simulatorDefaults}
       monthlyExpensesCents={monthlyExpenses}
     />
   );
