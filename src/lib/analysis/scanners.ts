@@ -575,7 +575,7 @@ export function estimateMonthlyExpenses(
 /* -------------------------------------------------------------------------- */
 
 /** Rendement actions long terme par défaut quand l'historique est insuffisant. */
-export const DEFAULT_EQUITY_RETURN = 0.07;
+export const DEFAULT_EQUITY_RETURN = 0.08;
 
 /**
  * CAGR réel du portefeuille actions depuis les valuations : part de la
@@ -628,7 +628,7 @@ import type { SimulatorDefaults } from "./simulator";
 /**
  * Paramètres par défaut du simulateur : investissements actuels + DCA actif
  * + performance passée réelle si exploitable, sinon moyenne long terme
- * (actions ~7 %/an, livret à son taux contractuel).
+ * (actions ~8 %/an, livret à son taux contractuel).
  */
 export function buildSimulatorDefaults(params: {
   positions: AnalysisPosition[];
