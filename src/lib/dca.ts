@@ -96,6 +96,8 @@ export interface SpendEstimate {
  * PEA : parts entières uniquement — sur 1 500 € avec une part à 120 €,
  * 12 parts = 1 440 € dépensés, 60 € non investis.
  * CTO : parts fractionnaires, tout le budget est dépensé.
+ * Non coté (PRIV) : souscription en fractions de parts, tout le budget
+ * est investi — pas de notion de part entière.
  */
 export function estimateSpendCents(
   maxAmountCents: number,
@@ -103,7 +105,7 @@ export function estimateSpendCents(
   envelopeType: EnvelopeType,
 ): SpendEstimate | null {
   if (priceCents === null || priceCents <= 0) return null;
-  if (envelopeType === "CTO" || envelopeType === "LIVRET_A") {
+  if (envelopeType !== "PEA") {
     return { estimatedCents: maxAmountCents, quantity: maxAmountCents / priceCents, remainderCents: 0 };
   }
   const quantity = Math.floor(maxAmountCents / priceCents);
