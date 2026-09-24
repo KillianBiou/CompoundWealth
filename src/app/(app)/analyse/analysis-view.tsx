@@ -640,11 +640,13 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
             {formatEurCents(finalPoint.totalCents)}
           </p>
-          <p className="mt-1 text-xs text-text-muted">
-            dont {formatEurCents(totalGainCents)} d&apos;intérêts ·{" "}
-            {formatEurCents(totalContributionsCents)} d&apos;apports
-            {useInflation ? ` · ${formatEurCents(finalPoint.totalRealCents)} en euros constants` : ""}
-          </p>
+          <div className="mt-1 space-y-0.5 text-xs text-text-muted">
+            <p>dont {formatEurCents(totalGainCents)} d&apos;intérêts</p>
+            <p>{formatEurCents(totalContributionsCents)} d&apos;apports</p>
+            {useInflation ? (
+              <p>{formatEurCents(finalPoint.totalRealCents)} en euros constants</p>
+            ) : null}
+          </div>
         </div>
         <div className="rounded-lg border border-accent-500/25 bg-gradient-to-br from-accent-500/10 to-transparent p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
@@ -653,12 +655,12 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
             {formatEurCents(monthlyRenteCents)}/mois
           </p>
-          <p className="mt-1 text-xs text-text-muted">
-            retrait de {formatPercent(withdrawalRate / 100)} du capital par an
-            {useInflation
-              ? ` · ${formatEurCents(monthlyRenteRealCents)}/mois en euros constants`
-              : ""}
-          </p>
+          <div className="mt-1 space-y-0.5 text-xs text-text-muted">
+            <p>retrait de {formatPercent(withdrawalRate / 100)} du capital par an</p>
+            {useInflation ? (
+              <p>{formatEurCents(monthlyRenteRealCents)}/mois en euros constants</p>
+            ) : null}
+          </div>
         </div>
       </div>
       <div className="h-64">
