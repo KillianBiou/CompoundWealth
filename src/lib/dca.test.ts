@@ -93,6 +93,12 @@ describe("estimateSpendCents", () => {
     expect(result?.estimatedCents).toBe(150_000);
     expect(result?.remainderCents).toBe(0);
   });
+  it("PRIV (non coté) : fractions de parts — budget complet investi, pas de reliquat", () => {
+    const result = estimateSpendCents(150_000, 12_000, "PRIV");
+    expect(result?.estimatedCents).toBe(150_000);
+    expect(result?.quantity).toBeCloseTo(12.5, 6);
+    expect(result?.remainderCents).toBe(0);
+  });
   it("prix inconnu → null", () => {
     expect(estimateSpendCents(150_000, null, "PEA")).toBeNull();
   });
