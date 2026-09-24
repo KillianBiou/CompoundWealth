@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
@@ -204,9 +204,11 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
 /*                                Onglet Détails                              */
 /* -------------------------------------------------------------------------- */
 
+const HOLDINGS_PAGE_SIZE = 10;
+
 function DetailsTab({ etf }: { etf: EtfDetail }) {
   const holdings = etf.topHoldings;
-  const top10Weight = holdings.reduce((sum, h) => sum + h.weight, 0);
+  const [visibleCount, setVisibleCount] = useState(HOLDINGS_PAGE_SIZE);
   if (holdings.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-text-muted">
@@ -214,19 +216,22 @@ function DetailsTab({ etf }: { etf: EtfDetail }) {
       </p>
     );
   }
+  const visible = holdings.slice(0, visibleCount);
+  const visibleWeight = visible.reduce((sum, h) => sum + h.weight, 0);
+  const remaining = holdings.length - visible.length;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border-cw p-4">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-            Top {holdings.length} valeurs
+            Top {visible.length} valeurs
           </p>
           <p className="text-xs text-text-muted tabular-nums">
-            poids cumulé {formatPercent(top10Weight)}
+            poids cumulé {formatPercent(visibleWeight)}
           </p>
         </div>
         <div className="mt-3 space-y-2.5">
-          {holdings.map((holding, index) => (
+          {visible.map((holding, index) => (
             <div key={holding.name}>
               <div className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="flex items-center gap-2 text-text-primary">
@@ -253,6 +258,16 @@ function DetailsTab({ etf }: { etf: EtfDetail }) {
             </div>
           ))}
         </div>
+        {remaining > 0 ? (
+          <button
+            type="button"
+            onClick={() => setVisibleCount((count) => count + HOLDINGS_PAGE_SIZE)}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-border-cw/60 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text-primary"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Afficher {Math.min(HOLDINGS_PAGE_SIZE, remaining)} valeur{remaining > 1 ? "s" : ""} de plus
+          </button>
+        ) : null}
       </div>
       <p className="text-xs text-text-muted">
         Poids issus du dernier rapport du fonds — les répartitions complètes
@@ -286,15 +301,14 @@ function BreakdownList({
   }
   const named = entries.filter((e) => e.name !== "Other");
   const other = entries.find((e) => e.name === "Other");
-  const visible = expanded ? named : named.slice(0, 4);
-  const total = entries.reduce((s, e) => s + e.weight, 0);
-  const hiddenWeight = expanded
-    ? 0
-    : named.slice(4).reduce((s, e) => s + e.weight, 0);
+  const visibleNamed = expanded ? named : named.slice(0, 4);
+  const hiddenNamed = expanded ? [] : named.slice(4);
+  const collapsedOtherWeight =
+    (other?.weight ?? 0) + hiddenNamed.reduce((s, e) => s + e.weight, 0);
   const max = entries[0]?.weight || 1;
   return (
     <div className="space-y-2">
-      {visible.map((entry, index) => {
+      {visibleNamed.map((entry, index) => {
         const label = translate ? translate(entry.name) : entry.name;
         return (
           <div key={entry.name}>
@@ -325,17 +339,23 @@ function BreakdownList({
           </div>
         );
       })}
-      {!expanded && hiddenWeight > 0 ? (
+      {!expanded && hiddenNamed.length > 0 ? (
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="flex w-full items-center justify-between rounded-md px-1 py-1 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text-primary"
+          className="mt-1 flex w-full items-center justify-between rounded-md border-t border-border-cw/40 px-1 pt-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text-primary"
         >
           <span className="flex items-center gap-2">
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-            {named.length - 4} autres pays
+            <span aria-hidden>🌍</span>
+            Autres
+            {hiddenNamed.length > 0 ? (
+              <span className="text-xs text-text-muted">
+                ({hiddenNamed.length} lignes)
+              </span>
+            ) : null}
           </span>
-          <span className="tabular-nums">+{formatPercent(hiddenWeight)}</span>
+          <span className="tabular-nums">+{formatPercent(collapsedOtherWeight)}</span>
         </button>
       ) : null}
       {expanded && named.length > 4 ? (
@@ -348,7 +368,7 @@ function BreakdownList({
           Replier
         </button>
       ) : null}
-      {other ? (
+      {(expanded || hiddenNamed.length === 0) && other ? (
         <div className="mt-1 flex items-baseline justify-between gap-2 border-t border-border-cw/40 pt-2 text-sm">
           <span className="flex items-center gap-2 text-text-muted">
             <span aria-hidden>🌍</span>
@@ -356,7 +376,6 @@ function BreakdownList({
           </span>
           <span className="tabular-nums text-text-muted">
             {formatPercent(other.weight)}
-            {total > 1.001 ? "" : ""}
           </span>
         </div>
       ) : null}

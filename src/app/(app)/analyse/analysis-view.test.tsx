@@ -165,6 +165,15 @@ function renderView() {
           countries: [
             { name: "United States", weight: 0.695 },
             { name: "Japan", weight: 0.0552 },
+            { name: "United Kingdom", weight: 0.0377 },
+            { name: "Canada", weight: 0.0346 },
+            { name: "Switzerland", weight: 0.0271 },
+            { name: "France", weight: 0.0217 },
+            { name: "Germany", weight: 0.0215 },
+            { name: "Netherlands", weight: 0.0165 },
+            { name: "Australia", weight: 0.0164 },
+            { name: "Ireland", weight: 0.0102 },
+            { name: "Other", weight: 0.0641 },
           ],
           sectors: [
             { name: "Technology", weight: 0.3452 },
@@ -257,5 +266,34 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText("Pays représentés")).toBeInTheDocument();
     expect(screen.getByText("Secteurs")).toBeInTheDocument();
     expect(screen.getByText("États-Unis")).toBeInTheDocument();
+  });
+  it("l'onglet Diversification déplie « Autres » pour révéler tous les pays", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Frais"));
+    fireEvent.click(screen.getByText("MSCI World Swap PEA"));
+    fireEvent.click(screen.getByText("Diversification"));
+    // replié : seuls les 4 premiers pays + la ligne « Autres » dépliable
+    const expand = screen.getAllByRole("button", { name: /Autres/ })[0];
+    expect(expand).toBeInTheDocument();
+    expect(screen.queryByText("Allemagne")).not.toBeInTheDocument();
+    // dépliage : les pays étendus apparaissent avec leurs poids
+    fireEvent.click(expand);
+    expect(screen.getByText("Allemagne")).toBeInTheDocument();
+    expect(screen.getByText("Suisse")).toBeInTheDocument();
+    // replier masque à nouveau les pays étendus
+    fireEvent.click(screen.getByRole("button", { name: /Replier/ }));
+    expect(screen.queryByText("Allemagne")).not.toBeInTheDocument();
+  });
+  it("l'onglet Détails affiche 10 valeurs puis déplie par 10", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Frais"));
+    fireEvent.click(screen.getByText("MSCI World Swap PEA"));
+    fireEvent.click(screen.getByText("Détails"));
+    // 10 valeurs visibles pour WPEA (fonds PEA), pas de bouton +
+    expect(screen.getByText("Apple")).toBeInTheDocument();
+    expect(screen.getByText(/poids cumulé/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Afficher/ }),
+    ).not.toBeInTheDocument();
   });
 });
