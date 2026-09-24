@@ -30,10 +30,12 @@ import { REGIONS } from "@/lib/analysis/exposure-catalog";
 import { SidePanel } from "./side-panel";
 import {
   simulateTwoTracks,
-  type DiversificationResult,
-  type FeeAnalysisResult,
-  type IncomeAnalysisResult,
   type SimulatorDefaults,
+} from "@/lib/analysis/simulator";
+import type {
+  DiversificationResult,
+  FeeAnalysisResult,
+  IncomeAnalysisResult,
 } from "@/lib/analysis/scanners";
 
 const CATEGORY_COLORS = [

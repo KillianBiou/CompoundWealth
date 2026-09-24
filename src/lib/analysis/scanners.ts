@@ -620,28 +620,15 @@ function valueAtOr(
   return current;
 }
 
+export { simulateTwoTracks, type TwoTrackSimulationPoint } from "./simulator";
+export type { SimulatorDefaults } from "./simulator";
+import type { SimulatorDefaults } from "./simulator";
+
 /**
  * Paramètres par défaut du simulateur : investissements actuels + DCA actif
  * + performance passée réelle si exploitable, sinon moyenne long terme
  * (actions ~7 %/an, livret à son taux contractuel).
  */
-export interface SimulatorDefaults {
-  /** patrimoine investi (actions/ETF) actuel, centimes */
-  investedWealthCents: number;
-  /** épargne réglementée (livrets) actuelle, centimes */
-  savingsWealthCents: number;
-  /** épargne mensuelle totale (versements réels + DCA actif estimé), centimes */
-  monthlySavingsCents: number;
-  /** part investie (DCA) de l'épargne mensuelle, centimes */
-  monthlyDcaCents: number;
-  /** rendement annuel des investissements, fraction */
-  equityReturn: number;
-  /** rendement annuel de l'épargne (livret), fraction */
-  savingsReturn: number;
-  /** source du rendement actions : historique réel ou moyenne long terme */
-  returnSource: "historique" | "moyenne";
-}
-
 export function buildSimulatorDefaults(params: {
   positions: AnalysisPosition[];
   /** valuations patrimoine investi (actions) agrégées */
@@ -674,70 +661,4 @@ export function buildSimulatorDefaults(params: {
     savingsReturn: params.savingsRate,
     returnSource: cagr !== null ? "historique" : "moyenne",
   };
-}
-
-/**
- * Simulation à deux compartiments : investissement (actions, rendement
- * composé) et épargne (livret, rendement simple annualisé). L'épargne
- * mensuelle est répartie selon la part DCA : le DCA va à l'investissement,
- * le reste à l'épargne — jamais l'inverse.
- */
-export interface TwoTrackSimulationPoint {
-  year: number;
-  investedCents: number;
-  savingsCents: number;
-  totalCents: number;
-  totalRealCents: number;
-}
-
-export function simulateTwoTracks(params: {
-  investedWealthCents: number;
-  savingsWealthCents: number;
-  monthlyInvestedCents: number;
-  monthlySavingsCents: number;
-  equityReturn: number;
-  savingsReturn: number;
-  inflation: number;
-  horizonYears: number;
-}): { points: TwoTrackSimulationPoint[]; fireYear: number | null } {
-  const {
-    investedWealthCents,
-    savingsWealthCents,
-    monthlyInvestedCents,
-    monthlySavingsCents,
-    equityReturn,
-    savingsReturn,
-    inflation,
-    horizonYears,
-  } = params;
-  const equityMonthly = Math.pow(1 + equityReturn, 1 / 12) - 1;
-  const savingsMonthly = savingsReturn / 12;
-  let invested = investedWealthCents;
-  let savings = savingsWealthCents;
-  const startYear = new Date().getFullYear();
-  const points: TwoTrackSimulationPoint[] = [
-    {
-      year: startYear,
-      investedCents: Math.round(invested),
-      savingsCents: Math.round(savings),
-      totalCents: Math.round(invested + savings),
-      totalRealCents: Math.round(invested + savings),
-    },
-  ];
-
-  for (let year = 1; year <= horizonYears; year += 1) {
-    for (let month = 1; month <= 12; month += 1) {
-      invested = invested * (1 + equityMonthly) + monthlyInvestedCents;
-      savings = savings * (1 + savingsMonthly) + monthlySavingsCents;
-    }
-    const total = invested + savings;
-    points.push({
-      year: startYear + year,
-      investedCents: Math.round(invested),
-      savingsCents: Math.round(savings),
-      totalCents: Math.round(total),
-      totalRealCents: Math.round(total / Math.pow(1 + inflation, year)),
-    });
-  }
-  return { points, fireYear: null };
 }
