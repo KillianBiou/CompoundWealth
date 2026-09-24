@@ -1,4 +1,4 @@
-export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A";
+export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A" | "PRIV";
 
 export interface TaxBreakdown {
   label: string;
@@ -93,6 +93,30 @@ export const ENVELOPE_RULES: Record<EnvelopeType, EnvelopeFiscalRules> = {
       `Flat tax de ${pct(FLAT_TAX_2026)} sur dividendes, intérêts et plus-values (${pct(INCOME_TAX_RATE)} d'impôt sur le revenu + ${pct(SOCIAL_LEVIES_2026)} de prélèvements sociaux), quelle que soit la durée de détention.`,
       "Option possible pour le barème progressif à la déclaration annuelle (intéressant pour les foyers faiblement imposés).",
       "Aucun plafond de versement ; moins-values imputables sur plus-values de l'année, reportables 10 ans.",
+    ],
+  },
+  PRIV: {
+    depositCapCents: null,
+    incomeTaxAfter5Years: INCOME_TAX_RATE,
+    incomeTaxBefore5Years: INCOME_TAX_RATE,
+    socialLevies: SOCIAL_LEVIES_2026,
+    flatTax: FLAT_TAX_2026,
+    flatTaxBreakdown: [
+      { label: "Impôt sur le revenu", rate: INCOME_TAX_RATE },
+      { label: "Prélèvements sociaux", rate: SOCIAL_LEVIES_2026 },
+    ],
+    withdrawalBefore5YearsCloses: false,
+    depositCapLabel: "Sans plafond",
+    incomeTaxIsDurationBased: false,
+    badges: [
+      `Flat tax ${pct(FLAT_TAX_2026)}`,
+      "Fonds non cotés · liquidité limitée",
+    ],
+    details: [
+      `Fiscalité de droit commun du compte-titres : flat tax de ${pct(FLAT_TAX_2026)} (${pct(INCOME_TAX_RATE)} d'IR + ${pct(SOCIAL_LEVIES_2026)} de prélèvements sociaux), sans avantage type PEA (pas d'exonération après 5 ans, pas d'éligibilité au report 150-0 B ter).`,
+      "Fonds evergreen (ELTIF) : souscription mensuelle, mais rachat en général trimestriel avec délai de préavis — la liquidité est limitée comparée aux ETF cotés.",
+      "Frais bien plus élevés qu'un ETF : frais de gestion annuels ~2 à 3 %, parfois une commission de performance (ex. Apollo : 12,5 % au-delà d'un hurdle), plus la rétrocession du courtier (~1 %/an). Compter ~3 à 4,5 %/an de coût total.",
+      "Valorisation indicative (NAV) publiée avec retard et lissée : la volatilité affichée est plus faible que celle réelle des actifs sous-jacents (private equity, dette privée, infra).",
     ],
   },
 };

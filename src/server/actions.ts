@@ -272,6 +272,89 @@ async function rebuildPositionValuations(
   return { ok: true };
 }
 
+async function createPrivatePosition({
+  envelopeId,
+  etf,
+  quantity,
+  date,
+  priceCents,
+}: {
+  envelopeId: string;
+  etf: { ticker: string; name: string; isin: string };
+  quantity: number;
+  date: Date;
+  priceCents: number;
+}): Promise<ActionState> {
+  const amountCents = Math.round(quantity * priceCents);
+  const existing = await prisma.position.findFirst({
+    where: { envelopeId, symbol: etf.ticker },
+    include: { investments: true, valuations: true },
+  });
+  if (existing) {
+    const totalQuantity = (existing.quantity ?? 0) + quantity;
+    const totalInvested =
+      (existing.investedCents ?? 0) +
+      existing.investments.reduce((s, inv) => s + inv.amountCents, 0) +
+      amountCents;
+    await prisma.$transaction([
+      prisma.positionInvestment.create({
+        data: { positionId: existing.id, date, amountCents },
+      }),
+      prisma.position.update({
+        where: { id: existing.id },
+        data: {
+          quantity: totalQuantity,
+          investedCents: totalInvested,
+          unitPriceCents: Math.round(totalInvested / totalQuantity),
+          boughtAt:
+            existing.boughtAt.getTime() > date.getTime() ? date : existing.boughtAt,
+        },
+      }),
+      prisma.positionValuation.upsert({
+        where: { positionId_date: { positionId: existing.id, date } },
+        create: {
+          positionId: existing.id,
+          date,
+          valueCents: amountCents,
+          source: "manuel",
+        },
+        update: { valueCents: amountCents, source: "manuel" },
+      }),
+    ]);
+    revalidatePath(`/envelopes/${envelopeId}`);
+    revalidatePath("/dashboard");
+    return { message: `${quantity} parts ajoutées à ${etf.ticker} (prix manuel)` };
+  }
+  const position = await prisma.position.create({
+    data: {
+      envelopeId,
+      name: `${etf.ticker} — ${etf.name}`,
+      symbol: etf.ticker,
+      category: "FUND",
+      quantity,
+      investedCents: amountCents,
+      unitPriceCents: priceCents,
+      boughtAt: date,
+    },
+  });
+  await prisma.positionInvestment.create({
+    data: { positionId: position.id, date, amountCents },
+  });
+  await prisma.positionValuation.create({
+    data: {
+      positionId: position.id,
+      date,
+      valueCents: amountCents,
+      source: "manuel",
+    },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/dashboard");
+  return {
+    message: `Position ajoutée : ${quantity} parts × ${(priceCents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € (fonds non coté, valorisation manuelle)`,
+  };
+}
+
 export async function createPositionAction(
   _state: ActionState,
   formData: FormData,
@@ -289,14 +372,33 @@ export async function createPositionAction(
     isin: str(formData, "isin"),
     quantity: str(formData, "quantity"),
     boughtAt: str(formData, "boughtAt"),
+    manualPriceEur: str(formData, "manualPriceEur") || undefined,
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { isin, quantity, boughtAt } = parsed.data;
+  const { isin, quantity, boughtAt, manualPriceEur } = parsed.data;
   const etf = getEtfByIsin(isin);
   if (!etf) return { errors: { isin: ["ETF introuvable dans le catalog"] } };
 
   const date = new Date(boughtAt);
+  if (etf.isPrivate) {
+    if (manualPriceEur === undefined) {
+      return {
+        errors: {
+          form: [
+            `${etf.ticker} est un fonds non coté : saisissez le prix d'achat (NAV) manuellement`,
+          ],
+        },
+      };
+    }
+    return createPrivatePosition({
+      envelopeId,
+      etf,
+      quantity,
+      date,
+      priceCents: eurosToCents(manualPriceEur),
+    });
+  }
   const symbol = etf.yahooSymbol ?? etf.ticker;
   const history = await fetchMarketHistory(symbol, date, new Date());
   if (!history.ok) {
@@ -785,6 +887,10 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
   let updated = 0;
   const failures: string[] = [];
   for (const [index, position] of envelope.positions.entries()) {
+    if (getEtfByIsin(position.symbol ?? "")?.isPrivate) {
+      failures.push(`${position.name} (fonds non coté : valorisation manuelle)`);
+      continue;
+    }
     const symbol = position.symbol?.trim();
     if (!symbol) {
       failures.push(`${position.name} (symbole manquant)`);
@@ -966,7 +1072,10 @@ export async function refreshAllPricesAction(): Promise<{
       envelope.lastPriceRefreshAt !== null &&
       now - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS;
     const refreshable = envelope.positions.filter(
-      (p) => p.symbol?.trim() && p.quantity !== null,
+      (p) =>
+        p.symbol?.trim() &&
+        p.quantity !== null &&
+        !getEtfByIsin(p.symbol ?? "")?.isPrivate,
     );
     if (!onCooldown && refreshable.length > 0) {
       for (const position of refreshable) {

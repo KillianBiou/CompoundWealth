@@ -21,7 +21,7 @@ export interface AnalysisPosition {
   /** enveloppe parente */
   envelopeId: string;
   envelopeName: string;
-  envelopeType: "PEA" | "CTO" | "LIVRET_A";
+  envelopeType: "PEA" | "CTO" | "LIVRET_A" | "PRIV";
   category: string;
   /** valeur actuelle en centimes */
   valueCents: number;
@@ -82,6 +82,7 @@ export const CUSTODY_RATE_BY_ENVELOPE: Record<AnalysisPosition["envelopeType"], 
   PEA: 0,
   CTO: 0,
   LIVRET_A: 0,
+  PRIV: 0,
 };
 
 /** Rendement annuel moyen attendu des actions avant frais, pour les projections. */

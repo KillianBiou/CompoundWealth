@@ -25,6 +25,12 @@ const types: { value: EnvelopeType; title: string; description: string; recommen
     description:
       "Épargne réglementée : versements plafonnés à 22 950 € (seuls les intérêts dépassent), taux 1,7 %, exonérée d'impôt. Sans positions.",
   },
+  {
+    value: "PRIV",
+    title: "Non coté",
+    description:
+      "Private equity / ELTIF (ex. Apollo, EQT Nexus chez Trade Republic). Fonds evergreen, frais 2-4,5 %/an, liquidité trimestrielle.",
+  },
 ];
 
 export function NewEnvelopeForm() {
@@ -62,7 +68,31 @@ export function NewEnvelopeForm() {
         ))}
       </div>
 
-      {type === "LIVRET_A" ? (
+      {type === "PRIV" ? (
+        <Card className="space-y-2 p-4">
+          <p className="text-sm font-medium">Non coté — private equity (ELTIF)</p>
+          <div className="flex flex-wrap gap-2">
+            {rules.badges.map((b) => (
+              <Badge key={b} tone="warning">
+                {b}
+              </Badge>
+            ))}
+          </div>
+          <p className="text-sm text-text-secondary">
+            <span className="font-medium text-text-primary">Fiscalité de droit commun</span> —
+            flat tax 31,4 % sur les gains, sans avantage type PEA. Les fonds evergreen
+            (ELTIF) permettent la souscription mensuelle mais le rachat n&apos;est en général
+            possible qu&apos;une fois par trimestre, avec préavis.
+          </p>
+          <p className="text-xs text-text-muted">
+            Attention aux frais : ~2 à 3 %/an de gestion + rétrocession courtier, parfois une
+            commission de performance. Comptez 3 à 4,5 %/an de coût total, à comparer aux
+            ~0,2 % d&apos;un ETF monde. La valorisation (NAV) est mensuelle et lissée : la
+            volatilité affichée sous-estime le risque réel. À considérer comme un complément
+            de diversification long terme, en petite proportion du patrimoine.
+          </p>
+        </Card>
+      ) : type === "LIVRET_A" ? (
         <Card className="space-y-2 p-4">
           <p className="text-sm font-medium">Livret A — épargne réglementée {new Date().getFullYear()}</p>
           <div className="flex flex-wrap gap-2">
@@ -117,7 +147,13 @@ export function NewEnvelopeForm() {
           name="name"
           required
           placeholder={
-            type === "PEA" ? "PEA Bourse" : type === "CTO" ? "CTO Diversification" : "Livret A épargne"
+            type === "PEA"
+              ? "PEA Bourse"
+              : type === "CTO"
+                ? "CTO Diversification"
+                : type === "PRIV"
+                  ? "Non coté Trade Republic"
+                  : "Livret A épargne"
           }
         />
       </Field>

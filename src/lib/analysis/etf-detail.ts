@@ -38,6 +38,8 @@ export interface EtfDetail {
   peaEligible: boolean;
   /** mention USER HOLDING dans les notes */
   userHolding: boolean;
+  /** notes libres du CSV (frais détaillés, liquidité, AIFM pour les fonds non cotés) */
+  notes: string;
   /** nom officiel distant (Trade Republic / justETF), sinon vide */
   trName: string;
   /** société de gestion (provider justETF), sinon vide */
@@ -145,6 +147,7 @@ export function parseEtfDetailCsv(content: string): EtfDetail[] {
       holdingsCount: toNumberOrNull(cells[idx("holdings_count")] ?? ""),
       peaEligible: iPea >= 0 ? toBool(cells[iPea] ?? "") : false,
       userHolding: /USER HOLDING/i.test(notes),
+      notes,
       trName: iTrName >= 0 ? (cells[iTrName] ?? "").trim() : "",
       provider: iProvider >= 0 ? (cells[iProvider] ?? "").trim() : "",
       fundCurrency: iFundCurrency >= 0 ? (cells[iFundCurrency] ?? "").trim() : "",

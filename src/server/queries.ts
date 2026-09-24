@@ -18,7 +18,7 @@ import {
 
 export interface EnvelopeSummary {
   id: string;
-  type: "PEA" | "CTO" | "LIVRET_A";
+  type: "PEA" | "CTO" | "LIVRET_A" | "PRIV";
   name: string;
   broker: string | null;
   openedAt: Date | null;
@@ -33,7 +33,7 @@ export interface EnvelopeSummary {
   /** cumul des sommes investies au fil du temps (versements détaillés si présents) */
   investedSeries: { date: Date; valueCents: number }[];
   /** type d'enveloppe */
-  envelopeType: "PEA" | "CTO" | "LIVRET_A";
+  envelopeType: "PEA" | "CTO" | "LIVRET_A" | "PRIV";
   /** série du livret si applicable (solde quinzaine par quinzaine) */
   livretSeries?: { date: Date; balanceCents: number; overCapCents: number }[];
   /** paramètres livret */

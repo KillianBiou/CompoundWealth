@@ -142,7 +142,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-semibold">{envelope.name}</h1>
-            <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type}</Badge>
+            <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type === "PRIV" ? "Non coté" : envelope.type}</Badge>
           </div>
           <p className="mt-1 text-sm text-text-secondary">
             {envelope.broker ? `${envelope.broker} · ` : ""}

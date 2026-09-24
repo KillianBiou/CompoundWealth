@@ -290,7 +290,7 @@ function CompactEnvelope({
           {envelope.name}
         </p>
         <p className="shrink-0 text-xs text-text-muted">
-          {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+          {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type === "PRIV" ? "Non coté" : envelope.type}
         </p>
       </Link>
       <div className="flex shrink-0 items-center gap-3 tabular-nums">
@@ -357,7 +357,7 @@ function DetailedEnvelope({
                   : "border-positive/40 text-positive",
               )}
             >
-              {isLivret ? "Livret A" : envelope.type}
+              {isLivret ? "Livret A" : envelope.type === "PRIV" ? "Non coté" : envelope.type}
             </span>
           </div>
           <p className="mt-0.5 text-xs text-text-muted">
@@ -456,7 +456,7 @@ function SemiCompactEnvelope({
             {envelope.name}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
-            {isLivret ? "Livret A" : envelope.type}
+            {isLivret ? "Livret A" : envelope.type === "PRIV" ? "Non coté" : envelope.type}
             {envelope.broker ? ` · ${envelope.broker}` : ""}
           </p>
         </Link>
