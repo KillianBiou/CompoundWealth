@@ -166,8 +166,9 @@ describe("AnalysisPageView", () => {
   it("la carte Abonnements est un placeholder désactivé", () => {
     renderView();
     const card = screen.getByText("Abonnements").closest("button");
+    expect(card).not.toBeNull();
     expect(card).toBeDisabled();
-    expect(card.textContent?.match(/bientôt/i)).toBeTruthy();
+    expect(card!.textContent?.match(/bientôt/i)).toBeTruthy();
   });
 
   it("le panneau exposition affiche les onglets sectoriel et géographique", () => {
