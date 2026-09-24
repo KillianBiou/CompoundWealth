@@ -13,9 +13,17 @@ describe("ETF_CATALOG", () => {
       expect(isin).toMatch(/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/);
     }
   });
-  it("ne contient que des ETF français (éligibles PEA)", () => {
-    expect(ETF_CATALOG.every((e) => e.ter > 0 && e.ter < 0.01)).toBe(true);
+  it("a des TER plausibles pour chaque type de fonds", () => {
+    const listed = ETF_CATALOG.filter((e) => !e.isPrivate);
+    const privateFunds = ETF_CATALOG.filter((e) => e.isPrivate);
+    expect(listed.every((e) => e.ter > 0 && e.ter < 0.01)).toBe(true);
+    // ELTIF private equity : frais de gestion 2-3 %/an
+    expect(privateFunds.every((e) => e.ter > 0.01 && e.ter < 0.05)).toBe(true);
     expect(ETF_CATALOG.every((e) => e.ticker.length > 0)).toBe(true);
+  });
+  it("inclut les fonds non cotés (ELTIF private equity)", () => {
+    expect(getEtfByIsin("LU3170240538")?.isPrivate).toBe(true);
+    expect(getEtfByIsin("LU3176111881")?.isPrivate).toBe(true);
   });
 });
 

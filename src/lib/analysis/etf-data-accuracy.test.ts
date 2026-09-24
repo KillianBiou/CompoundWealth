@@ -87,11 +87,14 @@ describe("données ETF du fichier enrichi — cohérence globale", () => {
     }
   });
 
-  it("a un TER positif et plausible (< 2 %/an) partout où il est connu", () => {
+  it("a un TER positif et plausible partout où il est connu", () => {
+    const privateIsins = new Set(["LU3170240538", "LU3176111881"]);
     for (const detail of details) {
       if (detail.ter === null) continue;
       expect(detail.ter, `${detail.isin} TER ${detail.ter}`).toBeGreaterThan(0);
-      expect(detail.ter, detail.isin).toBeLessThan(0.02);
+      // ELTIF private equity : frais jusqu'à 3 %/an ; ETF cotés < 2 %
+      const cap = privateIsins.has(detail.isin) ? 0.03 : 0.02;
+      expect(detail.ter, detail.isin).toBeLessThan(cap);
     }
   });
 });

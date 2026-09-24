@@ -55,7 +55,7 @@ export function DcaRecap({
   summaries,
   slices,
 }: {
-  envelopeType: "PEA" | "CTO";
+  envelopeType: "PEA" | "CTO" | "PRIV";
   summaries: Record<PeriodKey, DcaWindowSummary>;
   slices: DcaSlice[];
 }) {

@@ -1,6 +1,6 @@
 export type DcaFrequency = "BIWEEKLY" | "MONTHLY" | "BIMONTHLY" | "QUARTERLY";
 
-export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A";
+export type EnvelopeType = "PEA" | "CTO" | "LIVRET_A" | "PRIV";
 
 export const DCA_FREQUENCY_LABELS: Record<DcaFrequency, string> = {
   BIWEEKLY: "2 semaines",

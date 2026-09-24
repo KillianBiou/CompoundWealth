@@ -38,7 +38,7 @@ const notFuture = z
 
 export const envelopeSchema = z
   .object({
-    type: z.enum(["PEA", "CTO", "LIVRET_A"]),
+    type: z.enum(["PEA", "CTO", "LIVRET_A", "PRIV"]),
     name: z.string().trim().min(1, "Le nom est requis").max(80, "80 caractères maximum"),
     broker: z.string().trim().max(80).optional().or(z.literal("")),
     openedAt: isoDateOptional,
@@ -84,6 +84,12 @@ export const positionSchema = z
       .positive("Le nombre de parts doit être supérieur à 0")
       .max(1_000_000, "Nombre de parts trop élevé"),
     boughtAt: notFuture,
+    /** prix d'achat manuel en euros — requis pour les fonds non cotés (ELTIF) */
+    manualPriceEur: z.coerce
+      .number()
+      .positive("Le prix doit être supérieur à 0")
+      .max(1_000_000, "Prix trop élevé")
+      .optional(),
   });
 
 export const preferencesSchema = z.object({

@@ -69,7 +69,7 @@ export function DcaSection({
   positions,
 }: {
   envelopeId: string;
-  envelopeType: "PEA" | "CTO";
+  envelopeType: "PEA" | "CTO" | "PRIV";
   plans: DcaPlanRow[];
   positions: {
     symbol: string | null;
@@ -151,7 +151,7 @@ export function DcaSection({
 function buildSlices(
   plans: DcaPlanRow[],
   positions: Parameters<typeof referencePriceCents>[1],
-  envelopeType: "PEA" | "CTO",
+  envelopeType: "PEA" | "CTO" | "PRIV",
 ): DcaSlice[] {
   const slices: DcaSlice[] = [];
   const today = new Date();

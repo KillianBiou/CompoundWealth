@@ -152,6 +152,7 @@ function renderView() {
           holdingsCount: 1282,
           peaEligible: true,
           userHolding: true,
+          notes: "",
           trName: "iShares MSCI World Swap PEA UCITS ETF EUR (Acc)",
           provider: "iShares",
           fundCurrency: "EUR",

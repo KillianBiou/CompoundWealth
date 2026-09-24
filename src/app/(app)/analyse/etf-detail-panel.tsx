@@ -196,6 +196,18 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
         />
         {etf.holdingsAsOf ? <InfoRow label="Répartitions du" value={etf.holdingsAsOf} /> : null}
       </div>
+      {etf.notes ? (
+        <div className="rounded-lg border border-border-cw p-4">
+          <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
+            Bon à savoir
+          </p>
+          <ul className="space-y-1.5 text-xs text-text-secondary">
+            {etf.notes.split("; ").map((note) =>
+              note.trim() ? <li key={note}>· {note.trim()}</li> : null,
+            )}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

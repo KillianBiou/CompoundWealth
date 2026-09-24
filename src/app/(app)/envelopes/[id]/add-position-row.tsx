@@ -159,6 +159,29 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
               </label>
               <Input id="pos-date" name="boughtAt" type="date" required />
             </div>
+            {selected.isPrivate ? (
+              <div className="flex-1">
+                <label
+                  htmlFor="pos-price"
+                  className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
+                >
+                  Prix d&apos;achat (NAV €)
+                </label>
+                <Input
+                  id="pos-price"
+                  name="manualPriceEur"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  required
+                  placeholder="100,00"
+                />
+                <p className="mt-1 text-xs text-text-muted">
+                  Fonds non coté : saisissez le prix d&apos;achat constaté chez le courtier.
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="text-sm text-text-secondary">

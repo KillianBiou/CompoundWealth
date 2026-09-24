@@ -67,7 +67,7 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
               {envelope.name}
             </p>
             <p className="mt-0.5 text-xs text-text-muted">
-              {envelope.type}
+              {envelope.type === "PRIV" ? "Non coté" : envelope.type}
               {envelope.broker ? ` · ${envelope.broker}` : ""}
             </p>
           </div>
@@ -75,12 +75,16 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
             tone={
               envelope.type === "PEA"
                 ? "positive"
-                : envelope.type === "LIVRET_A"
+                : envelope.type === "LIVRET_A" || envelope.type === "PRIV"
                   ? "neutral"
                   : "warning"
             }
           >
-            {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+            {envelope.type === "LIVRET_A"
+              ? "Livret A"
+              : envelope.type === "PRIV"
+                ? "Non coté"
+                : envelope.type}
           </Badge>
         </div>
         <div className="mt-4 flex items-end justify-between gap-4">

@@ -1,6 +1,8 @@
 export interface EtfCatalogEntry {
   ticker: string;
   isin: string;
+  /** fonds non coté (ELTIF) : pas de cotation Yahoo, valorisation manuelle */
+  isPrivate?: boolean;
   /** symbole Yahoo Finance exact (suffixe de place inclus) */
   yahooSymbol: string | null;
   name: string;
@@ -14,7 +16,8 @@ export interface EtfCatalogEntry {
     | "France"
     | "Défense Europe"
     | "Technologie Europe"
-    | "Émergents";
+    | "Émergents"
+    | "Non coté";
   ter: number;
 }
 
@@ -145,6 +148,26 @@ export const ETF_CATALOG: EtfCatalogEntry[] = [
     indexCategory: "Technologie Europe",
     ter: 0.0018,
   },
+  {
+    ticker: "APOLLO",
+    isin: "LU3170240538",
+    yahooSymbol: null,
+    isPrivate: true,
+    name: "Apollo Global Private Markets ELTIF",
+    issuer: "Apollo Management International",
+    indexCategory: "Non coté",
+    ter: 0.028,
+  },
+  {
+    ticker: "EQT",
+    isin: "LU3176111881",
+    yahooSymbol: null,
+    isPrivate: true,
+    name: "EQT Nexus Fund SICAV — NXTF ELTIF",
+    issuer: "EQT Fund Management S.à r.l.",
+    indexCategory: "Non coté",
+    ter: 0.0235,
+  },
 ];
 
 export const ETF_CATEGORIES = [
@@ -157,6 +180,7 @@ export const ETF_CATEGORIES = [
   "Défense Europe",
   "Technologie Europe",
   "Émergents",
+  "Non coté",
 ] as const;
 
 function normalize(value: string): string {
