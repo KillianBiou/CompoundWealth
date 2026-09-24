@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import {
   Bar,
   BarChart,
@@ -601,6 +601,70 @@ function readSavedSimParams(): Partial<SimParams> | null {
   }
 }
 
+let simParamsCache: { raw: string | null; parsed: Partial<SimParams> | null } = {
+  raw: undefined as unknown as string | null,
+  parsed: null,
+};
+
+let simParamsListener: (() => void) | null = null;
+
+/**
+ * Paramètres du simulateur synchronisés avec le localStorage via
+ * useSyncExternalStore : le rendu serveur et le premier rendu client
+ * utilisent les défauts (pas de mismatch d'hydratation), puis la snapshot
+ * client bascule sur les paramètres sauvegardés.
+ */
+function useSimParams(defaults: SimulatorDefaults): [
+  SimParams,
+  (patch: Partial<SimParams>) => void,
+] {
+  const base = useMemo(() => defaultSimParams(defaults), [defaults]);
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    simParamsListener = onStoreChange;
+    return () => {
+      simParamsListener = null;
+    };
+  }, []);
+  const saved = useSyncExternalStore(
+    subscribe,
+    () => {
+      // snapshot stable : le JSON n'est reparé que si le contenu brut change
+      let raw: string | null;
+      try {
+        raw = localStorage.getItem(SIM_STORAGE_KEY);
+      } catch {
+        raw = null;
+      }
+      if (simParamsCache.raw !== raw) {
+        let parsed: Partial<SimParams> | null = null;
+        try {
+          parsed = raw ? (JSON.parse(raw) as Partial<SimParams>) : null;
+        } catch {
+          parsed = null;
+        }
+        simParamsCache = { raw, parsed };
+      }
+      return simParamsCache.parsed;
+    },
+    () => null,
+  );
+  const params = useMemo(
+    () => ({ ...base, ...(saved ?? {}) }),
+    [base, saved],
+  );
+  const update = useCallback((patch: Partial<SimParams>) => {
+    try {
+      const current = { ...base, ...(readSavedSimParams() ?? {}) };
+      const next = { ...current, ...patch };
+      localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // stockage indisponible : pas de persistance
+    }
+    simParamsListener?.();
+  }, [base]);
+  return [params, update];
+}
+
 function simulateFromParams(defaults: SimulatorDefaults, params: SimParams) {
   const monthlyInvested = defaults.monthlyDcaCents + params.extraSavings;
   const monthlySavings = Math.max(
@@ -1110,22 +1174,7 @@ export function AnalysisPageView({
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [previousPanel, setPreviousPanel] = useState<PanelId | null>(null);
-  const [simParams, setSimParams] = useState<SimParams>(() => {
-    const base = defaultSimParams(simulatorDefaults);
-    const saved = readSavedSimParams();
-    return saved ? { ...base, ...saved } : base;
-  });
-  const updateSimParams = (patch: Partial<SimParams>) => {
-    setSimParams((prev) => {
-      const next = { ...prev, ...patch };
-      try {
-        localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // stockage indisponible : pas de persistance
-      }
-      return next;
-    });
-  };
+  const [simParams, updateSimParams] = useSimParams(simulatorDefaults);
   const open = (id: PanelId) => {
     setPreviousPanel(null);
     setOpenPanel(id);
