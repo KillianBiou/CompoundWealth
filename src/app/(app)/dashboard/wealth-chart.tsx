@@ -81,7 +81,7 @@ function mergeSeries(
   });
 }
 
-function ChartTooltip({
+export function ChartTooltip({
   active,
   payload,
 }: {
@@ -95,7 +95,8 @@ function ChartTooltip({
   const invested = point.investedTotal;
   const hasValue = savings !== null || equity !== null;
   const value = hasValue ? ((savings ?? 0) + (equity ?? 0)) * 100 : null;
-  const gain = value !== null && invested !== null ? value - invested : null;
+  const investedCents = invested !== null ? invested * 100 : null;
+  const gain = value !== null && investedCents !== null ? value - investedCents : null;
   return (
     <div className="rounded-lg border border-border-cw bg-bg-elevated p-3 text-xs shadow-lg">
       <p className="mb-2 font-medium text-text-primary">
