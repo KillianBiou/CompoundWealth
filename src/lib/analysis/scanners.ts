@@ -578,11 +578,12 @@ export function estimateMonthlyExpenses(
 export const DEFAULT_EQUITY_RETURN = 0.08;
 
 /**
- * CAGR réel du portefeuille actions depuis les valuations : part de la
- * performance qui n'est pas expliquée par les versements. On neutralise les
- * flux : rendement = (V_fin − Σ versements postérieurs au début) / V_début,
- * annualisé. Retourne null si l'historique est trop court (< 6 mois) ou
- * trop petit.
+ * CAGR réel du portefeuille actions depuis les valuations, neutralisé des
+ * versements : rendement pondéré par le temps (Modified Dietz par
+ * sous-période, flux comptés à mi-période), annualisé. Diviser le gain net
+ * par le seul capital initial gonflerait le rendement quand les versements
+ * dominent (petit capital de départ + DCA mensuel). Retourne null si
+ * l'historique est trop court (< 6 mois) ou trop petit.
  */
 export function historicalCagr(
   valuations: { date: Date; valueCents: number }[],
@@ -594,14 +595,25 @@ export function historicalCagr(
   const start = sorted[0];
   const months = (now.getTime() - start.date.getTime()) / (30.44 * 24 * 3600 * 1000);
   if (months < 6 || start.valueCents <= 0) return null;
-  const end = sorted[sorted.length - 1];
-  // approche flux nettoyés : gain réel = V_end − V_start − versements sur la période
-  const investedStart = valueAtOr(invested, start.date, 0);
-  const investedEnd = valueAtOr(invested, now, 0);
-  const flows = investedEnd - investedStart;
-  const realGain = end.valueCents - start.valueCents - flows;
-  if (start.valueCents <= 0) return null;
-  const totalReturn = realGain / start.valueCents;
+  let chained = 1;
+  let previousValue = start.valueCents;
+  let previousInvested = valueAtOr(invested, start.date, 0);
+  for (let i = 1; i < sorted.length; i += 1) {
+    const point = sorted[i];
+    const investedHere = valueAtOr(invested, point.date, previousInvested);
+    const flow = investedHere - previousInvested;
+    const denominator = previousValue + flow / 2;
+    if (denominator > 0) {
+      const periodReturn = (point.valueCents - previousValue - flow) / denominator;
+      if (periodReturn > -1) {
+        chained *= 1 + periodReturn;
+      }
+    }
+    previousValue = point.valueCents;
+    previousInvested = investedHere;
+  }
+  const totalReturn = chained - 1;
+  if (totalReturn <= -1) return null;
   const years = Math.max(months / 12, 0.5);
   const cagr = Math.pow(1 + totalReturn, 1 / years) - 1;
   if (!Number.isFinite(cagr)) return null;
