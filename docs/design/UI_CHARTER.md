@@ -8,7 +8,7 @@
 
 ## 1. Principes
 
-Inspirée des trackers modernes les mieux notés (Finary, Kubera, Snowball Analytics, Capitally, Robinhood) — **sans copier leurs couleurs** (Finary : bleu/orange ; Robinhood : vert ; Kubera : orange ; Delta : violet). CompoundWealth adopte une identité propre :
+Inspirée des trackers modernes les mieux notés (competition, Kubera, Snowball Analytics, Capitally, Robinhood) — **sans copier leurs couleurs** (competition : bleu/orange ; Robinhood : vert ; Kubera : orange ; Delta : violet). CompoundWealth adopte une identité propre :
 
 1. **Noir profond + une teinte d'accent unique** : le noir structure et apaise, l'accent signe la marque.
 2. **Dark mode par défaut** : les interfaces de données financières gagnent en lisibilité sur fond sombre (moins de fatigue oculaire, chiffres mis en valeur). Un mode clair est fourni.
@@ -152,4 +152,4 @@ Les variables de ce document sont la source de vérité pour `src/app/globals.cs
 - Dégradés criards, glassmorphism, néons.
 - Plus de 2 niveaux d'élévation de surface.
 - Couleur de marque comme fond de section entière (elle perd sa rareté).
-- Copie des codes couleurs exacts de Finary/Kubera/Robinhood (plagiat visuel).
+- Copie des codes couleurs exacts de competition/Kubera/Robinhood (plagiat visuel).
