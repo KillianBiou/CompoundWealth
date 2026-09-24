@@ -2,9 +2,9 @@ import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
 import { currentValueCents } from "@/lib/portfolio/series";
-import { getEtfByIsin } from "@/lib/etf-catalog";
+import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
-import { getEtfDetailByIsin } from "@/lib/analysis/etf-detail";
+import { getEtfDetailByIsin, getEtfDetailByTicker } from "@/lib/analysis/etf-detail";
 import {
   analyzeFees,
   analyzeIncome,
@@ -26,8 +26,20 @@ function isinOf(position: { symbol: string | null; name: string }): string | nul
   const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
   const symbol = position.symbol?.trim().toUpperCase() ?? "";
   if (ISIN_PATTERN.test(symbol)) return symbol;
+  // Les positions créées manuellement ou par DCA stockent le ticker (WPEA,
+  // IFRE...) dans symbol : on le résout via le catalogue puis le CSV.
+  const byTicker = getEtfByTicker(symbol);
+  if (byTicker) return byTicker.isin;
+  const detailByTicker = getEtfDetailByTicker(symbol);
+  if (detailByTicker) return detailByTicker.isin;
   const fromName = position.name.match(/[A-Z]{2}[A-Z0-9]{9}[0-9]/);
-  return fromName ? fromName[0] : null;
+  if (fromName) return fromName[0];
+  const nameTicker = position.name.split(" — ")[0]?.trim().toUpperCase() ?? "";
+  if (nameTicker) {
+    const fromNameTicker = getEtfByTicker(nameTicker) ?? getEtfDetailByTicker(nameTicker);
+    if (fromNameTicker) return fromNameTicker.isin;
+  }
+  return null;
 }
 
 

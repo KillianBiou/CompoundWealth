@@ -648,9 +648,10 @@ export function buildSimulatorDefaults(params: {
   const savingsWealthCents = params.positions
     .filter((p) => p.envelopeType === "LIVRET_A")
     .reduce((s, p) => s + p.valueCents, 0);
-  const realSavingsMonthly = averageMonthlySavings(params.positions, now) ?? 0;
-  const monthlySavingsCents = realSavingsMonthly + params.dcaMonthlyCents;
+  // Défaut = DCA actif uniquement : les versements passés (achats historiques)
+  // ne présagent pas d'une épargne mensuelle future.
   const monthlyDcaCents = params.dcaMonthlyCents;
+  const monthlySavingsCents = params.dcaMonthlyCents;
   const cagr = historicalCagr(params.equityValuations, params.equityInvested, now);
   return {
     investedWealthCents,

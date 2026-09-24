@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/session";
 import {
-  getEstimatedMonthlyExpensesCents,
   getFeeAnalysis,
   getIncomeAnalysis,
   getRegionAnalysis,
@@ -18,13 +17,12 @@ export default async function AnalysePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [fees, income, sectors, regions, monthlyExpenses, positions, envelopes] =
+  const [fees, income, sectors, regions, positions, envelopes] =
     await Promise.all([
       getFeeAnalysis(),
       getIncomeAnalysis(),
       getSectorAnalysis(),
       getRegionAnalysis(),
-      getEstimatedMonthlyExpensesCents(),
       getAnalysisPositions(),
       getEnvelopeSummaries(),
     ]);
@@ -51,7 +49,6 @@ export default async function AnalysePage() {
       sectors={sectors}
       regions={regions}
       simulatorDefaults={simulatorDefaults}
-      monthlyExpensesCents={monthlyExpenses}
     />
   );
 }

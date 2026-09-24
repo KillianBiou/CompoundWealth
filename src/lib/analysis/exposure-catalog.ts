@@ -222,7 +222,7 @@ const byIsin = new Map(ETF_EXPOSURES.map((e) => [e.isin, e]));
 
 /**
  * Récupère l'exposition d'un ETF par ISIN. Le CSV de détail
- * (example/etfDetail.csv) prime : yield de distribution réel 2025 et TER
+ * (data/etfDetail.csv) prime : yield de distribution réel 2025 et TER
  * exact ; la répartition secteur/région vient du catalogue codé
  * (approximation par indice) complétée par la région du CSV.
  */

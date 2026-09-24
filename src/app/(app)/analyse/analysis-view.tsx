@@ -53,7 +53,7 @@ function colorFor(index: number): string {
   return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 }
 
-type PanelId = "frais" | "revenus" | "secteurs" | "geo" | "simulateur" | "abonnements";
+type PanelId = "frais" | "revenus" | "exposition" | "simulateur" | "abonnements";
 
 const MONTHS = [
   "janv.", "févr.", "mars", "avr.", "mai", "juin",
@@ -542,13 +542,7 @@ function Slider({
   );
 }
 
-function SimulationPanel({
-  defaults,
-  monthlyExpensesCents,
-}: {
-  defaults: SimulatorDefaults;
-  monthlyExpensesCents: number | null;
-}) {
+function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
   const [horizonYears, setHorizonYears] = useState(20);
   const [withdrawalRate, setWithdrawalRate] = useState(4);
   const [equityReturn, setEquityReturn] = useState(defaults.equityReturn * 100);
@@ -560,7 +554,7 @@ function SimulationPanel({
       0,
       defaults.monthlySavingsCents - defaults.monthlyDcaCents - extraSavings,
     );
-    const result = simulateTwoTracks({
+    return simulateTwoTracks({
       investedWealthCents: defaults.investedWealthCents,
       savingsWealthCents: defaults.savingsWealthCents,
       monthlyInvestedCents: monthlyInvested,
@@ -570,17 +564,15 @@ function SimulationPanel({
       inflation: 0.02,
       horizonYears,
     });
-    return result;
   }, [defaults, horizonYears, equityReturn, extraSavings]);
 
   const finalPoint = simulation.points[simulation.points.length - 1];
-  const fireTarget =
-    monthlyExpensesCents !== null ? monthlyExpensesCents * 12 * (100 / withdrawalRate) : null;
-  const fireYear = useMemo(() => {
-    if (fireTarget === null) return null;
-    const hit = simulation.points.find((p) => p.totalCents >= fireTarget);
-    return hit ? hit.year : null;
-  }, [simulation, fireTarget]);
+  const monthlyRenteCents = Math.round(
+    (finalPoint.totalCents * (withdrawalRate / 100)) / 12,
+  );
+  const monthlyRenteRealCents = Math.round(
+    (finalPoint.totalRealCents * (withdrawalRate / 100)) / 12,
+  );
 
   const chartData = simulation.points.map((p) => ({
     year: p.year,
@@ -592,46 +584,33 @@ function SimulationPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-positive/25 bg-positive/5 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-          Capital projeté en {finalPoint.year}
-        </p>
-        <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
-          {formatEurCents(finalPoint.totalCents)}
-        </p>
-        <p className="mt-1 text-xs text-text-muted">
-          {formatEurCents(finalPoint.totalRealCents)} en euros constants · investissement{" "}
-          {formatEurCents(finalPoint.investedCents)} + épargne {formatEurCents(finalPoint.savingsCents)}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-lg border border-positive/25 bg-gradient-to-br from-positive/10 to-transparent p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Indépendance financière
+            Capital à l&apos;horizon ({finalPoint.year})
           </p>
-          <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
-            {fireYear !== null ? fireYear : "> " + finalPoint.year}
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
+            {formatEurCents(finalPoint.totalCents)}
           </p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            règle {withdrawalRate.toFixed(1).replace(".", ",")} %
-            {fireTarget !== null ? ` · cible ${formatEurCents(fireTarget)}` : ""}
+          <p className="mt-1 text-xs text-text-muted">
+            {formatEurCents(finalPoint.totalRealCents)} en euros constants · investissement{" "}
+            {formatEurCents(finalPoint.investedCents)} + épargne {formatEurCents(finalPoint.savingsCents)}
           </p>
         </div>
-        <div>
+        <div className="rounded-lg border border-accent-500/25 bg-gradient-to-br from-accent-500/10 to-transparent p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Rendement retenu
+            Rente mensuelle ({withdrawalRate.toFixed(2).replace(".", ",")} %/an)
           </p>
-          <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
-            {formatPercent(equityReturn / 100)}
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
+            {formatEurCents(monthlyRenteCents)}/mois
           </p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            {defaults.returnSource === "historique"
-              ? "votre performance passée réelle"
-              : "moyenne long terme (historique insuffisant)"}
+          <p className="mt-1 text-xs text-text-muted">
+            {formatEurCents(monthlyRenteRealCents)}/mois en euros constants · retrait de{" "}
+            {formatPercent(withdrawalRate / 100)} du capital par an
           </p>
         </div>
       </div>
-      <div className="h-52">
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
@@ -750,6 +729,262 @@ function SimulationPanel({
 }
 
 /* -------------------------------------------------------------------------- */
+/*              Carte Simulateur (pleine largeur, graphique intégré)           */
+/* -------------------------------------------------------------------------- */
+
+function SimulatorCard({
+  defaults,
+  onClick,
+}: {
+  defaults: SimulatorDefaults;
+  onClick: (id: PanelId) => void;
+}) {
+  const simulation = useMemo(
+    () =>
+      simulateTwoTracks({
+        investedWealthCents: defaults.investedWealthCents,
+        savingsWealthCents: defaults.savingsWealthCents,
+        monthlyInvestedCents: defaults.monthlyDcaCents,
+        monthlySavingsCents: Math.max(0, defaults.monthlySavingsCents - defaults.monthlyDcaCents),
+        equityReturn: defaults.equityReturn,
+        savingsReturn: defaults.savingsReturn,
+        inflation: 0.02,
+        horizonYears: 20,
+      }),
+    [defaults],
+  );
+  const finalPoint = simulation.points[simulation.points.length - 1];
+  const chartData = simulation.points.map((p) => ({
+    year: p.year,
+    totalEur: p.totalCents / 100,
+    investedEur: p.investedCents / 100,
+    savingsEur: p.savingsCents / 100,
+  }));
+  return (
+    <button
+      type="button"
+      onClick={() => onClick("simulateur")}
+      className="group relative col-span-1 flex flex-col gap-3 overflow-hidden rounded-lg border border-border-cw bg-bg-elevated p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-accent-500/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)] active:translate-y-0 active:scale-[0.99] lg:col-span-3"
+    >
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-warning/10 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        aria-hidden
+      />
+      <div className="relative flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-bg-subtle text-accent-500 transition-colors group-hover:bg-accent-500/10">
+            <TrendingUp className="h-5 w-5" aria-hidden />
+          </span>
+          <div>
+            <p className="font-heading text-base font-semibold text-text-primary">
+              Simulateur de patrimoine
+            </p>
+            <p className="mt-0.5 text-xs text-text-muted">
+              projection à 20 ans par défaut · rendement{" "}
+              {formatPercent(defaults.equityReturn)} ({defaults.returnSource}) · DCA{" "}
+              {formatEurCents(defaults.monthlyDcaCents)}/mois
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-8">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+              Capital projeté ({finalPoint.year})
+            </p>
+            <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
+              {formatEurCents(finalPoint.totalCents)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+              Rente 4 %/an
+            </p>
+            <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
+              {formatEurCents(Math.round((finalPoint.totalCents * 0.04) / 12))}/mois
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="relative h-36">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <XAxis dataKey="year" hide />
+            <YAxis hide />
+            <Tooltip
+              contentStyle={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              formatter={(value, name) => [
+                formatEurCents(Number(value) * 100),
+                name === "totalEur"
+                  ? "Total"
+                  : name === "investedEur"
+                    ? "Investissement"
+                    : "Épargne",
+              ]}
+            />
+            <Line
+              type="monotone"
+              dataKey="investedEur"
+              stroke="var(--positive)"
+              strokeWidth={2}
+              dot={false}
+              name="Investissement"
+            />
+            <Line
+              type="monotone"
+              dataKey="savingsEur"
+              stroke="var(--info)"
+              strokeWidth={2}
+              dot={false}
+              name="Épargne"
+            />
+            <Line
+              type="monotone"
+              dataKey="totalEur"
+              stroke="var(--text-secondary)"
+              strokeWidth={2.5}
+              dot={false}
+              name="Total"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="relative text-xs text-text-muted">
+        Investissement {formatEurCents(defaults.investedWealthCents)} + épargne{" "}
+        {formatEurCents(defaults.savingsWealthCents)} — cliquez pour simuler horizon,
+        rendement et épargne.
+      </p>
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                 Carte Exposition (géo | secteur, 2 colonnes)                 */
+/* -------------------------------------------------------------------------- */
+
+function ExposureCard({
+  sectors,
+  regions,
+  onClick,
+}: {
+  sectors: DiversificationResult;
+  regions: DiversificationResult;
+  onClick: (id: PanelId) => void;
+}) {
+  const disabled = sectors.lines.length === 0 && regions.lines.length === 0;
+  const topRegion = regions.lines[0]
+    ? REGIONS.find((r) => r.key === regions.lines[0].sector)
+    : null;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onClick("exposition")}
+      className={cn(
+        "group relative col-span-1 flex flex-col gap-2 overflow-hidden rounded-lg border border-border-cw bg-bg-elevated p-6 text-left transition-all duration-200 sm:col-span-2",
+        disabled
+          ? "cursor-default opacity-60"
+          : "cursor-pointer hover:-translate-y-0.5 hover:border-accent-500/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)] active:translate-y-0 active:scale-[0.99]",
+      )}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-500/10 via-transparent to-info/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+        aria-hidden
+      />
+      <div className="relative flex items-center justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-bg-subtle text-accent-500 transition-colors group-hover:bg-accent-500/10">
+          <Globe2 className="h-5 w-5" aria-hidden />
+        </span>
+        {scoreBadge(sectors.score ?? regions.score)}
+      </div>
+      <p className="relative font-heading text-base font-semibold text-text-primary">
+        Exposition
+      </p>
+      <div className="relative grid grid-cols-1 divide-y divide-border-cw sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+        <div className="sm:pr-6 sm:border-0">
+          <p className="font-heading text-base font-semibold text-text-primary">
+            {topRegion?.flag ?? ""} {topRegion?.label ?? "Géographie"}
+          </p>
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
+            {regions.lines[0] ? formatPercent(regions.lines[0].share) : "—"}
+          </p>
+          <p className="mt-0.5 text-xs font-medium tracking-wide text-text-secondary uppercase">
+            zone dominante · {regions.lines.length} zones
+          </p>
+        </div>
+        <div className="sm:pl-6">
+          <p className="font-heading text-base font-semibold text-text-primary">
+            {sectors.lines[0]?.sector ?? "Secteurs"}
+          </p>
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
+            {sectors.lines[0] ? formatPercent(sectors.lines[0].share) : "—"}
+          </p>
+          <p className="mt-0.5 text-xs font-medium tracking-wide text-text-secondary uppercase">
+            secteur dominant · {sectors.lines.length} secteurs
+          </p>
+        </div>
+      </div>
+      <p className="relative text-xs text-text-muted">
+        Répartition réelle ETF dépliés (look-through) — cliquez pour le détail
+        sectoriel et géographique.
+      </p>
+    </button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                    Panneau Exposition (onglets secteur/géo)                  */
+/* -------------------------------------------------------------------------- */
+
+function ExposurePanel({
+  sectors,
+  regions,
+}: {
+  sectors: DiversificationResult;
+  regions: DiversificationResult;
+}) {
+  const [tab, setTab] = useState<"sector" | "region">("region");
+  const result = tab === "region" ? regions : sectors;
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/50 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("region")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
+            tab === "region"
+              ? "bg-accent-500/15 text-accent-500"
+              : "text-text-secondary hover:text-text-primary",
+          )}
+        >
+          <Globe2 className="h-4 w-4" aria-hidden />
+          Géographique
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("sector")}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
+            tab === "sector"
+              ? "bg-accent-500/15 text-accent-500"
+              : "text-text-secondary hover:text-text-primary",
+          )}
+        >
+          <PieIcon className="h-4 w-4" aria-hidden />
+          Sectoriel
+        </button>
+      </div>
+      <DiversificationPanel result={result} kind={tab} />
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*                            Vue principale                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -759,14 +994,12 @@ export function AnalysisPageView({
   sectors,
   regions,
   simulatorDefaults,
-  monthlyExpensesCents,
 }: {
   fees: FeeAnalysisResult;
   income: IncomeAnalysisResult;
   sectors: DiversificationResult;
   regions: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
-  monthlyExpensesCents: number | null;
 }) {
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const open = (id: PanelId) => setOpenPanel(id);
@@ -782,19 +1015,14 @@ export function AnalysisPageView({
       icon: <Receipt className="h-5 w-5" aria-hidden />,
     },
     revenus: {
-      title: "Revenus passifs",
-      subtitle: "Dividendes, intérêts et distributions",
+      title: "Dividendes & intérêts",
+      subtitle: "Dividendes versés en cash et rendements capitalisés (ETF Acc)",
       icon: <Coins className="h-5 w-5" aria-hidden />,
     },
-    secteurs: {
-      title: "Diversification sectorielle",
-      subtitle: "Répartition réelle, ETF dépliés (look-through)",
+    exposition: {
+      title: "Exposition",
+      subtitle: "Répartition sectorielle et géographique, ETF dépliés (look-through)",
       icon: <PieIcon className="h-5 w-5" aria-hidden />,
-    },
-    geo: {
-      title: "Diversification géographique",
-      subtitle: "Exposition par zone, ETF dépliés (look-through)",
-      icon: <Globe2 className="h-5 w-5" aria-hidden />,
     },
     simulateur: {
       title: "Simulateur de patrimoine",
@@ -809,9 +1037,6 @@ export function AnalysisPageView({
   };
 
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
-  const topRegion = regions.lines[0]
-    ? REGIONS.find((r) => r.key === regions.lines[0].sector)
-    : null;
 
   return (
     <div className="space-y-6">
@@ -830,11 +1055,11 @@ export function AnalysisPageView({
           icon={<Receipt className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-negative/10 via-transparent to-transparent"
           badge={feeBadge(fees.feeRate)}
-          kpi={formatEurCents(fees.annualCostCents)}
-          kpiLabel="frais annuels"
+          kpi={fees.feeRate !== null ? formatPercent(fees.feeRate) : "—"}
+          kpiLabel={fees.feeRate !== null ? `du patrimoine · ${formatEurCents(fees.annualCostCents)}/an` : "TER partiellement inconnu"}
           detail={
             <>
-              {fees.feeRate !== null ? `${formatPercent(fees.feeRate)} du patrimoine` : "TER partiellement inconnu"}
+              {formatEurCents(fees.annualCostCents)} de frais annuels
               <br />
               −{formatEurCents(loss20?.lossCents ?? 0)} projetés sur 20 ans
             </>
@@ -844,12 +1069,12 @@ export function AnalysisPageView({
         />
         <ScannerCard
           id="revenus"
-          title="Revenus passifs"
+          title="Dividendes & intérêts"
           icon={<Coins className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-positive/10 via-transparent to-transparent"
           badge={<Badge tone="neutral">12 mois</Badge>}
           kpi={formatEurCents(income.cashTwelveMonthsCents)}
-          kpiLabel="perçus sur 12 mois"
+          kpiLabel="dividendes perçus sur 12 mois"
           detail={
             <>
               projection : {formatEurCents(income.projectedTwelveMonthsCents)}
@@ -860,84 +1085,12 @@ export function AnalysisPageView({
           onClick={open}
           disabled={income.lines.length === 0}
         />
-        <ScannerCard
-          id="secteurs"
-          title="Secteurs"
-          icon={<PieIcon className="h-5 w-5" aria-hidden />}
-          gradient="bg-gradient-to-br from-accent-500/10 via-transparent to-transparent"
-          badge={scoreBadge(sectors.score)}
-          kpi={sectors.lines[0]?.sector ?? "—"}
-          kpiLabel="secteur dominant"
-          detail={
-            sectors.lines[0] ? (
-              <>
-                {formatPercent(sectors.lines[0].share)} · {sectors.lines.length} secteurs
-                <br />
-                {sectors.alerts.length > 0
-                  ? `⚠ ${sectors.alerts[0].label} au-dessus du seuil`
-                  : "aucune alerte de concentration"}
-              </>
-            ) : (
-              "exposition à enrichir"
-            )
-          }
-          onClick={open}
-          disabled={sectors.lines.length === 0}
-        />
-        <ScannerCard
-          id="geo"
-          title="Géographie"
-          icon={<Globe2 className="h-5 w-5" aria-hidden />}
-          gradient="bg-gradient-to-br from-info/10 via-transparent to-transparent"
-          badge={scoreBadge(regions.score)}
-          kpi={
-            regions.lines[0]
-              ? `${topRegion?.flag ?? ""} ${topRegion?.label ?? regions.lines[0].sector}`
-              : "—"
-          }
-          kpiLabel="zone dominante"
-          detail={
-            regions.lines[0] ? (
-              <>
-                {formatPercent(regions.lines[0].share)} · {regions.lines.length} zones
-                <br />
-                {regions.lines
-                  .slice(0, 3)
-                  .map(
-                    (l) =>
-                      `${REGIONS.find((r) => r.key === l.sector)?.flag ?? ""} ${formatPercent(l.share)}`,
-                  )
-                  .join(" · ")}
-              </>
-            ) : (
-              "exposition à enrichir"
-            )
-          }
-          onClick={open}
-          disabled={regions.lines.length === 0}
-        />
-        <ScannerCard
-          id="simulateur"
-          title="Simulateur"
-          icon={<TrendingUp className="h-5 w-5" aria-hidden />}
-          gradient="bg-gradient-to-br from-warning/10 via-transparent to-transparent"
-          badge={
-            <Badge tone="neutral">
-              {simulatorDefaults.returnSource === "historique" ? "historique réel" : "moyenne"}
-            </Badge>
-          }
-          kpi={formatEurCents(simulatorDefaults.investedWealthCents + simulatorDefaults.savingsWealthCents)}
-          kpiLabel="patrimoine simulé"
-          detail={
-            <>
-              rendement : {formatPercent(simulatorDefaults.equityReturn)}
-              <br />
-              dont épargne : {formatEurCents(simulatorDefaults.savingsWealthCents)} · DCA{" "}
-              {formatEurCents(simulatorDefaults.monthlyDcaCents)}/mois
-            </>
-          }
+        <ExposureCard
+          sectors={sectors}
+          regions={regions}
           onClick={open}
         />
+        <SimulatorCard defaults={simulatorDefaults} onClick={open} />
         <ScannerCard
           id="abonnements"
           title="Abonnements"
@@ -961,10 +1114,11 @@ export function AnalysisPageView({
       >
         {openPanel === "frais" ? <FeePanel fees={fees} /> : null}
         {openPanel === "revenus" ? <IncomePanel income={income} /> : null}
-        {openPanel === "secteurs" ? <DiversificationPanel result={sectors} kind="sector" /> : null}
-        {openPanel === "geo" ? <DiversificationPanel result={regions} kind="region" /> : null}
+        {openPanel === "exposition" ? (
+          <ExposurePanel sectors={sectors} regions={regions} />
+        ) : null}
         {openPanel === "simulateur" ? (
-          <SimulationPanel defaults={simulatorDefaults} monthlyExpensesCents={monthlyExpensesCents} />
+          <SimulationPanel defaults={simulatorDefaults} />
         ) : null}
         {openPanel === "abonnements" ? (
           <p className="py-8 text-center text-sm text-text-muted">

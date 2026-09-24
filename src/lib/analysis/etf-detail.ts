@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Détail des ETF depuis example/etfDetail.csv : TER, yields de distribution,
+ * Détail des ETF depuis data/etfDetail.csv : TER, yields de distribution,
  * région, focus sectoriel, émetteur, réplication, éligibilité PEA, etc.
  * Le fichier est fourni par l'utilisateur et remplacé à loisir ; les colonnes
  * TER et yields sont exprimées en pourcents (0,25 = 0,25 %/an).
@@ -130,7 +130,7 @@ function loadEtfDetails(): Map<string, EtfDetail> {
   if (cache && now - cache.at < CACHE_TTL_MS) return cache.byIsin;
   const byIsin = new Map<string, EtfDetail>();
   try {
-    const file = path.join(process.cwd(), "example", "etfDetail.csv");
+    const file = path.join(process.cwd(), "data", "etfDetail.csv");
     const content = fs.readFileSync(file, "utf8");
     for (const detail of parseEtfDetailCsv(content)) {
       byIsin.set(detail.isin, detail);
@@ -148,6 +148,16 @@ export function getEtfDetailByIsin(isin: string | null): EtfDetail | null {
   return loadEtfDetails().get(isin.trim().toUpperCase()) ?? null;
 }
 
+/** Détail CSV d'un ETF par ticker (WPEA, IFRE...) ; null si absent. */
+export function getEtfDetailByTicker(ticker: string | null): EtfDetail | null {
+  if (!ticker) return null;
+  const normalized = ticker.trim().toUpperCase();
+  for (const detail of loadEtfDetails().values()) {
+    if (detail.ticker.toUpperCase() === normalized) return detail;
+  }
+  return null;
+}
+
 /** Tous les détails CSV disponibles (pour l'exploration et les stats). */
 export function getAllEtfDetails(): EtfDetail[] {
   return [...loadEtfDetails().values()];
@@ -156,4 +166,9 @@ export function getAllEtfDetails(): EtfDetail[] {
 /** Liste des ISIN présents dans le CSV — utile pour l'import automatique. */
 export function getKnownDetailIsins(): Set<string> {
   return new Set(loadEtfDetails().keys());
+}
+
+/** Invalide le cache mémoire — force la relecture du CSV au prochain accès. */
+export function invalidateEtfDetailCache(): void {
+  cache = null;
 }

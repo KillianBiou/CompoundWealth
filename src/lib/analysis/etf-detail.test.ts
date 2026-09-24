@@ -94,7 +94,7 @@ describe("buildSimulatorDefaults", () => {
     };
   }
 
-  it("sépare l'investissement de l'épargne et ajoute le DCA à l'épargne mensuelle", () => {
+  it("sépare l'investissement de l'épargne ; défaut = DCA actif uniquement", () => {
     const positions = [
       position(),
       position({
@@ -115,7 +115,7 @@ describe("buildSimulatorDefaults", () => {
     });
     expect(defaults.investedWealthCents).toBe(50_000_00);
     expect(defaults.savingsWealthCents).toBe(8_000_00);
-    expect(defaults.monthlySavingsCents).toBe(40_000 + Math.round(30_000_00 / 12));
+    expect(defaults.monthlySavingsCents).toBe(40_000);
     expect(defaults.monthlyDcaCents).toBe(40_000);
     expect(defaults.savingsReturn).toBe(0.017);
     // pas d'historique exploitable → moyenne long terme

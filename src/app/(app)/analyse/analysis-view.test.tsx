@@ -129,19 +129,17 @@ function renderView() {
       sectors={sectors}
       regions={regions}
       simulatorDefaults={simulatorDefaults}
-      monthlyExpensesCents={1_500_00}
     />,
   );
 }
 
 describe("AnalysisPageView", () => {
-  it("affiche les six cartes scanners avec leurs KPI", () => {
+  it("affiche les cinq cartes scanners avec leurs KPI", () => {
     renderView();
     expect(screen.getByText("Frais")).toBeInTheDocument();
-    expect(screen.getByText("Revenus passifs")).toBeInTheDocument();
-    expect(screen.getByText("Secteurs")).toBeInTheDocument();
-    expect(screen.getByText("Géographie")).toBeInTheDocument();
-    expect(screen.getByText("Simulateur")).toBeInTheDocument();
+    expect(screen.getByText("Dividendes & intérêts")).toBeInTheDocument();
+    expect(screen.getByText("Exposition")).toBeInTheDocument();
+    expect(screen.getByText("Simulateur de patrimoine")).toBeInTheDocument();
     expect(screen.getByText("Abonnements")).toBeInTheDocument();
   });
 
@@ -172,11 +170,12 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText(/bientôt/i)).toBeInTheDocument();
   });
 
-  it("le panneau secteurs affiche le score et le secteur dominant", () => {
+  it("le panneau exposition affiche les onglets sectoriel et géographique", () => {
     renderView();
-    fireEvent.click(screen.getByText("Secteurs"));
-    expect(screen.getByText("Diversification sectorielle")).toBeInTheDocument();
-    expect(screen.getAllByText("6/10").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    expect(screen.getByText("Géographique")).toBeInTheDocument();
+    expect(screen.getByText("Sectoriel")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Sectoriel"));
     expect(screen.getAllByText("Technologie").length).toBeGreaterThan(0);
   });
 });
