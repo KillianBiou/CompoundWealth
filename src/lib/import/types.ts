@@ -18,6 +18,8 @@ export interface ImportedPosition {
   valuations: ImportedValuation[];
   /** achats individuels reconstruits depuis l'historique */
   investments: { date: string; amountCents: number }[];
+  /** dividendes et intérêts reçus, reconstruits depuis l'historique */
+  cashIncomes: { date: string; amountCents: number; kind: string }[];
 }
 
 export interface ImportedEnvelope {

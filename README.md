@@ -38,6 +38,21 @@ pnpm dev  # ou supprimez .next si le serveur dev était déjà lancé
 | `pnpm test` / `pnpm test:run` | Vitest (watch / une fois) |
 | `pnpm db:push` | Synchronise le schéma Prisma avec la base |
 
+## Recalcul planifié
+
+Les métriques de la page **Analyse** sont recalculées à chaque visite (agrégations
+serveur par requête). Pour tenir les prix à jour sans visite manuelle, un endpoint
+de recalcul est disponible :
+
+```bash
+curl -X POST -H "x-cron-secret: $CRON_SECRET" https://<votre-app>/api/cron/refresh
+```
+
+Il actualise les prix Yahoo de toutes les enveloppes (cooldown 5 min par enveloppe,
+requêtes espacées d'une seconde) — branchez-le sur un cron externe (Vercel Cron,
+GitHub Actions, crontab). Définissez `CRON_SECRET` dans `.env` ; sans cette
+variable, l'endpoint refuse de s'exécuter.
+
 ## Documentation
 
 | Document | Contenu |
