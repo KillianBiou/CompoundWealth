@@ -49,7 +49,7 @@ export function RefreshAllButton() {
       title={
         pending
           ? "Actualisation en cours…"
-          : "Actualiser les prix de toutes les positions de toutes les enveloppes (Yahoo Finance, limité à une fois toutes les 5 minutes par enveloppe)"
+          : "Actualiser les prix de toutes les positions et reconstruire l'historique des enveloppes qui ont des jours manquants (Yahoo Finance)"
       }
       aria-label="Actualiser toutes les valeurs"
       onClick={run}

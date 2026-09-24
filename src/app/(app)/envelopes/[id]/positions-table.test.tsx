@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { renderWithToast } from "../../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { PositionsTable } from "./positions-table";
@@ -16,6 +16,7 @@ const base = {
   id: "pos-1",
   name: "CW8 — MSCI World",
   symbol: "CW8",
+  isin: null as string | null,
   category: "ETF",
   boughtAt: new Date("2026-01-15"),
   valuationDate: new Date("2026-09-20"),
@@ -82,5 +83,36 @@ describe("PositionsTable", () => {
     );
     const deleteButton = screen.getByRole("button", { name: "Supprimer" });
     expect(deleteButton).toHaveClass("cursor-pointer");
+  });
+  it("rend le nom d'un ETF connu cliquable et notifie le clic", () => {
+    const onSelectPosition = vi.fn();
+    const etfRow = { ...row(100_000, 120_000), isin: "LU1681043599" };
+    renderWithToast(
+      <PositionsTable
+        envelopeId="env-1"
+        positions={[etfRow]}
+        onSelectPosition={onSelectPosition}
+        clickableIsins={new Set(["LU1681043599"])}
+      />,
+    );
+    const nameButton = screen.getByRole("button", { name: /CW8 — MSCI World/ });
+    expect(nameButton).toHaveClass("cursor-pointer");
+    fireEvent.click(nameButton);
+    expect(onSelectPosition).toHaveBeenCalledTimes(1);
+    expect(onSelectPosition.mock.calls[0][0].isin).toBe("LU1681043599");
+  });
+  it("garde un ETF inconnu du catalogue non cliquable", () => {
+    const onSelectPosition = vi.fn();
+    renderWithToast(
+      <PositionsTable
+        envelopeId="env-1"
+        positions={[{ ...row(100_000, 120_000), isin: "XX1234567890" }]}
+        onSelectPosition={onSelectPosition}
+        clickableIsins={new Set(["LU1681043599"])}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /CW8 — MSCI World/ }),
+    ).not.toBeInTheDocument();
   });
 });
