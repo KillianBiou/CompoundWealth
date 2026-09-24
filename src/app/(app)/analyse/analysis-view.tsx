@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -572,68 +572,75 @@ function Slider({
 
 const SIM_STORAGE_KEY = "analyse-simulateur-params";
 
-function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
-  const saved = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(SIM_STORAGE_KEY);
-      return raw
-        ? (JSON.parse(raw) as Partial<{
-            horizonYears: number;
-            withdrawalRate: number;
-            equityReturn: number;
-            extraSavings: number;
-            useInflation: boolean;
-            inflationRate: number;
-          }>)
-        : null;
-    } catch {
-      return null;
-    }
-  }, []);
-  const [horizonYears, setHorizonYears] = useState(saved?.horizonYears ?? 20);
-  const [withdrawalRate, setWithdrawalRate] = useState(saved?.withdrawalRate ?? 4);
-  const [equityReturn, setEquityReturn] = useState(
-    saved?.equityReturn ?? defaults.equityReturn * 100,
+interface SimParams {
+  horizonYears: number;
+  withdrawalRate: number;
+  equityReturn: number;
+  extraSavings: number;
+  useInflation: boolean;
+  inflationRate: number;
+}
+
+function defaultSimParams(defaults: SimulatorDefaults): SimParams {
+  return {
+    horizonYears: 20,
+    withdrawalRate: 4,
+    equityReturn: defaults.equityReturn * 100,
+    extraSavings: 0,
+    useInflation: false,
+    inflationRate: 2,
+  };
+}
+
+function readSavedSimParams(): Partial<SimParams> | null {
+  try {
+    const raw = localStorage.getItem(SIM_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Partial<SimParams>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function simulateFromParams(defaults: SimulatorDefaults, params: SimParams) {
+  const monthlyInvested = defaults.monthlyDcaCents + params.extraSavings;
+  const monthlySavings = Math.max(
+    0,
+    defaults.monthlySavingsCents - defaults.monthlyDcaCents - params.extraSavings,
   );
-  const [extraSavings, setExtraSavings] = useState(saved?.extraSavings ?? 0);
-  const [useInflation, setUseInflation] = useState(saved?.useInflation ?? false);
-  const [inflationRate, setInflationRate] = useState(saved?.inflationRate ?? 2);
+  return simulateTwoTracks({
+    investedWealthCents: defaults.investedWealthCents,
+    savingsWealthCents: defaults.savingsWealthCents,
+    monthlyInvestedCents: monthlyInvested,
+    monthlySavingsCents: monthlySavings,
+    equityReturn: params.equityReturn / 100,
+    savingsReturn: defaults.savingsReturn,
+    inflation: params.useInflation ? params.inflationRate / 100 : 0,
+    horizonYears: params.horizonYears,
+  });
+}
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        SIM_STORAGE_KEY,
-        JSON.stringify({
-          horizonYears,
-          withdrawalRate,
-          equityReturn,
-          extraSavings,
-          useInflation,
-          inflationRate,
-        }),
-      );
-    } catch {
-      // stockage indisponible : pas de persistance
-    }
-  }, [horizonYears, withdrawalRate, equityReturn, extraSavings, useInflation, inflationRate]);
+function SimulationPanel({
+  defaults,
+  params,
+  onParamChange,
+}: {
+  defaults: SimulatorDefaults;
+  params: SimParams;
+  onParamChange: (patch: Partial<SimParams>) => void;
+}) {
+  const { horizonYears, withdrawalRate, equityReturn, extraSavings, useInflation, inflationRate } =
+    params;
+  const setHorizonYears = (v: number) => onParamChange({ horizonYears: v });
+  const setWithdrawalRate = (v: number) => onParamChange({ withdrawalRate: v });
+  const setEquityReturn = (v: number) => onParamChange({ equityReturn: v });
+  const setExtraSavings = (v: number) => onParamChange({ extraSavings: v });
+  const setUseInflation = (v: boolean) => onParamChange({ useInflation: v });
+  const setInflationRate = (v: number) => onParamChange({ inflationRate: v });
 
-  const simulation = useMemo(() => {
-    const monthlyInvested = defaults.monthlyDcaCents + extraSavings;
-    const monthlySavings = Math.max(
-      0,
-      defaults.monthlySavingsCents - defaults.monthlyDcaCents - extraSavings,
-    );
-    return simulateTwoTracks({
-      investedWealthCents: defaults.investedWealthCents,
-      savingsWealthCents: defaults.savingsWealthCents,
-      monthlyInvestedCents: monthlyInvested,
-      monthlySavingsCents: monthlySavings,
-      equityReturn: equityReturn / 100,
-      savingsReturn: defaults.savingsReturn,
-      inflation: useInflation ? inflationRate / 100 : 0,
-      horizonYears,
-    });
-  }, [defaults, horizonYears, equityReturn, extraSavings, useInflation, inflationRate]);
+  const simulation = useMemo(
+    () => simulateFromParams(defaults, params),
+    [defaults, params],
+  );
 
   const finalPoint = simulation.points[simulation.points.length - 1];
   const monthlyRenteCents = Math.round(
@@ -846,25 +853,14 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
 
 function SimulatorCard({
   defaults,
+  params,
   onClick,
 }: {
   defaults: SimulatorDefaults;
+  params: SimParams;
   onClick: (id: PanelId) => void;
 }) {
-  const simulation = useMemo(
-    () =>
-      simulateTwoTracks({
-        investedWealthCents: defaults.investedWealthCents,
-        savingsWealthCents: defaults.savingsWealthCents,
-        monthlyInvestedCents: defaults.monthlyDcaCents,
-        monthlySavingsCents: Math.max(0, defaults.monthlySavingsCents - defaults.monthlyDcaCents),
-        equityReturn: defaults.equityReturn,
-        savingsReturn: defaults.savingsReturn,
-        inflation: 0.02,
-        horizonYears: 20,
-      }),
-    [defaults],
-  );
+  const simulation = useMemo(() => simulateFromParams(defaults, params), [defaults, params]);
   const finalPoint = simulation.points[simulation.points.length - 1];
   const chartData = simulation.points.map((p) => ({
     year: p.year,
@@ -892,9 +888,9 @@ function SimulatorCard({
               Simulateur de patrimoine
             </p>
             <p className="mt-0.5 text-xs text-text-muted">
-              projection à 20 ans par défaut · rendement{" "}
-              {formatPercent(defaults.equityReturn)} ({defaults.returnSource}) · DCA{" "}
-              {formatEurCents(defaults.monthlyDcaCents)}/mois
+              projection à {params.horizonYears} ans · rendement{" "}
+              {formatPercent(params.equityReturn / 100)} · DCA{" "}
+              {formatEurCents(defaults.monthlyDcaCents + params.extraSavings)}/mois
             </p>
           </div>
         </div>
@@ -909,10 +905,12 @@ function SimulatorCard({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Rente 4 %/an
+              Rente {params.withdrawalRate.toFixed(2).replace(".", ",")} %/an
             </p>
             <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
-              {formatEurCents(Math.round((finalPoint.totalCents * 0.04) / 12))}/mois
+              {formatEurCents(
+                Math.round((finalPoint.totalCents * (params.withdrawalRate / 100)) / 12),
+              )}/mois
             </p>
           </div>
         </div>
@@ -960,7 +958,7 @@ function SimulatorCard({
       </div>
       <p className="relative text-xs text-text-muted">
         Investissement {formatEurCents(defaults.investedWealthCents)} + épargne{" "}
-        {formatEurCents(defaults.savingsWealthCents)} — cliquez pour simuler horizon,
+        {formatEurCents(defaults.savingsWealthCents)} — cliquez pour affiner horizon,
         rendement et épargne.
       </p>
     </button>
@@ -1112,6 +1110,22 @@ export function AnalysisPageView({
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [previousPanel, setPreviousPanel] = useState<PanelId | null>(null);
+  const [simParams, setSimParams] = useState<SimParams>(() => {
+    const base = defaultSimParams(simulatorDefaults);
+    const saved = readSavedSimParams();
+    return saved ? { ...base, ...saved } : base;
+  });
+  const updateSimParams = (patch: Partial<SimParams>) => {
+    setSimParams((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // stockage indisponible : pas de persistance
+      }
+      return next;
+    });
+  };
   const open = (id: PanelId) => {
     setPreviousPanel(null);
     setOpenPanel(id);
@@ -1249,7 +1263,7 @@ export function AnalysisPageView({
             Un nouvel onglet d&apos;analyse prendra place ici.
           </p>
         </div>
-        <SimulatorCard defaults={simulatorDefaults} onClick={open} />
+        <SimulatorCard defaults={simulatorDefaults} params={simParams} onClick={open} />
       </div>
 
       <SidePanel
@@ -1273,7 +1287,11 @@ export function AnalysisPageView({
           <ExposurePanel sectors={sectors} regions={regions} />
         ) : null}
         {openPanel === "simulateur" ? (
-          <SimulationPanel defaults={simulatorDefaults} />
+          <SimulationPanel
+            defaults={simulatorDefaults}
+            params={simParams}
+            onParamChange={updateSimParams}
+          />
         ) : null}
         {openPanel === "etf" && selectedIsin && etfDetails[selectedIsin] ? (
           <EtfDetailPanel etf={etfDetails[selectedIsin]} />
