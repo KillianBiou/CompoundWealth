@@ -76,6 +76,8 @@ interface PositionAccumulator {
   buyDates: { date: string; quantityDelta: number; priceCents: number }[];
   /** versements individuels (montant investi par achat) */
   investments: { date: string; amountCents: number }[];
+  /** dividendes et intérêts reçus en cash */
+  cashIncomes: { date: string; amountCents: number; kind: string }[];
 }
 
 interface EnvelopeAccumulator {
@@ -180,6 +182,7 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
           lastPriceCents: null,
           buyDates: [],
           investments: [],
+          cashIncomes: [],
         };
         envelope.positions.set(key, position);
       }
@@ -212,6 +215,7 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
           firstBoughtAt: p.firstBoughtAt,
           valuations: buildValuations(p),
           investments: [...p.investments].sort((a, b) => a.date.localeCompare(b.date)),
+          cashIncomes: [...p.cashIncomes].sort((a, b) => a.date.localeCompare(b.date)),
         }),
       ),
     }));

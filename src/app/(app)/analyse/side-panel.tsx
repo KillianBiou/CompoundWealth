@@ -1,0 +1,99 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/components/cn";
+
+/**
+ * Panneau latéral droit (façon Sheet/Drawer) : s'ouvre en glide depuis la
+ * droite, se ferme par la croix, la touche Échap ou un clic hors zone.
+ */
+export function SidePanel({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-border-cw bg-bg-elevated shadow-2xl"
+        style={{ animation: "side-panel-in 220ms ease-out" }}
+      >
+        <style>{`
+          @keyframes side-panel-in {
+            from { transform: translateX(24px); opacity: 0.4; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+        `}</style>
+        <div className="flex items-start justify-between gap-4 border-b border-border-cw px-6 py-4">
+          <div className="flex items-start gap-3">
+            {icon ? (
+              <span
+                className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-accent-500/10 text-accent-500"
+                aria-hidden
+              >
+                {icon}
+              </span>
+            ) : null}
+            <div>
+              <h2 className="font-heading text-lg font-semibold text-text-primary">{title}</h2>
+              {subtitle ? (
+                <p className="mt-0.5 text-xs text-text-muted">{subtitle}</p>
+              ) : null}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer le panneau"
+            className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+        <div className={cn("flex-1 overflow-y-auto px-6 py-5")}>{children}</div>
+      </div>
+    </div>
+  );
+}
