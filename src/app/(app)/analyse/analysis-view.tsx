@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -542,11 +542,52 @@ function Slider({
   );
 }
 
+const SIM_STORAGE_KEY = "analyse-simulateur-params";
+
 function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
-  const [horizonYears, setHorizonYears] = useState(20);
-  const [withdrawalRate, setWithdrawalRate] = useState(4);
-  const [equityReturn, setEquityReturn] = useState(defaults.equityReturn * 100);
-  const [extraSavings, setExtraSavings] = useState(0);
+  const saved = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(SIM_STORAGE_KEY);
+      return raw
+        ? (JSON.parse(raw) as Partial<{
+            horizonYears: number;
+            withdrawalRate: number;
+            equityReturn: number;
+            extraSavings: number;
+            useInflation: boolean;
+            inflationRate: number;
+          }>)
+        : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const [horizonYears, setHorizonYears] = useState(saved?.horizonYears ?? 20);
+  const [withdrawalRate, setWithdrawalRate] = useState(saved?.withdrawalRate ?? 4);
+  const [equityReturn, setEquityReturn] = useState(
+    saved?.equityReturn ?? defaults.equityReturn * 100,
+  );
+  const [extraSavings, setExtraSavings] = useState(saved?.extraSavings ?? 0);
+  const [useInflation, setUseInflation] = useState(saved?.useInflation ?? false);
+  const [inflationRate, setInflationRate] = useState(saved?.inflationRate ?? 2);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SIM_STORAGE_KEY,
+        JSON.stringify({
+          horizonYears,
+          withdrawalRate,
+          equityReturn,
+          extraSavings,
+          useInflation,
+          inflationRate,
+        }),
+      );
+    } catch {
+      // stockage indisponible : pas de persistance
+    }
+  }, [horizonYears, withdrawalRate, equityReturn, extraSavings, useInflation, inflationRate]);
 
   const simulation = useMemo(() => {
     const monthlyInvested = defaults.monthlyDcaCents + extraSavings;
@@ -561,10 +602,10 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
       monthlySavingsCents: monthlySavings,
       equityReturn: equityReturn / 100,
       savingsReturn: defaults.savingsReturn,
-      inflation: 0.02,
+      inflation: useInflation ? inflationRate / 100 : 0,
       horizonYears,
     });
-  }, [defaults, horizonYears, equityReturn, extraSavings]);
+  }, [defaults, horizonYears, equityReturn, extraSavings, useInflation, inflationRate]);
 
   const finalPoint = simulation.points[simulation.points.length - 1];
   const monthlyRenteCents = Math.round(
@@ -573,6 +614,13 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
   const monthlyRenteRealCents = Math.round(
     (finalPoint.totalRealCents * (withdrawalRate / 100)) / 12,
   );
+  // apports totaux sur l'horizon : capital initial + versements cumulés
+  const totalContributionsCents =
+    defaults.investedWealthCents +
+    defaults.savingsWealthCents +
+    (defaults.monthlyDcaCents + extraSavings) * 12 * horizonYears +
+    Math.max(0, defaults.monthlySavingsCents - defaults.monthlyDcaCents - extraSavings) * 12 * horizonYears;
+  const totalGainCents = finalPoint.totalCents - totalContributionsCents;
 
   const chartData = simulation.points.map((p) => ({
     year: p.year,
@@ -593,8 +641,9 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
             {formatEurCents(finalPoint.totalCents)}
           </p>
           <p className="mt-1 text-xs text-text-muted">
-            {formatEurCents(finalPoint.totalRealCents)} en euros constants · investissement{" "}
-            {formatEurCents(finalPoint.investedCents)} + épargne {formatEurCents(finalPoint.savingsCents)}
+            dont {formatEurCents(totalGainCents)} d&apos;intérêts ·{" "}
+            {formatEurCents(totalContributionsCents)} d&apos;apports
+            {useInflation ? ` · ${formatEurCents(finalPoint.totalRealCents)} en euros constants` : ""}
           </p>
         </div>
         <div className="rounded-lg border border-accent-500/25 bg-gradient-to-br from-accent-500/10 to-transparent p-4">
@@ -605,8 +654,10 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
             {formatEurCents(monthlyRenteCents)}/mois
           </p>
           <p className="mt-1 text-xs text-text-muted">
-            {formatEurCents(monthlyRenteRealCents)}/mois en euros constants · retrait de{" "}
-            {formatPercent(withdrawalRate / 100)} du capital par an
+            retrait de {formatPercent(withdrawalRate / 100)} du capital par an
+            {useInflation
+              ? ` · ${formatEurCents(monthlyRenteRealCents)}/mois en euros constants`
+              : ""}
           </p>
         </div>
       </div>
@@ -663,15 +714,17 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
               dot={false}
               name="Épargne"
             />
-            <Line
-              type="monotone"
-              dataKey="totalRealEur"
-              stroke="var(--text-muted)"
-              strokeWidth={1.5}
-              strokeDasharray="5 4"
-              dot={false}
-              name="Euros constants"
-            />
+            {useInflation ? (
+              <Line
+                type="monotone"
+                dataKey="totalRealEur"
+                stroke="var(--text-muted)"
+                strokeWidth={1.5}
+                strokeDasharray="5 4"
+                dot={false}
+                name="Euros constants"
+              />
+            ) : null}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -717,6 +770,44 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
           format={(v) => formatEurCents(v)}
           hint={`s'ajoute au DCA actuel (${formatEurCents(defaults.monthlyDcaCents)}/mois) et va à l'investissement`}
         />
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="sim-inflation-toggle"
+            className="text-sm font-medium text-text-secondary"
+          >
+            Prendre en compte l&apos;inflation
+          </label>
+          <button
+            id="sim-inflation-toggle"
+            type="button"
+            role="switch"
+            aria-checked={useInflation}
+            onClick={() => setUseInflation(!useInflation)}
+            className={cn(
+              "relative h-6 w-11 rounded-full transition-colors",
+              useInflation ? "bg-accent-500" : "bg-bg-subtle",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all",
+                useInflation ? "left-[22px]" : "left-0.5",
+              )}
+            />
+          </button>
+        </div>
+        {useInflation ? (
+          <Slider
+            label="Inflation moyenne par an"
+            value={inflationRate}
+            min={0}
+            max={10}
+            step={0.25}
+            onChange={setInflationRate}
+            format={(v) => `${v.toFixed(2).replace(".", ",")} %`}
+            hint="moyenne historique euro : ~2 %/an"
+          />
+        ) : null}
       </div>
       <p className="text-xs text-text-muted">
         Investissement (actions/ETF) : composition au rendement choisi. Épargne (livrets) :
@@ -1085,12 +1176,6 @@ export function AnalysisPageView({
           onClick={open}
           disabled={income.lines.length === 0}
         />
-        <ExposureCard
-          sectors={sectors}
-          regions={regions}
-          onClick={open}
-        />
-        <SimulatorCard defaults={simulatorDefaults} onClick={open} />
         <ScannerCard
           id="abonnements"
           title="Abonnements"
@@ -1103,6 +1188,23 @@ export function AnalysisPageView({
           onClick={open}
           comingSoon
         />
+        <ExposureCard
+          sectors={sectors}
+          regions={regions}
+          onClick={open}
+        />
+        <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-cw p-6 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-bg-subtle text-text-muted">
+            <Wallet className="h-5 w-5" aria-hidden />
+          </span>
+          <p className="font-heading text-base font-semibold text-text-muted">
+            Bientôt disponible
+          </p>
+          <p className="text-xs text-text-muted">
+            Un nouvel onglet d&apos;analyse prendra place ici.
+          </p>
+        </div>
+        <SimulatorCard defaults={simulatorDefaults} onClick={open} />
       </div>
 
       <SidePanel

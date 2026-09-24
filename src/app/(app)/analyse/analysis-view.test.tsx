@@ -167,7 +167,7 @@ describe("AnalysisPageView", () => {
     renderView();
     const card = screen.getByText("Abonnements").closest("button");
     expect(card).toBeDisabled();
-    expect(screen.getByText(/bientôt/i)).toBeInTheDocument();
+    expect(card.textContent?.match(/bientôt/i)).toBeTruthy();
   });
 
   it("le panneau exposition affiche les onglets sectoriel et géographique", () => {

@@ -639,15 +639,20 @@ export function buildSimulatorDefaults(params: {
   dcaMonthlyCents: number;
   /** taux du livret (fraction), pour l'épargne */
   savingsRate: number;
+  /** solde actuel des livrets (centimes) — les dépôts de livret ne sont pas
+   *  des positions, le solde vient de la série quinzaine de l'enveloppe */
+  savingsWealthCents?: number;
   now?: Date;
 }): SimulatorDefaults {
   const now = params.now ?? new Date();
   const investedWealthCents = params.positions
     .filter((p) => p.envelopeType !== "LIVRET_A" && p.valueCents > 0)
     .reduce((s, p) => s + p.valueCents, 0);
-  const savingsWealthCents = params.positions
-    .filter((p) => p.envelopeType === "LIVRET_A")
-    .reduce((s, p) => s + p.valueCents, 0);
+  const savingsWealthCents =
+    params.savingsWealthCents ??
+    params.positions
+      .filter((p) => p.envelopeType === "LIVRET_A")
+      .reduce((s, p) => s + p.valueCents, 0);
   // Défaut = DCA actif uniquement : les versements passés (achats historiques)
   // ne présagent pas d'une épargne mensuelle future.
   const monthlyDcaCents = params.dcaMonthlyCents;

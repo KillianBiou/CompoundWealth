@@ -31,8 +31,14 @@ export default async function AnalysePage() {
   const equityValuations = aggregateSeries(equityEnvelopes.map((e) => e.series));
   const equityInvested = aggregateSeries(equityEnvelopes.map((e) => e.investedSeries));
   const dcaMonthlyCents = equityEnvelopes.reduce((s, e) => s + (e.dcaMonthlyCents ?? 0), 0);
-  const savingsRate =
-    envelopes.find((e) => e.type === "LIVRET_A")?.interestRate ?? LIVRET_A_RATE;
+  const livretEnvelope = envelopes.find((e) => e.type === "LIVRET_A");
+  const savingsRate = livretEnvelope?.interestRate ?? LIVRET_A_RATE;
+  // le solde du livret A vit dans la série quinzaine (les dépôts ne sont pas
+  // des positions) — valeur courante de la série, sinon 0
+  const savingsWealthCents = livretEnvelope
+    ? livretEnvelope.livretSeries?.[livretEnvelope.livretSeries.length - 1]?.balanceCents ??
+      livretEnvelope.valueCents
+    : 0;
 
   const simulatorDefaults = buildSimulatorDefaults({
     positions,
@@ -40,6 +46,7 @@ export default async function AnalysePage() {
     equityInvested,
     dcaMonthlyCents,
     savingsRate,
+    savingsWealthCents,
   });
 
   return (
