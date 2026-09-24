@@ -493,13 +493,19 @@ function DiversificationPanel({
                 />
               </div>
               {open === index ? (
-                <p className="mt-1 pl-4 text-xs text-text-muted">
-                  {line.contributors
-                    .slice(0, 4)
-                    .map((c) => `${c.name} (${formatEurCents(c.amountCents)})`)
-                    .join(" · ")}
-                  {line.contributors.length > 4 ? " …" : ""}
-                </p>
+                <ul className="mt-1 space-y-1">
+                  {line.contributors.map((c) => (
+                    <li
+                      key={c.name}
+                      className="flex items-center justify-between gap-2 pl-4 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-text-secondary">{c.name}</span>
+                      <span className="shrink-0 tabular-nums text-text-muted">
+                        {formatEurCents(c.amountCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </div>
           );
@@ -1105,11 +1111,24 @@ export function AnalysisPageView({
 }) {
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
-  const open = (id: PanelId) => setOpenPanel(id);
-  const close = () => setOpenPanel(null);
+  const [previousPanel, setPreviousPanel] = useState<PanelId | null>(null);
+  const open = (id: PanelId) => {
+    setPreviousPanel(null);
+    setOpenPanel(id);
+  };
+  const close = () => {
+    setOpenPanel(null);
+    setPreviousPanel(null);
+  };
   const openEtf = (isin: string) => {
     setSelectedIsin(isin);
+    setPreviousPanel((prev) => (prev === null ? openPanel : prev));
     setOpenPanel("etf");
+  };
+  const back = () => {
+    if (previousPanel === null) return;
+    setOpenPanel(previousPanel);
+    setPreviousPanel(null);
   };
 
   const panels: Record<
@@ -1236,6 +1255,12 @@ export function AnalysisPageView({
       <SidePanel
         open={openPanel !== null}
         onClose={close}
+        onBack={openPanel === "etf" && previousPanel !== null ? back : undefined}
+        backLabel={
+          openPanel === "etf" && previousPanel !== null
+            ? `Retour — ${panels[previousPanel].title}`
+            : undefined
+        }
         title={openPanel !== null ? panels[openPanel].title : ""}
         subtitle={openPanel !== null ? panels[openPanel].subtitle : undefined}
         icon={openPanel !== null ? panels[openPanel].icon : undefined}

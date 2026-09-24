@@ -23,7 +23,7 @@ import {
 /*                          Positions agrégées d'analyse                       */
 /* -------------------------------------------------------------------------- */
 
-function isinOf(position: { symbol: string | null; name: string }): string | null {
+export function isinOf(position: { symbol: string | null; name: string }): string | null {
   const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
   const symbol = position.symbol?.trim().toUpperCase() ?? "";
   if (ISIN_PATTERN.test(symbol)) return symbol;
