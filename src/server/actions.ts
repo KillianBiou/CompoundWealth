@@ -942,7 +942,14 @@ export async function refreshAllPricesAction(): Promise<{
   const userId = await requireUserId();
   const envelopes = await prisma.envelope.findMany({
     where: { userId, closedAt: null },
-    include: { positions: true },
+    include: {
+      positions: {
+        include: {
+          investments: { orderBy: { date: "asc" } },
+          valuations: { orderBy: { date: "desc" }, take: 1 },
+        },
+      },
+    },
     orderBy: { createdAt: "asc" },
   });
   if (envelopes.length === 0) return { errors: { form: ["Aucune enveloppe active"] } };
@@ -950,7 +957,9 @@ export async function refreshAllPricesAction(): Promise<{
   const skipped: string[] = [];
   const failures: string[] = [];
   const refreshedEnvelopes: { id: string; name: string }[] = [];
+  const rebuiltEnvelopes = new Set<string>();
   let updated = 0;
+  let rebuilt = 0;
   let firstRequest = true;
   for (const envelope of envelopes) {
     const onCooldown =
@@ -959,39 +968,79 @@ export async function refreshAllPricesAction(): Promise<{
     const refreshable = envelope.positions.filter(
       (p) => p.symbol?.trim() && p.quantity !== null,
     );
-    if (onCooldown || refreshable.length === 0) {
-      if (refreshable.length > 0) skipped.push(envelope.name);
-      continue;
+    if (!onCooldown && refreshable.length > 0) {
+      for (const position of refreshable) {
+        if (!firstRequest) await new Promise((resolve) => setTimeout(resolve, 1000));
+        firstRequest = false;
+        const quote = await fetchMarketQuote(position.symbol!.trim());
+        if (!quote.ok) {
+          failures.push(`${envelope.name} · ${position.name} (${quote.reason})`);
+          continue;
+        }
+        const valueCents = Math.round(position.quantity! * quote.priceCents);
+        const valuationDate = new Date();
+        await prisma.positionValuation.upsert({
+          where: { positionId_date: { positionId: position.id, date: valuationDate } },
+          create: {
+            positionId: position.id,
+            date: valuationDate,
+            valueCents,
+            source: "yahoo",
+          },
+          update: { valueCents, source: "yahoo" },
+        });
+        updated += 1;
+      }
+      await prisma.envelope.update({
+        where: { id: envelope.id },
+        data: { lastPriceRefreshAt: new Date() },
+      });
+      refreshedEnvelopes.push({ id: envelope.id, name: envelope.name });
+    } else if (refreshable.length > 0) {
+      skipped.push(envelope.name);
     }
-    for (const position of refreshable) {
+    // Historique : si des jours de bourse manquent pour une position (dernière
+    // valorisation plus vieille que le dernier jour de bourse présumé), on
+    // reconstruit les valorisations quotidiennes depuis Yahoo en une requête.
+    const stale = envelope.positions.filter((p) => positionNeedsHistoryRebuild(p));
+    for (const position of stale) {
       if (!firstRequest) await new Promise((resolve) => setTimeout(resolve, 1000));
       firstRequest = false;
-      const quote = await fetchMarketQuote(position.symbol!.trim());
-      if (!quote.ok) {
-        failures.push(`${envelope.name} · ${position.name} (${quote.reason})`);
+      const result = await rebuildPositionValuations({
+        id: position.id,
+        symbol: position.symbol!.trim(),
+        investments: position.investments.map((inv) => ({
+          date: inv.date,
+          amountCents: inv.amountCents,
+        })),
+      });
+      if (!result.ok) {
+        failures.push(
+          `${envelope.name} · ${position.name} — historique (${result.reason})`,
+        );
         continue;
       }
-      const valueCents = Math.round(position.quantity! * quote.priceCents);
-      const valuationDate = new Date();
-      await prisma.positionValuation.upsert({
-        where: { positionId_date: { positionId: position.id, date: valuationDate } },
-        create: {
-          positionId: position.id,
-          date: valuationDate,
-          valueCents,
-          source: "yahoo",
-        },
-        update: { valueCents, source: "yahoo" },
-      });
-      updated += 1;
+      rebuilt += 1;
+      rebuiltEnvelopes.add(envelope.id);
     }
-    await prisma.envelope.update({
-      where: { id: envelope.id },
-      data: { lastPriceRefreshAt: new Date() },
-    });
-    refreshedEnvelopes.push({ id: envelope.id, name: envelope.name });
   }
-  if (updated === 0) {
+  revalidatePath("/dashboard");
+  revalidatePath("/envelopes");
+  for (const id of [...refreshedEnvelopes.map((e) => e.id), ...rebuiltEnvelopes]) {
+    revalidatePath(`/envelopes/${id}`);
+  }
+  const summary: string[] = [];
+  if (updated > 0) {
+    summary.push(
+      `${updated} prix actualisé${updated > 1 ? "s" : ""} sur ${refreshedEnvelopes.length} enveloppe${refreshedEnvelopes.length > 1 ? "s" : ""}`,
+    );
+  }
+  if (rebuilt > 0) {
+    summary.push(
+      `historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""}`,
+    );
+  }
+  if (summary.length === 0) {
     return {
       errors: {
         form: [
@@ -1004,15 +1053,37 @@ export async function refreshAllPricesAction(): Promise<{
       },
     };
   }
-  revalidatePath("/dashboard");
-  revalidatePath("/envelopes");
-  for (const envelope of refreshedEnvelopes) {
-    revalidatePath(`/envelopes/${envelope.id}`);
-  }
   return {
-    message: `${updated} prix actualisé${updated > 1 ? "s" : ""} sur ${refreshedEnvelopes.length} enveloppe${refreshedEnvelopes.length > 1 ? "s" : ""}`,
+    message: summary.join(" ; "),
     errors: skipped.length > 0 || failures.length > 0 ? { skipped, failures } : undefined,
   };
+}
+
+/**
+ * Dernier jour de bourse présumé : aujourd'hui si jour ouvré, sinon le
+ * vendredi précédent (les valorisations du week-end n'existent pas).
+ */
+function lastTradingDay(now: Date): Date {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 3; i += 1) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) return d;
+    d.setDate(d.getDate() - 1);
+  }
+  return d;
+}
+
+function positionNeedsHistoryRebuild(position: {
+  symbol: string | null;
+  investments: unknown[];
+  valuations: { date: Date }[];
+}): boolean {
+  if (!position.symbol?.trim()) return false;
+  if (position.investments.length === 0) return false;
+  const latest = position.valuations[0]?.date ?? null;
+  if (latest === null) return true;
+  return latest.getTime() < lastTradingDay(new Date()).getTime();
 }
 
 export async function rebuildHistoryAction(envelopeId: string): Promise<ActionState> {

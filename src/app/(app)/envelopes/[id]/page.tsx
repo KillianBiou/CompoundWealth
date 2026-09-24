@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getEnvelope, getCurrentUser } from "@/server/queries";
+import { getEtfDetailsByIsin, isinOf } from "@/server/analysis";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import { buildEnvelopeValuations } from "@/lib/portfolio/series";
@@ -13,7 +14,7 @@ import {
 import { Badge, Card, Kpi } from "@/components/ui";
 import { EnvelopeChart } from "./envelope-chart";
 import { DepositsBadge } from "./deposits-form";
-import { PositionsTable } from "./positions-table";
+import { PositionsTableWithPanel } from "./positions-table-with-panel";
 import { DcaSection } from "./dca-section";
 import { LivretSection } from "./livret-section";
 import { LivretDcaSection } from "./livret-dca-section";
@@ -250,12 +251,14 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         />
       </Card>
 
-      <PositionsTable
+      <PositionsTableWithPanel
         envelopeId={envelope.id}
+        etfDetails={getEtfDetailsByIsin()}
         positions={envelope.positions.map((p) => ({
           id: p.id,
           name: p.name,
           symbol: p.symbol,
+          isin: isinOf(p),
           category: p.category,
           investedCents: p.investedCents,
           currentValueCents:

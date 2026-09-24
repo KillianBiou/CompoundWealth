@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { cn } from "@/components/cn";
 
 /**
  * Panneau latéral droit (façon Sheet/Drawer) : s'ouvre en glide depuis la
  * droite, se ferme par la croix, la touche Échap ou un clic hors zone.
+ * Si onBack est fourni, un bouton retour apparaît à gauche du titre.
  */
 export function SidePanel({
   open,
   onClose,
+  onBack,
+  backLabel,
   title,
   subtitle,
   icon,
@@ -18,6 +21,10 @@ export function SidePanel({
 }: {
   open: boolean;
   onClose: () => void;
+  /** revient au panneau précédent (navigation interne), si fourni */
+  onBack?: () => void;
+  /** libellé accessible du bouton retour (défaut : « Retour ») */
+  backLabel?: string;
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
@@ -83,14 +90,27 @@ export function SidePanel({
               ) : null}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer le panneau"
-            className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
-          >
-            <X className="h-5 w-5" aria-hidden />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {onBack ? (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label={backLabel ?? "Retour"}
+                title={backLabel ?? "Retour"}
+                className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+              >
+                <ArrowLeft className="h-5 w-5" aria-hidden />
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Fermer le panneau"
+              className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
+            >
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
         </div>
         <div className={cn("flex-1 overflow-y-auto px-6 py-5")}>{children}</div>
       </div>
