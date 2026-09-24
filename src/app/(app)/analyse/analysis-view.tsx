@@ -27,7 +27,9 @@ import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Kpi } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { REGIONS } from "@/lib/analysis/exposure-catalog";
+import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import { SidePanel } from "./side-panel";
+import { EtfDetailPanel } from "./etf-detail-panel";
 import {
   simulateTwoTracks,
   type SimulatorDefaults,
@@ -53,7 +55,7 @@ function colorFor(index: number): string {
   return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 }
 
-type PanelId = "frais" | "revenus" | "exposition" | "simulateur" | "abonnements";
+type PanelId = "frais" | "revenus" | "exposition" | "simulateur" | "abonnements" | "etf";
 
 const MONTHS = [
   "janv.", "févr.", "mars", "avr.", "mai", "juin",
@@ -147,7 +149,13 @@ function scoreBadge(score: number | null) {
 /*                              Panneau frais                                  */
 /* -------------------------------------------------------------------------- */
 
-function FeePanel({ fees }: { fees: FeeAnalysisResult }) {
+function FeePanel({
+  fees,
+  onSelectIsin,
+}: {
+  fees: FeeAnalysisResult;
+  onSelectIsin: (isin: string) => void;
+}) {
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
   return (
     <div className="space-y-5">
@@ -182,7 +190,11 @@ function FeePanel({ fees }: { fees: FeeAnalysisResult }) {
             {fees.lines.map((line) => (
               <tr
                 key={line.positionId}
-                className="border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30"
+                className={cn(
+                  "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
+                  line.isin && "cursor-pointer",
+                )}
+                onClick={() => line.isin && onSelectIsin(line.isin)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
@@ -253,7 +265,13 @@ function FeePanel({ fees }: { fees: FeeAnalysisResult }) {
 /*                              Panneau revenus                                */
 /* -------------------------------------------------------------------------- */
 
-function IncomePanel({ income }: { income: IncomeAnalysisResult }) {
+function IncomePanel({
+  income,
+  onSelectIsin,
+}: {
+  income: IncomeAnalysisResult;
+  onSelectIsin: (isin: string) => void;
+}) {
   const calendarData = income.monthlyCalendar.map((m) => ({
     label: `${MONTHS[m.month]} ${String(m.year).slice(2)}`,
     amountEur: m.amountCents / 100,
@@ -314,7 +332,11 @@ function IncomePanel({ income }: { income: IncomeAnalysisResult }) {
             {income.lines.map((line) => (
               <tr
                 key={`${line.positionId}-${line.kind}`}
-                className="border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30"
+                className={cn(
+                  "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
+                  line.isin && "cursor-pointer",
+                )}
+                onClick={() => line.isin && onSelectIsin(line.isin)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
                 <td className="px-3 py-2">
@@ -471,13 +493,19 @@ function DiversificationPanel({
                 />
               </div>
               {open === index ? (
-                <p className="mt-1 pl-4 text-xs text-text-muted">
-                  {line.contributors
-                    .slice(0, 4)
-                    .map((c) => `${c.name} (${formatEurCents(c.amountCents)})`)
-                    .join(" · ")}
-                  {line.contributors.length > 4 ? " …" : ""}
-                </p>
+                <ul className="mt-1 space-y-1">
+                  {line.contributors.map((c) => (
+                    <li
+                      key={c.name}
+                      className="flex items-center justify-between gap-2 pl-4 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-text-secondary">{c.name}</span>
+                      <span className="shrink-0 tabular-nums text-text-muted">
+                        {formatEurCents(c.amountCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </div>
           );
@@ -1071,20 +1099,41 @@ export function AnalysisPageView({
   sectors,
   regions,
   simulatorDefaults,
+  etfDetails,
 }: {
   fees: FeeAnalysisResult;
   income: IncomeAnalysisResult;
   sectors: DiversificationResult;
   regions: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
+  /** détails CSV par ISIN, pour le panneau latéral ETF */
+  etfDetails: Record<string, EtfDetail>;
 }) {
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
-  const open = (id: PanelId) => setOpenPanel(id);
-  const close = () => setOpenPanel(null);
+  const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
+  const [previousPanel, setPreviousPanel] = useState<PanelId | null>(null);
+  const open = (id: PanelId) => {
+    setPreviousPanel(null);
+    setOpenPanel(id);
+  };
+  const close = () => {
+    setOpenPanel(null);
+    setPreviousPanel(null);
+  };
+  const openEtf = (isin: string) => {
+    setSelectedIsin(isin);
+    setPreviousPanel((prev) => (prev === null ? openPanel : prev));
+    setOpenPanel("etf");
+  };
+  const back = () => {
+    if (previousPanel === null) return;
+    setOpenPanel(previousPanel);
+    setPreviousPanel(null);
+  };
 
   const panels: Record<
     PanelId,
-    { title: string; subtitle: string; icon: React.ReactNode }
+    { title: string; subtitle?: string; icon: React.ReactNode }
   > = {
     frais: {
       title: "Scanner de frais",
@@ -1110,6 +1159,16 @@ export function AnalysisPageView({
       title: "Abonnements",
       subtitle: "Détection des paiements récurrents — bientôt",
       icon: <Wallet className="h-5 w-5" aria-hidden />,
+    },
+    etf: {
+      title:
+        selectedIsin
+          ? (etfDetails[selectedIsin]?.trName ||
+            etfDetails[selectedIsin]?.name ||
+            selectedIsin)
+          : "ETF",
+      subtitle: selectedIsin !== null ? selectedIsin : undefined,
+      icon: <PieIcon className="h-5 w-5" aria-hidden />,
     },
   };
 
@@ -1196,17 +1255,28 @@ export function AnalysisPageView({
       <SidePanel
         open={openPanel !== null}
         onClose={close}
+        onBack={openPanel === "etf" && previousPanel !== null ? back : undefined}
+        backLabel={
+          openPanel === "etf" && previousPanel !== null
+            ? `Retour — ${panels[previousPanel].title}`
+            : undefined
+        }
         title={openPanel !== null ? panels[openPanel].title : ""}
         subtitle={openPanel !== null ? panels[openPanel].subtitle : undefined}
         icon={openPanel !== null ? panels[openPanel].icon : undefined}
       >
-        {openPanel === "frais" ? <FeePanel fees={fees} /> : null}
-        {openPanel === "revenus" ? <IncomePanel income={income} /> : null}
+        {openPanel === "frais" ? <FeePanel fees={fees} onSelectIsin={openEtf} /> : null}
+        {openPanel === "revenus" ? (
+          <IncomePanel income={income} onSelectIsin={openEtf} />
+        ) : null}
         {openPanel === "exposition" ? (
           <ExposurePanel sectors={sectors} regions={regions} />
         ) : null}
         {openPanel === "simulateur" ? (
           <SimulationPanel defaults={simulatorDefaults} />
+        ) : null}
+        {openPanel === "etf" && selectedIsin && etfDetails[selectedIsin] ? (
+          <EtfDetailPanel etf={etfDetails[selectedIsin]} />
         ) : null}
         {openPanel === "abonnements" ? (
           <p className="py-8 text-center text-sm text-text-muted">

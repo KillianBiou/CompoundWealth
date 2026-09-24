@@ -15,6 +15,8 @@ export interface PositionRow {
   id: string;
   name: string;
   symbol: string | null;
+  /** ISIN si la position correspond à un ETF du catalogue, sinon null */
+  isin: string | null;
   category: string;
   investedCents: number | null;
   currentValueCents: number | null;
@@ -32,9 +34,15 @@ const sourceLabels: Record<string, string> = {
 export function PositionsTable({
   envelopeId,
   positions,
+  onSelectPosition,
+  clickableIsins,
 }: {
   envelopeId: string;
   positions: PositionRow[];
+  /** appelé au clic sur un ETF connu du catalogue (ouvre le panneau latéral) */
+  onSelectPosition?: (position: PositionRow) => void;
+  /** ISIN cliquables — les autres lignes restent inertes */
+  clickableIsins?: Set<string>;
 }) {
   return (
     <Card className="p-0">
@@ -66,10 +74,28 @@ export function PositionsTable({
               {positions.map((p) => (
                 <tr key={p.id} className="border-b border-border-cw/40 transition-colors hover:bg-bg-subtle/30">
                   <td className="px-6 py-3">
-                    <span className="font-medium text-text-primary">{p.name}</span>
-                    {p.symbol ? (
-                      <span className="ml-2 text-xs text-text-muted">{p.symbol}</span>
-                    ) : null}
+                    {p.isin && clickableIsins?.has(p.isin) && onSelectPosition ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectPosition(p)}
+                        title="Voir le détail de l'ETF"
+                        className="cursor-pointer text-left font-medium text-text-primary transition-colors hover:text-accent-500"
+                      >
+                        {p.name}
+                        {p.symbol ? (
+                          <span className="ml-2 text-xs font-normal text-text-muted">
+                            {p.symbol}
+                          </span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      <>
+                        <span className="font-medium text-text-primary">{p.name}</span>
+                        {p.symbol ? (
+                          <span className="ml-2 text-xs text-text-muted">{p.symbol}</span>
+                        ) : null}
+                      </>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone="neutral">{categoryLabels[p.category] ?? p.category}</Badge>
