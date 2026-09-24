@@ -640,7 +640,7 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
             {formatEurCents(finalPoint.totalCents)}
           </p>
-          <div className="mt-1 space-y-0.5 text-xs text-text-muted">
+          <div className="mt-1 space-y-0.5 text-xs text-gold">
             <p>dont {formatEurCents(totalGainCents)} d&apos;intérêts</p>
             <p>{formatEurCents(totalContributionsCents)} d&apos;apports</p>
             {useInflation ? (
@@ -655,7 +655,7 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
             {formatEurCents(monthlyRenteCents)}/mois
           </p>
-          <div className="mt-1 space-y-0.5 text-xs text-text-muted">
+          <div className="mt-1 space-y-0.5 text-xs text-gold">
             <p>retrait de {formatPercent(withdrawalRate / 100)} du capital par an</p>
             {useInflation ? (
               <p>{formatEurCents(monthlyRenteRealCents)}/mois en euros constants</p>
@@ -689,16 +689,7 @@ function SimulationPanel({ defaults }: { defaults: SimulatorDefaults }) {
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              formatter={(value, name) => [
-                formatEurCents(Number(value) * 100),
-                name === "investedEur"
-                  ? "Investissement"
-                  : name === "savingsEur"
-                    ? "Épargne"
-                    : name === "totalEur"
-                      ? "Total"
-                      : "Euros constants",
-              ]}
+              formatter={(value, name) => [formatEurCents(Number(value) * 100), name]}
             />
             <Line
               type="monotone"
@@ -910,14 +901,7 @@ function SimulatorCard({
                 borderRadius: 8,
                 fontSize: 12,
               }}
-              formatter={(value, name) => [
-                formatEurCents(Number(value) * 100),
-                name === "totalEur"
-                  ? "Total"
-                  : name === "investedEur"
-                    ? "Investissement"
-                    : "Épargne",
-              ]}
+              formatter={(value, name) => [formatEurCents(Number(value) * 100), name]}
             />
             <Line
               type="monotone"
