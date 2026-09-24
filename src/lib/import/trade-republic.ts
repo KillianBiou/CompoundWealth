@@ -81,7 +81,7 @@ interface PositionAccumulator {
 }
 
 interface EnvelopeAccumulator {
-  type: "PEA" | "CTO";
+  type: "PEA" | "CTO" | "PRIV";
   name: string;
   depositsCents: number;
   firstBuyDate: string | null;
@@ -94,6 +94,23 @@ function envelopeName(accountType: string): string {
 
 function envelopeType(accountType: string): "PEA" | "CTO" {
   return accountType === "PEA" ? "PEA" : "CTO";
+}
+
+/**
+ * Les fonds non cotés (ELTIF Private Markets) sont isolés dans une
+ * enveloppe dédiée « Non coté » : fiscalité identique au CTO mais
+ * liquidité et frais très différents.
+ */
+const PRIVATE_ENVELOPE: EnvelopeAccumulator = {
+  type: "PRIV",
+  name: "Non coté Trade Republic",
+  depositsCents: 0,
+  firstBuyDate: null,
+  positions: new Map(),
+};
+
+function isPrivateFund(row: TradeRepublicRow): boolean {
+  return row.asset_class === "PRIVATE_FUND";
 }
 
 export const tradeRepublicAdapter: BrokerImportAdapter = {
@@ -150,16 +167,20 @@ export const tradeRepublicAdapter: BrokerImportAdapter = {
         continue;
       }
 
-      const name = envelopeName(row.account_type);
+      const name = isPrivateFund(row)
+        ? PRIVATE_ENVELOPE.name
+        : envelopeName(row.account_type);
       let envelope = envelopes.get(name);
       if (!envelope) {
-        envelope = {
-          type: envelopeType(row.account_type),
-          name,
-          depositsCents: 0,
-          firstBuyDate: null,
-          positions: new Map(),
-        };
+        envelope = isPrivateFund(row)
+          ? { ...PRIVATE_ENVELOPE, positions: new Map() }
+          : {
+              type: envelopeType(row.account_type),
+              name,
+              depositsCents: 0,
+              firstBuyDate: null,
+              positions: new Map(),
+            };
         envelopes.set(name, envelope);
       }
 

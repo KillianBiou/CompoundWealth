@@ -1,5 +1,5 @@
 export type ImportedCategory = "ETF" | "STOCK" | "BOND" | "FUND" | "OTHER";
-export type ImportedEnvelopeType = "PEA" | "CTO";
+export type ImportedEnvelopeType = "PEA" | "CTO" | "PRIV";
 
 export interface ImportedValuation {
   date: string;

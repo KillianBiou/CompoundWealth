@@ -95,7 +95,7 @@ export function ImportForm() {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-heading text-lg font-semibold">{envelope.name}</h2>
               <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>
-                {envelope.type}
+                {envelope.type === "PRIV" ? "Non coté" : envelope.type}
               </Badge>
             </div>
             <p className="text-sm text-text-secondary">
