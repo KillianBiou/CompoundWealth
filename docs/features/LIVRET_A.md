@@ -170,7 +170,7 @@ Sur le tableau de bord, la classe d'actif « épargne » agrège les séries liv
 | Écran | Contenu |
 | --- | --- |
 | `/envelopes/new` | Troisième carte « Livret A » (description plafond/taux/exonération), encart explicatif dédié, placeholder « Livret A épargne ». |
-| `/envelopes/[id]` (livret) | KPI solde/intérêts/pouvoir d'achat, bandeaux d'alerte, graphique du solde avec plafond pointillé, mouvements, paramètres, versements réguliers (DCA), zone de danger. |
+| `/envelopes/[id]` (livret) | KPI solde/intérêts/pouvoir d'achat, bandeaux d'alerte, graphique du solde avec plafond pointillé et sélecteur de période (1 sem → tout, mêmes périodes que les enveloppes actions), mouvements, paramètres, versements réguliers (DCA), zone de danger. Le graphique n'affiche **que l'histoire** : la série (avec ses 12 mois d'horizon) est filtrée à ≤ maintenant, sans backfill avant le premier versement. |
 | `/envelopes` | Carte d'enveloppe : badge « Livret A » neutre, sparkline du solde, alerte de dépassement de plafond dans le pied. |
 | `/dashboard` | Graphique empilé : épargne bleue (bas) + actions/ETF vertes (dessus) + investi total en ligne pointillée. |
 

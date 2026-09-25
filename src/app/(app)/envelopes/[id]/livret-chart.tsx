@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -12,8 +12,12 @@ import {
   YAxis,
 } from "recharts";
 import { LIVRET_A_DEPOSIT_CAP_CENTS } from "@/lib/livret";
+import { PERIOD_DAYS, type PeriodKey } from "@/lib/portfolio/series";
 import { formatEurCents, formatMoneyCentsCompact } from "@/lib/money";
+import { cn } from "@/components/cn";
 import { useI18n } from "@/i18n/provider";
+
+const periodKeys: PeriodKey[] = ["1w", "1m", "3m", "6m", "1y", "2y", "all"];
 
 export interface LivretPointRow {
   date: Date;
@@ -74,15 +78,31 @@ export function LivretChart({
   onToggleCap: () => void;
 }) {
   const { t } = useI18n();
+  const [period, setPeriod] = useState<PeriodKey>("all");
+  const [nowTime] = useState(() => Date.now());
+  const periods = periodKeys.map((key) => ({ key, label: t.envelopes.chart.periods[key] }));
+
+  // la série reçue peut contenir des mois de projection : seule l'histoire
+  // (≤ maintenant) est affichée, sans jamais remonter avant le premier versement
+  const visible = useMemo(() => {
+    const past = series.filter((p) => p.date.getTime() <= nowTime);
+    const days = PERIOD_DAYS[period];
+    if (days === null) return past;
+    const cutoff = nowTime - days * 24 * 60 * 60 * 1000;
+    const anchor = [...past].reverse().find((p) => p.date.getTime() <= cutoff);
+    const inWindow = past.filter((p) => p.date.getTime() > cutoff);
+    return anchor ? [anchor, ...inWindow] : inWindow;
+  }, [series, period, nowTime]);
+
   const data = useMemo(
     () =>
-      series.map((p) => ({
+      visible.map((p) => ({
         date: p.date.getTime(),
         balance: p.balanceCents / 100,
         overCapOnly: p.overCapCents / 100,
         overCap: p.overCapCents / 100,
       })),
-    [series],
+    [visible],
   );
 
   if (series.length === 0) {
@@ -93,7 +113,7 @@ export function LivretChart({
     );
   }
 
-  const hasOverCap = series.some((p) => p.overCapCents > 0);
+  const hasOverCap = visible.some((p) => p.overCapCents > 0);
 
   return (
     <div>
@@ -112,6 +132,24 @@ export function LivretChart({
             {t.envelopes.livretDca.chart.overCapBadge}
           </span>
         ) : null}
+      </div>
+      <div className="mb-3 flex gap-1 overflow-x-auto" role="group" aria-label={t.envelopes.chart.periodGroup}>
+        {periods.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => setPeriod(p.key)}
+            aria-pressed={period === p.key}
+            className={cn(
+              "shrink-0 cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              period === p.key
+                ? "bg-accent-500 text-white"
+                : "bg-bg-subtle text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
       </div>
       <div className="h-64" aria-label={t.envelopes.livretDca.chart.aria}>
         <ResponsiveContainer width="100%" height="100%">
