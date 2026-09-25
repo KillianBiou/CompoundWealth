@@ -8,7 +8,10 @@ import type {
   IncomeAnalysisResult,
   SimulatorDefaults,
 } from "@/lib/analysis/scanners";
-import type { PerformanceReport } from "@/lib/analysis/performance-report";
+import type {
+  PerformancePeriodKey,
+  PerformanceReport,
+} from "@/lib/analysis/performance-report";
 
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -223,6 +226,7 @@ const performance: PerformanceReport = {
     },
     valueCents: 11_231_00,
     contributedCents: 10_450_00,
+    startValueCents: 0,
     flows: [],
   },
   envelopes: [
@@ -241,6 +245,7 @@ const performance: PerformanceReport = {
       },
       valueCents: 9_600_00,
       contributedCents: 9_000_00,
+      startValueCents: 0,
       flows: [],
     },
     {
@@ -258,6 +263,7 @@ const performance: PerformanceReport = {
       },
       valueCents: 1_631_00,
       contributedCents: 1_450_00,
+      startValueCents: 0,
       flows: [],
     },
   ],
@@ -277,6 +283,7 @@ const performance: PerformanceReport = {
       },
       valueCents: 9_600_00,
       contributedCents: 9_000_00,
+      startValueCents: 0,
       flows: [],
     },
   ],
@@ -302,6 +309,34 @@ const performance: PerformanceReport = {
     referenceValueCents: 11_300_00,
     deltaCents: -207_00,
   },
+  period: "1y",
+  periodStart: new Date("2024-01-15T00:00:00Z"),
+};
+
+const performanceAll: PerformanceReport = {
+  ...performance,
+  period: "all",
+  periodStart: null,
+  total: {
+    ...performance.total,
+    metrics: {
+      xirr: 0.061,
+      twrAnnualized: 0.055,
+      twrCumulative: 0.14,
+      simpleReturn: 0.105,
+      gainCents: 1_096_00,
+      contributedCents: 10_450_00,
+      years: 2.1,
+    },
+    valueCents: 11_546_00,
+  },
+};
+
+const performanceByPeriod: Record<PerformancePeriodKey, PerformanceReport | null> = {
+  "1y": performance,
+  "3y": null,
+  "5y": null,
+  all: performanceAll,
 };
 
 function renderView() {
@@ -314,7 +349,7 @@ function renderView() {
       countries={countries}
       economies={economies}
       simulatorDefaults={simulatorDefaults}
-      performance={performance}
+      performanceByPeriod={performanceByPeriod}
       etfDetails={{
         [fees.lines[0].isin ?? "IE0002XZSHO1"]: {
           isin: fees.lines[0].isin ?? "IE0002XZSHO1",
@@ -495,6 +530,24 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText(/Par actif/));
     expect(screen.getByText("MSCI World Swap PEA")).toBeInTheDocument();
     expect(screen.queryByText("PEA Trade Republic")).not.toBeInTheDocument();
+  });
+
+  it("le sélecteur de période bascule la performance analysée (1 an par défaut, toute la durée)", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    // par défaut : 12 derniers mois, XIRR +8,20 % du rapport « 1y »
+    expect(screen.getByText("Période analysée : du 15/01/2024 à aujourd'hui")).toBeInTheDocument();
+    expect(screen.getAllByText("+8,2 %").length).toBeGreaterThan(0);
+    // bascule vers toute la durée : XIRR +6,10 % du rapport « all »
+    fireEvent.click(screen.getByRole("button", { name: "Toute la durée" }));
+    expect(
+      screen.getByText("Période analysée : toute la vie du portefeuille"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("+6,1 %").length).toBeGreaterThan(0);
+    // période indisponible (3 ans) : bouton désactivé
+    expect(
+      screen.getByRole("button", { name: "3 ans" }),
+    ).toBeDisabled();
   });
 
   it("le panneau exposition affiche les onglets sectoriel et géographique", () => {

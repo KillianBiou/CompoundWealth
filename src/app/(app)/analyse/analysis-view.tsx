@@ -57,6 +57,11 @@ import type {
   PerformanceLevel,
   PerformanceReport,
 } from "@/lib/analysis/performance-report";
+import {
+  defaultPerformancePeriod,
+  PERFORMANCE_PERIODS,
+  type PerformancePeriodKey,
+} from "@/lib/analysis/performance-periods";
 
 const CATEGORY_COLORS = [
   "#e84545",
@@ -610,6 +615,20 @@ function formatSignedPercent(ratio: number | null): string {
   return `${ratio >= 0 ? "+" : "−"}${formatted}`;
 }
 
+/** Libellé court de période pour la carte (1 an, 3 ans, 5 ans, toute la période). */
+function periodShortLabel(
+  period: PerformancePeriodKey,
+  t: Dictionary,
+): string {
+  return period === "1y"
+    ? t.analyse.performance.period1y
+    : period === "3y"
+      ? t.analyse.performance.period3y
+      : period === "5y"
+        ? t.analyse.performance.period5y
+        : t.analyse.performance.periodAll;
+}
+
 function performanceBadge(xirrValue: number | null) {
   if (xirrValue === null) return <Badge tone="neutral">—</Badge>;
   if (xirrValue >= 0.05) return <Badge tone="positive">{formatPercent(xirrValue)}</Badge>;
@@ -658,12 +677,27 @@ function signedEur(cents: number): string {
 }
 
 function PerformancePanel({
-  report,
+  reports,
+  initialPeriod,
 }: {
-  report: PerformanceReport;
+  reports: Record<PerformancePeriodKey, PerformanceReport | null>;
+  initialPeriod: PerformancePeriodKey;
 }) {
   const { t } = useI18n();
   const [detailTab, setDetailTab] = useState<"envelopes" | "assets">("envelopes");
+  const [period, setPeriod] = useState<PerformancePeriodKey>(initialPeriod);
+  const report = reports[period] ?? reports.all;
+  if (report === null) {
+    return (
+      <p className="text-sm text-text-muted">{t.analyse.performance.emptyLevels}</p>
+    );
+  }
+  const periodLabels: Record<PerformancePeriodKey, string> = {
+    "1y": t.analyse.performance.period1y,
+    "3y": t.analyse.performance.period3y,
+    "5y": t.analyse.performance.period5y,
+    all: t.analyse.performance.periodAll,
+  };
   const total = report.total;
   const metrics = total.metrics;
   const xirrValue = metrics?.xirr ?? null;
@@ -741,6 +775,39 @@ function PerformancePanel({
 
   return (
     <div className="space-y-5">
+      <div>
+        <div className="mb-2 flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/30 p-1">
+          {PERFORMANCE_PERIODS.map(({ key }) => {
+            const available = reports[key] !== null;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!available}
+                onClick={() => setPeriod(key)}
+                className={cn(
+                  "flex flex-1 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                  period === key
+                    ? "bg-accent-500/15 text-accent-500"
+                    : available
+                      ? "text-text-secondary hover:text-text-primary"
+                      : "cursor-not-allowed text-text-muted/50",
+                )}
+              >
+                {periodLabels[key]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-text-muted">
+          {report.periodStart !== null
+            ? t.analyse.performance.periodFrom.replace(
+                "{start}",
+                report.periodStart.toLocaleDateString("fr-FR"),
+              )
+            : t.analyse.performance.periodAllHint}
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <Kpi
           label={t.analyse.performance.xirrLabel}
@@ -843,7 +910,9 @@ function PerformancePanel({
                 {t.analyse.performance.refGain.replace(
                   "{gain}",
                   signedEur(
-                    report.worldGrowth.referenceValueCents - total.contributedCents,
+                    report.worldGrowth.referenceValueCents -
+                      total.contributedCents -
+                      total.startValueCents,
                   ),
                 )}
               </p>
@@ -1674,7 +1743,7 @@ export function AnalysisPageView({
   countries,
   economies,
   simulatorDefaults,
-  performance,
+  performanceByPeriod,
   etfDetails,
   actionDetails,
 }: {
@@ -1688,14 +1757,19 @@ export function AnalysisPageView({
   economies: DiversificationResult;
   sectors: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
-  /** rapport de performance XIRR / TWR par niveau (global, enveloppes, actifs) */
-  performance: PerformanceReport;
+  /** rapports de performance XIRR / TWR par période (1 an par défaut, 3 ans, 5 ans, tout) */
+  performanceByPeriod: Record<PerformancePeriodKey, PerformanceReport | null>;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
   etfDetails: Record<string, EtfDetail>;
   /** détails CSV des actions, par symbole Yahoo ou ISIN */
   actionDetails: Record<string, ActionDetail>;
 }) {
   const { t } = useI18n();
+  const performancePeriod = useMemo(
+    () => defaultPerformancePeriod(performanceByPeriod),
+    [performanceByPeriod],
+  );
+  const performance = performanceByPeriod[performancePeriod] ?? null;
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionDetail | null>(null);
@@ -1834,7 +1908,8 @@ export function AnalysisPageView({
         2,
       );
     }
-    if (openPanel === "performance") return JSON.stringify(performance, null, 2);
+    if (openPanel === "performance")
+      return JSON.stringify(performanceByPeriod, null, 2);
     return undefined;
   }, [
     openPanel,
@@ -1849,7 +1924,7 @@ export function AnalysisPageView({
     economies,
     simulatorDefaults,
     simParams,
-    performance,
+    performanceByPeriod,
   ]);
 
   return (
@@ -1905,14 +1980,21 @@ export function AnalysisPageView({
           title={t.analyse.cards.performance.title}
           icon={<Activity className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-info/10 via-transparent to-positive/10"
-          badge={performanceBadge(performance.total.metrics?.xirr ?? null)}
-          kpi={formatSignedPercent(performance.total.metrics?.xirr ?? null)}
-          kpiLabel={t.analyse.cards.performance.kpiLabel}
+          badge={performanceBadge(performance?.total.metrics?.xirr ?? null)}
+          kpi={formatSignedPercent(performance?.total.metrics?.xirr ?? null)}
+          kpiLabel={
+            performancePeriod === "1y"
+              ? t.analyse.cards.performance.kpiLabel1y
+              : t.analyse.cards.performance.kpiLabel.replace(
+                  "{period}",
+                  periodShortLabel(performancePeriod, t),
+                )
+          }
           detail={
             <>
               {t.analyse.cards.performance.detailLine1.replace(
                 "{gain}",
-                performance.total.metrics?.gainCents != null
+                performance?.total.metrics?.gainCents != null
                   ? formatEurCents(performance.total.metrics.gainCents)
                   : "—",
               )}
@@ -1922,8 +2004,8 @@ export function AnalysisPageView({
                 // période ≤ 1 an : le Modified Dietz annualisé n'est pas défini,
                 // on affiche le cumulé (plus honnête qu'un annualisé court)
                 formatSignedPercent(
-                  performance.total.metrics?.twrAnnualized ??
-                    performance.total.metrics?.twrCumulative ??
+                  performance?.total.metrics?.twrAnnualized ??
+                    performance?.total.metrics?.twrCumulative ??
                     null,
                 ),
               )}
@@ -1931,8 +2013,9 @@ export function AnalysisPageView({
           }
           onClick={open}
           disabled={
-            performance.total.metrics?.xirr === null &&
-            performance.total.metrics?.twrCumulative === null
+            performance === null ||
+            (performance.total.metrics?.xirr === null &&
+              performance.total.metrics?.twrCumulative === null)
           }
         />
         <ExposureCard
@@ -2002,7 +2085,10 @@ export function AnalysisPageView({
           />
         ) : null}
         {openPanel === "performance" ? (
-          <PerformancePanel report={performance} />
+          <PerformancePanel
+            reports={performanceByPeriod}
+            initialPeriod={performancePeriod}
+          />
         ) : null}
       </SidePanel>
     </div>

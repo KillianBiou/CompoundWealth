@@ -8,7 +8,11 @@ import {
   type CashFlow,
   type PerformanceMetricsResult,
 } from "./performance";
+import { buildEnvelopeValuations, valueAt } from "@/lib/portfolio/series";
 import type { AnalysisPosition } from "./scanners";
+import type { PerformancePeriodKey } from "./performance-periods";
+
+export type { PerformancePeriodKey } from "./performance-periods";
 
 /* -------------------------------------------------------------------------- */
 /*                     Rapport de performance par niveau                       */
@@ -27,6 +31,8 @@ export interface PerformanceLevel {
   valueCents: number;
   /** total versé, centimes */
   contributedCents: number;
+  /** valeur du niveau au début de la sous-période, centimes (0 sur toute la vie) */
+  startValueCents: number;
   /** flux détaillés (tableau du panneau) */
   flows: { date: Date; amountCents: number }[];
 }
@@ -72,6 +78,10 @@ export interface PerformanceReport {
     /** écart du portefeuille réel vs cette marche d'escalier World réelle, centimes */
     deltaCents: number;
   } | null;
+  /** clé de la période analysée ("1y", "3y", "5y", "all") */
+  period: PerformancePeriodKey;
+  /** date de début effective de la période analysée (premier flux ou cutoff), null = toute la vie */
+  periodStart: Date | null;
 }
 
 /**
@@ -87,6 +97,10 @@ export function buildLevel(params: {
   flows: CashFlow[];
   finalValueCents: number;
   finalDate: Date;
+  /** début de la sous-période (null = toute la vie du niveau) */
+  startDate?: Date | null;
+  /** valeur du niveau au début de la sous-période, centimes */
+  startValueCents?: number;
 }): PerformanceLevel {
   const { id, name, flows, finalValueCents, finalDate } = params;
   const envelopeType = params.envelopeType ?? null;
@@ -97,15 +111,24 @@ export function buildLevel(params: {
     flows: normalized,
     finalValueCents,
     finalDate,
+    startDate: params.startDate ?? null,
+    startValueCents: params.startValueCents ?? 0,
   });
+  const hasSubPeriod = params.startDate != null;
+  const periodFlows = hasSubPeriod
+    ? normalized.filter(
+        (f) => f.date.getTime() > toUtcMidnight(params.startDate!).getTime(),
+      )
+    : normalized;
   return {
     id,
     name,
     envelopeType,
     metrics,
     valueCents: finalValueCents,
-    contributedCents: normalized.reduce((s, f) => s + f.amountCents, 0),
-    flows: normalized,
+    contributedCents: periodFlows.reduce((s, f) => s + f.amountCents, 0),
+    startValueCents: params.startValueCents ?? 0,
+    flows: periodFlows,
   };
 }
 
@@ -114,9 +137,19 @@ function buildReference(
   finalDate: Date,
   rate: number,
   portfolioValueCents: number,
+  startValueCents = 0,
+  startDate?: Date | null,
 ): ReferenceStrategy {
-  const valueCents = referenceFinalValue(flows, finalDate, rate);
-  const contributed = flows.reduce((s, f) => s + f.amountCents, 0);
+  const valueCents = referenceFinalValue(
+    flows,
+    finalDate,
+    rate,
+    startValueCents,
+    startDate,
+  );
+  const contributed =
+    flows.reduce((s, f) => s + f.amountCents, 0) +
+    (startDate != null ? Math.max(0, startValueCents) : 0);
   return {
     rate,
     valueCents,
@@ -137,15 +170,40 @@ export function buildPerformanceReport(params: {
   worldEquityRate: number;
   /** croissance réelle du MSCI World sur la même période, si disponible */
   worldGrowth?: PerformanceReport["worldGrowth"];
+  /** clé de la période analysée ("1y", "3y", "5y", "all") */
+  period?: PerformancePeriodKey;
+  /** cutoff de la sous-période (null = toute la vie du portefeuille) */
+  periodStart?: Date | null;
+  /** valeur du livret au cutoff de la sous-période, centimes */
+  livretStartValueCents?: number;
   now?: Date;
 }): PerformanceReport {
   const now = params.now ?? new Date();
   const { positions, livretFlows, livretValueCents, savingsRate, worldEquityRate } =
     params;
+  const period = params.period ?? "all";
+  const periodStart =
+    params.periodStart != null ? toUtcMidnight(params.periodStart) : null;
+  const livretStartValueCents = params.livretStartValueCents ?? 0;
+  const isSubPeriod = periodStart !== null;
+
+  /** valeur d'un niveau au cutoff : dernière valorisation connue avant la date */
+  const startValueOf = (valuations: { date: Date; valueCents: number }[]) =>
+    periodStart !== null ? valueAt(valuations, periodStart) : 0;
+  /** flux d'un niveau restreints à la sous-période (après le cutoff) */
+  const inPeriod = (flows: CashFlow[]) =>
+    periodStart !== null
+      ? flows.filter((f) => toUtcMidnight(f.date).getTime() > periodStart.getTime())
+      : flows;
 
   // --- niveaux positions -----------------------------------------------------
   const positionLevels: PerformanceLevel[] = positions
-    .filter((p) => p.valueCents > 0 || (p.investedCents ?? 0) > 0)
+    .filter(
+      (p) =>
+        p.valueCents > 0 ||
+        (p.investedCents ?? 0) > 0 ||
+        (isSubPeriod && startValueOf(p.valuations ?? []) > 0),
+    )
     .map((p) =>
       buildLevel({
         id: p.id,
@@ -154,6 +212,8 @@ export function buildPerformanceReport(params: {
         flows: positionCashFlows(p),
         finalValueCents: p.valueCents,
         finalDate: now,
+        startDate: periodStart,
+        startValueCents: startValueOf(p.valuations ?? []),
       }),
     );
 
@@ -186,12 +246,19 @@ export function buildPerformanceReport(params: {
           })),
           finalValueCents: livretValueCents,
           finalDate: now,
+          startDate: periodStart,
+          startValueCents: livretStartValueCents,
         }),
       );
       continue;
     }
     const flows = mergeCashFlows(entry.positions.flatMap((p) => positionCashFlows(p)));
     const valueCents = entry.positions.reduce((s, p) => s + p.valueCents, 0);
+    // valorisations agrégées de l'enveloppe : somme des dernières valeurs
+    // connues de chaque position à chaque instant (interpolation plate)
+    const envelopeValuations = buildEnvelopeValuations(
+      entry.positions.map((p) => ({ valuations: p.valuations ?? [] })),
+    );
     envelopeLevels.push(
       buildLevel({
         id: envelopeId,
@@ -200,6 +267,8 @@ export function buildPerformanceReport(params: {
         flows,
         finalValueCents: valueCents,
         finalDate: now,
+        startDate: periodStart,
+        startValueCents: startValueOf(envelopeValuations),
       }),
     );
   }
@@ -214,21 +283,41 @@ export function buildPerformanceReport(params: {
   ]);
   const totalValue =
     positions.reduce((s, p) => s + p.valueCents, 0) + livretValueCents;
+  const totalStartValueCents =
+    positions.reduce((s, p) => s + startValueOf(p.valuations ?? []), 0) +
+    livretStartValueCents;
   const totalLevel = buildLevel({
     id: "total",
     name: "total",
     flows: allFlows,
     finalValueCents: totalValue,
     finalDate: now,
+    startDate: periodStart,
+    startValueCents: totalStartValueCents,
   });
 
   // --- références ------------------------------------------------------------
-  const hasFlows = allFlows.length > 0;
+  const hasFlows = allFlows.length > 0 || totalStartValueCents > 0;
+  const periodFlows = inPeriod(allFlows);
   const savingsReference = hasFlows
-    ? buildReference(allFlows, now, savingsRate, totalValue)
+    ? buildReference(
+        periodFlows,
+        now,
+        savingsRate,
+        totalValue,
+        totalStartValueCents,
+        periodStart,
+      )
     : null;
   const worldReference = hasFlows
-    ? buildReference(allFlows, now, worldEquityRate, totalValue)
+    ? buildReference(
+        periodFlows,
+        now,
+        worldEquityRate,
+        totalValue,
+        totalStartValueCents,
+        periodStart,
+      )
     : null;
 
   return {
@@ -240,5 +329,7 @@ export function buildPerformanceReport(params: {
     savingsReference,
     worldReference,
     worldGrowth: params.worldGrowth ?? null,
+    period,
+    periodStart,
   };
 }

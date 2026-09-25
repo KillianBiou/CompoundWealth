@@ -27,6 +27,10 @@ import {
   type PerformanceReport,
 } from "@/lib/analysis/performance-report";
 import {
+  PERFORMANCE_PERIODS,
+  type PerformancePeriodKey,
+} from "@/lib/analysis/performance-periods";
+import {
   mergeCashFlows,
   positionCashFlows,
   toUtcMidnight,
@@ -185,29 +189,23 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
 }
 
 /**
- * Croissance réelle du MSCI World (ETF monde du catalogue, Yahoo) sur la
- * période couverte par les versements : TWR de l'indice entre le premier
- * flux et aujourd'hui, pour confronter le verdict à la performance réelle
- * du marché et pas seulement à un taux constant. Un seul appel distant,
- * échec gracieux (null) si l'historique est indisponible.
+ * Croissance réelle du Monde sur une période, à partir d'un historique de
+ * cours déjà récupéré (un seul appel Yahoo pour toutes les périodes).
+ * Échec gracieux : null si l'historique ne couvre pas la période.
  */
-async function getWorldGrowth(
+function worldGrowthFromPoints(
   flows: { date: Date; amountCents: number }[],
-  now: Date,
-): Promise<PerformanceReport["worldGrowth"]> {
-  if (flows.length === 0) return null;
-  const firstFlowDate = flows[0].date;
-  // premier ETF « Monde » du catalogue (représentatif du MSCI World)
-  const world = ETF_CATALOG.find((e) => e.indexCategory === "Monde");
-  if (!world) return null;
-  const history = await fetchMarketHistory(world.isin, firstFlowDate, now);
-  if (!history.ok || history.points.length === 0) return null;
-  const points = history.points.filter(
-    (p) => p.date.getTime() >= firstFlowDate.getTime() && p.closeCents > 0,
+  points: { date: Date; closeCents: number }[],
+  periodStart: Date | null,
+): PerformanceReport["worldGrowth"] {
+  const startDate = periodStart ?? points[0]?.date ?? null;
+  if (startDate === null) return null;
+  const periodPoints = points.filter(
+    (p) => p.date.getTime() >= startDate.getTime(),
   );
-  if (points.length < 2) return null;
-  const start = points[0];
-  const end = points[points.length - 1];
+  if (periodPoints.length < 2) return null;
+  const start = periodPoints[0];
+  const end = periodPoints[periodPoints.length - 1];
   const cumulative = (end.closeCents - start.closeCents) / start.closeCents;
   const days = Math.round(
     (end.date.getTime() - start.date.getTime()) / (24 * 3600 * 1000),
@@ -223,7 +221,7 @@ async function getWorldGrowth(
   // aurait réellement donné avec vos propres versements.
   let shares = 0;
   let cursor = 0;
-  for (const point of points) {
+  for (const point of periodPoints) {
     while (
       cursor < flows.length &&
       flows[cursor].date.getTime() <= point.date.getTime()
@@ -249,61 +247,136 @@ async function getWorldGrowth(
 }
 
 /**
- * Rapport de performance (XIRR / TWR) : flux externes de toutes les
- * enveloppes (versements des positions + dépôts du livret, qui n'est pas
- * une position), valeur finale = patrimoine actuel. Trois niveaux de
- * détail : global, par enveloppe, par actif. Les flux sont normalisés à
- * minuit UTC pour que chaque versement vive un nombre entier de jours.
+ * Rapport de performance (XIRR / TWR) pour chaque période du sélecteur
+ * (1 an par défaut, 3 ans, 5 ans, toute la vie du portefeuille) : flux
+ * externes de toutes les enveloppes (versements des positions + dépôts du
+ * livret, qui n'est pas une position), valeur finale = patrimoine actuel.
+ * Pour une sous-période, la valeur au cutoff vient des valorisations
+ * historiques (dernière valorisation connue avant la date, 0 avant la
+ * première). Trois niveaux de détail : global, par enveloppe, par actif.
+ * Les flux sont normalisés à minuit UTC pour que chaque versement vive un
+ * nombre entier de jours.
  */
-export const getPerformanceReport = cache(async (): Promise<PerformanceReport> => {
-  const userId = await requireUserId();
-  const positions = await getAnalysisPositions();
-  const livretEnvelopes = await prisma.envelope.findMany({
-    where: { userId, closedAt: null, type: "LIVRET_A" },
-    include: { deposits: { orderBy: { date: "asc" } } },
-  });
-  const nowTime = Date.now();
-  const now = new Date(nowTime);
-  const livretFlows: { date: Date; amountCents: number }[] = [];
-  let livretBalance = 0;
-  for (const env of livretEnvelopes) {
-    const rate = env.interestRate ?? LIVRET_A_RATE;
-    const events = env.deposits.map((dep) => ({
-      date: dep.date,
-      amountCents: dep.amountCents,
-    }));
-    const series = buildLivretBalanceSeries(events, rate);
-    const current =
-      [...series].reverse().find((p) => p.date.getTime() <= nowTime) ??
-      series[0] ??
-      null;
-    livretBalance += current ? current.balanceCents : 0;
-    livretFlows.push(...events);
-  }
-  // flux externes du portefeuille, triés et normalisés UTC minuit : c'est
-  // la « marche d'escalier » DCA rejouée au cours réel du MSCI World
-  const allFlows = mergeCashFlows([
-    ...positions.flatMap((p) => positionCashFlows(p)),
-    ...livretFlows.map((f) => ({
-      date: toUtcMidnight(f.date),
-      amountCents: f.amountCents,
-    })),
-  ]);
-  const worldGrowth = await getWorldGrowth(allFlows, now).catch(() => null);
-  if (worldGrowth) {
+export const getPerformanceReports = cache(
+  async (): Promise<
+    Record<PerformancePeriodKey, PerformanceReport | null>
+  > => {
+    const userId = await requireUserId();
+    const positions = await getAnalysisPositions();
+    const livretEnvelopes = await prisma.envelope.findMany({
+      where: { userId, closedAt: null, type: "LIVRET_A" },
+      include: { deposits: { orderBy: { date: "asc" } } },
+    });
+    const nowTime = Date.now();
+    const now = new Date(nowTime);
+    const livretFlows: { date: Date; amountCents: number }[] = [];
+    const livretSeries: { date: Date; balanceCents: number }[][] = [];
+    let livretBalance = 0;
+    for (const env of livretEnvelopes) {
+      const rate = env.interestRate ?? LIVRET_A_RATE;
+      const events = env.deposits.map((dep) => ({
+        date: dep.date,
+        amountCents: dep.amountCents,
+      }));
+      const series = buildLivretBalanceSeries(events, rate);
+      const current =
+        [...series].reverse().find((p) => p.date.getTime() <= nowTime) ??
+        series[0] ??
+        null;
+      livretBalance += current ? current.balanceCents : 0;
+      livretSeries.push(series);
+      livretFlows.push(...events);
+    }
+    // flux externes du portefeuille, triés et normalisés UTC minuit : c'est
+    // la « marche d'escalier » DCA rejouée au cours réel du MSCI World
+    const allFlows = mergeCashFlows([
+      ...positions.flatMap((p) => positionCashFlows(p)),
+      ...livretFlows.map((f) => ({
+        date: toUtcMidnight(f.date),
+        amountCents: f.amountCents,
+      })),
+    ]);
+    if (allFlows.length === 0) {
+      return { "1y": null, "3y": null, "5y": null, all: null };
+    }
+    const firstFlowDate = allFlows[0].date;
     const totalValue =
       positions.reduce((s, p) => s + p.valueCents, 0) + livretBalance;
-    worldGrowth.deltaCents = totalValue - worldGrowth.referenceValueCents;
-  }
-  return buildPerformanceReport({
-    positions,
-    livretFlows,
-    livretValueCents: livretBalance,
-    savingsRate: LIVRET_A_RATE,
-    worldEquityRate: DEFAULT_EQUITY_RETURN,
-    worldGrowth,
-  });
-});
+
+    // un seul appel Yahoo pour toutes les périodes : l'historique complet
+    // du premier flux à aujourd'hui
+    const world = ETF_CATALOG.find((e) => e.indexCategory === "Monde");
+    const worldHistory = world
+      ? await fetchMarketHistory(world.isin, firstFlowDate, now).catch(
+          () => null,
+        )
+      : null;
+    const worldPoints =
+      worldHistory && worldHistory.ok
+        ? worldHistory.points.filter(
+            (p) =>
+              p.date.getTime() >= firstFlowDate.getTime() && p.closeCents > 0,
+          )
+        : [];
+
+    const reports: Record<PerformancePeriodKey, PerformanceReport | null> = {
+      "1y": null,
+      "3y": null,
+      "5y": null,
+      all: null,
+    };
+    for (const { key, days } of PERFORMANCE_PERIODS) {
+      // cutoff de la période ; « all » démarre au premier flux
+      const periodStart =
+        days === null
+          ? null
+          : toUtcMidnight(new Date(nowTime - days * 24 * 3600 * 1000));
+      // période plus ancienne que le portefeuille : indisponible (null),
+      // sauf « all » qui couvre toujours toute sa durée
+      if (
+        periodStart !== null &&
+        periodStart.getTime() < firstFlowDate.getTime()
+      ) {
+        continue;
+      }
+      // solde du livret au cutoff : dernière quinzaine connue avant la date
+      const livretStartValueCents = periodStart
+        ? livretSeries.reduce((sum, series) => {
+            const point =
+              [...series]
+                .reverse()
+                .find((p) => p.date.getTime() <= periodStart.getTime()) ?? null;
+            return sum + (point ? point.balanceCents : 0);
+          }, 0)
+        : 0;
+      // croissance réelle du Monde sur la période, même historique de cours
+      const periodWorldFlows = periodStart
+        ? allFlows.filter((f) => f.date.getTime() > periodStart.getTime())
+        : allFlows;
+      const worldGrowth = worldGrowthFromPoints(
+        periodWorldFlows,
+        worldPoints,
+        periodStart,
+      );
+      if (worldGrowth) {
+        worldGrowth.deltaCents = totalValue - worldGrowth.referenceValueCents;
+      }
+      reports[key] = buildPerformanceReport({
+        positions,
+        livretFlows,
+        livretValueCents: livretBalance,
+        savingsRate: LIVRET_A_RATE,
+        worldEquityRate: DEFAULT_EQUITY_RETURN,
+        worldGrowth,
+        period: key,
+        periodStart,
+        livretStartValueCents,
+        now,
+      });
+    }
+    return reports;
+  },
+);
 
 /** Épargne mensuelle moyenne (12 mois glissants) depuis les versements réels. */
 export const getAverageMonthlySavingsCents = cache(async (): Promise<number | null> => {
