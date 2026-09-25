@@ -106,6 +106,7 @@ describe("buildSimulatorDefaults", () => {
       id: "p1",
       name: "World",
       isin: "IE0002XZSHO1",
+      symbol: null,
       envelopeId: "e1",
       envelopeName: "PEA",
       envelopeType: "PEA",
