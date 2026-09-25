@@ -159,6 +159,7 @@ function renderView() {
           currencyRisk: "Currency unhedged",
           wkn: "A3E1JV",
           holdingsAsOf: "",
+          dataAsOf: "2026-09-25",
           topHoldings: [
             { name: "Apple", weight: 0.0563 },
             { name: "NVIDIA Corp.", weight: 0.0513 },

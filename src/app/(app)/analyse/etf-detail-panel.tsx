@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
+import { DataAsOfBadge } from "./data-as-of-badge";
 
 /**
  * Panneau latéral de détail d'un ETF : onglets Général (identité, frais,
@@ -133,6 +134,16 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
           <Badge tone="neutral">{etf.replication || "—"}</Badge>
           {etf.peaEligible ? <Badge tone="positive">PEA</Badge> : null}
           {etf.userHolding ? <Badge tone="warning">USER HOLDING</Badge> : null}
+        </div>
+        <div className="mt-3">
+          <DataAsOfBadge
+            dataAsOf={etf.dataAsOf}
+            source={
+              etf.assetClass === "Private Equity"
+                ? "KID / émetteur (ELTIF)"
+                : "justETF / émetteur"
+            }
+          />
         </div>
       </div>
 

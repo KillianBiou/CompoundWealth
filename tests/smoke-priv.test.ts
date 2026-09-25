@@ -20,6 +20,11 @@ describe("fonds non cotés (ELTIF)", () => {
     expect(searchEtfCatalog("non cote").map((e) => e.isin)).toContain("LU3170240538");
   });
 
+  it("détails CSV : date de dernière mise à jour présente", () => {
+    const apollo = getEtfDetailByIsin("LU3170240538");
+    expect(apollo?.dataAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   it("détails CSV : AIFM, frais, liquidité chargés", () => {
     const apollo = getEtfDetailByIsin("LU3170240538");
     const eqt = getEtfDetailByIsin("LU3176111881");
