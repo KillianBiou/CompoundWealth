@@ -1,3 +1,5 @@
+"use client";
+
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
