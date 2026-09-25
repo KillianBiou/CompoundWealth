@@ -6,6 +6,8 @@ import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import { getEtfDetailByIsin, getEtfDetailByTicker, getAllEtfDetails } from "@/lib/analysis/etf-detail";
+import type { ActionDetail } from "@/lib/analysis/action-detail";
+import { getAllActionDetails } from "@/lib/analysis/action-detail";
 import {
   analyzeFees,
   analyzeIncome,
@@ -79,6 +81,7 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
         id: position.id,
         name: position.name,
         isin,
+        symbol: position.symbol,
         envelopeId: envelope.id,
         envelopeName: envelope.name,
         envelopeType: envelope.type,
@@ -136,6 +139,21 @@ export function getEtfDetailsByIsin(): Record<string, EtfDetail> {
     byIsin[detail.isin] = detail;
   }
   return byIsin;
+}
+
+/**
+ * Détails CSV des actions, indexés par symbole Yahoo ET par ISIN —
+ * passés au client pour le panneau latéral de détail d'une action.
+ */
+export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
+  const bySymbol: Record<string, ActionDetail> = {};
+  for (const detail of getAllActionDetails()) {
+    bySymbol[detail.tickerYahoo.toUpperCase()] = detail;
+    if (detail.isin) {
+      bySymbol[detail.isin] = detail;
+    }
+  }
+  return bySymbol;
 }
 
 /** Épargne mensuelle moyenne (12 mois glissants) depuis les versements réels. */

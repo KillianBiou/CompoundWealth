@@ -18,6 +18,7 @@ function makePosition(overrides: Partial<AnalysisPosition> = {}): AnalysisPositi
     id: "pos-1",
     name: "MSCI World Swap PEA",
     isin: "IE0002XZSHO1",
+    symbol: null,
     envelopeId: "env-1",
     envelopeName: "PEA Trade Republic",
     envelopeType: "PEA",

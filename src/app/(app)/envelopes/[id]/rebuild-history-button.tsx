@@ -5,24 +5,22 @@ import { History } from "lucide-react";
 import { rebuildHistoryAction } from "@/server/actions";
 import { useToast } from "@/components/toast";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 export function RebuildHistoryButton({ envelopeId }: { envelopeId: string }) {
   const [pending, startTransition] = useTransition();
   const toast = useToast();
+  const { t } = useI18n();
 
   return (
     <button
       type="button"
       disabled={pending}
-      title={
-        pending
-          ? "Reconstruction en cours…"
-          : "Reconstruire l'historique quotidien de toutes les positions depuis Yahoo Finance (1 requête par position, remplace les valorisations importées)"
-      }
-      aria-label="Reconstruire l'historique des cours"
+      title={pending ? t.envelopes.rebuild.pendingTitle : t.envelopes.rebuild.title}
+      aria-label={t.envelopes.rebuild.aria}
       onClick={() => {
-        const loadingId = toast.loading("Reconstruction de l'historique…", {
-          details: ["Une requête par position — cela peut prendre un moment."],
+        const loadingId = toast.loading(t.envelopes.rebuild.loading, {
+          details: [t.envelopes.rebuild.loadingDetail],
         });
         startTransition(async () => {
           const result = await rebuildHistoryAction(envelopeId);
@@ -41,7 +39,7 @@ export function RebuildHistoryButton({ envelopeId }: { envelopeId: string }) {
     >
       <History className="h-4 w-4" aria-hidden />
       <span className="sr-only">
-        {pending ? "Reconstruction en cours…" : "Reconstruire l'historique"}
+        {pending ? t.envelopes.rebuild.pendingSr : t.envelopes.rebuild.sr}
       </span>
     </button>
   );

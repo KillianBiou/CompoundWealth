@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import type { EnvelopeSummary } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "./ui";
 import { cn } from "./cn";
+import { useI18n } from "@/i18n/provider";
 
 export function Sparkline({
   series,
@@ -11,10 +14,11 @@ export function Sparkline({
   series: { date: Date; valueCents: number }[];
   gainCents: number | null;
 }) {
+  const { t } = useI18n();
   if (series.length < 2) {
     return (
       <div className="flex h-10 items-center justify-end text-[11px] text-text-muted">
-        Historique en construction…
+        {t.envelopes.card.historyBuilding}
       </div>
     );
   }
@@ -36,7 +40,7 @@ export function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       className="h-10 w-40"
       role="img"
-      aria-label="Évolution récente de la valeur"
+      aria-label={t.envelopes.card.recentChange}
       preserveAspectRatio="none"
     >
       <polyline
@@ -52,12 +56,19 @@ export function Sparkline({
 }
 
 export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
+  const { t } = useI18n();
   const gain = envelope.gainCents;
   const gainRatio = envelope.investedCents > 0 && gain !== null ? gain / envelope.investedCents : null;
   const isLivret = envelope.type === "LIVRET_A";
+  const isPriv = envelope.type === "PRIV";
   const sparkSeries = isLivret && envelope.livretSeries
     ? envelope.livretSeries.map((p) => ({ date: p.date, valueCents: p.balanceCents }))
     : envelope.series;
+  const typeLabel = isLivret
+    ? t.envelopes.card.livretA
+    : isPriv
+      ? t.envelopes.card.priv
+      : envelope.type;
   return (
     <Link href={`/envelopes/${envelope.id}`} className="group block">
       <Card className="h-full transition-colors group-hover:border-accent-500/50">
@@ -67,7 +78,7 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
               {envelope.name}
             </p>
             <p className="mt-0.5 text-xs text-text-muted">
-              {envelope.type}
+              {typeLabel}
               {envelope.broker ? ` · ${envelope.broker}` : ""}
             </p>
           </div>
@@ -75,12 +86,12 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
             tone={
               envelope.type === "PEA"
                 ? "positive"
-                : envelope.type === "LIVRET_A"
+                : envelope.type === "LIVRET_A" || envelope.type === "PRIV"
                   ? "neutral"
                   : "warning"
             }
           >
-            {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+            {typeLabel}
           </Badge>
         </div>
         <div className="mt-4 flex items-end justify-between gap-4">
@@ -104,7 +115,7 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
               </p>
             ) : (
               <p className="mt-1 text-sm text-text-muted italic">
-                État des lieux — gain non calculable
+                {t.envelopes.card.gainNotComputable}
               </p>
             )}
           </div>
@@ -116,28 +127,30 @@ export function EnvelopeCard({ envelope }: { envelope: EnvelopeSummary }) {
           <p className="text-xs text-text-muted">
             {isLivret ? (
               <>
-                Livret A
+                {t.envelopes.card.livretA}
                 {envelope.overCapCents && envelope.overCapCents > 0 ? (
                   <span className="text-negative">
                     {" "}
-                    · {formatEurCents(envelope.overCapCents)} au-dessus du plafond
+                    {t.envelopes.card.overCap.replace("{amount}", formatEurCents(envelope.overCapCents))}
                   </span>
                 ) : null}
               </>
             ) : (
               <>
-                {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""}
+                {t.envelopes.card.positionsCount
+                  .replace("{count}", String(envelope.positionsCount))
+                  .replace("{s}", envelope.positionsCount > 1 ? "s" : "")}
                 {envelope.investedCents > 0 ? (
                   <span className="text-text-secondary">
                     {" "}
-                    · investi {formatEurCents(envelope.investedCents)}
+                    {t.envelopes.card.invested.replace("{amount}", formatEurCents(envelope.investedCents))}
                   </span>
                 ) : null}
               </>
             )}
           </p>
           <p className="text-xs font-medium text-text-muted transition-colors group-hover:text-accent-500">
-            Détails →
+            {t.envelopes.card.details}
           </p>
         </div>
       </Card>

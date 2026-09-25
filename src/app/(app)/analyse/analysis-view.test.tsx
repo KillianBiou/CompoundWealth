@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
+import { renderWithI18n } from "../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { AnalysisPageView } from "./analysis-view";
 import type {
@@ -33,12 +34,25 @@ const fees: FeeAnalysisResult = {
       positionId: "pos-1",
       name: "MSCI World Swap PEA",
       isin: "IE0002XZSHO1",
+      symbol: "IE0002XZSHO1",
       envelopeName: "PEA Trade Republic",
       ter: 0.002,
       custodyRate: 0,
       transactionFeesCents: 12_00,
       annualCostCents: 140_00,
       valueCents: 70_000_00,
+    },
+    {
+      positionId: "pos-2",
+      name: "NVIDIA",
+      isin: "US67066G1040",
+      symbol: "US67066G1040",
+      envelopeName: "CTO Trade Republic",
+      ter: null,
+      custodyRate: 0,
+      transactionFeesCents: 3_00,
+      annualCostCents: 0,
+      valueCents: 30_000_00,
     },
   ],
   transactionFeesCents: 12_00,
@@ -60,6 +74,7 @@ const income: IncomeAnalysisResult = {
       positionId: "pos-1",
       name: "NVIDIA",
       isin: "US67066G1040",
+      symbol: "US67066G1040",
       envelopeName: "CTO Trade Republic",
       kind: "cash",
       twelveMonthsCents: 237_00,
@@ -122,7 +137,7 @@ const simulatorDefaults: SimulatorDefaults = {
 };
 
 function renderView() {
-  return render(
+  return renderWithI18n(
     <AnalysisPageView
       fees={fees}
       income={income}
@@ -152,12 +167,14 @@ function renderView() {
           holdingsCount: 1282,
           peaEligible: true,
           userHolding: true,
+          notes: "",
           trName: "iShares MSCI World Swap PEA UCITS ETF EUR (Acc)",
           provider: "iShares",
           fundCurrency: "EUR",
           currencyRisk: "Currency unhedged",
           wkn: "A3E1JV",
           holdingsAsOf: "",
+          dataAsOf: "2026-09-25",
           topHoldings: [
             { name: "Apple", weight: 0.0563 },
             { name: "NVIDIA Corp.", weight: 0.0513 },
@@ -179,6 +196,43 @@ function renderView() {
             { name: "Technology", weight: 0.3452 },
             { name: "Finance", weight: 0.1869 },
           ],
+        },
+      }}
+      actionDetails={{
+        US67066G1040: {
+          name: "NVIDIA",
+          ticker: "NVDA",
+          tickerYahoo: "NVDA",
+          isin: "US67066G1040",
+          country: "United States",
+          sector: "Technology",
+          exchange: "NASDAQ",
+          longName: "NVIDIA Corporation",
+          currency: "USD",
+          price: 224.58,
+          previousClose: 225.51,
+          marketCap: 5_422_933_082_112,
+          trailingPe: 28.5,
+          forwardPe: 14.32,
+          priceToBook: 23.68,
+          dividendYield: 0.0044,
+          dividendRate: 1,
+          payoutRatio: 0.0354,
+          beta: 2.217,
+          volume: 76_420_503,
+          averageVolume3Month: 126_051_807,
+          fiftyTwoWeekHigh: 236.54,
+          fiftyTwoWeekLow: 164.27,
+          fiftyDayAverage: 215.62,
+          twoHundredDayAverage: 199.28,
+          industry: "Semiconductors",
+          website: "https://www.nvidia.com",
+          hqCity: "Santa Clara",
+          hqState: "CA",
+          fullTimeEmployees: 42000,
+          businessSummary: "NVIDIA Corporation operates as a data center scale AI infrastructure company.",
+          notes: "",
+          dataAsOf: "2026-09-25",
         },
       }}
     />,
@@ -246,6 +300,30 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText("Diversification")).toBeInTheDocument();
     // identité de l'ETF visible dans l'onglet Général
     expect(screen.getByText("MSCI World")).toBeInTheDocument();
+  });
+  it("ouvre le panneau action au clic sur une action du scanner de frais", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Frais"));
+    fireEvent.click(screen.getByText("NVIDIA"));
+    expect(
+      screen.getAllByText("NVIDIA Corporation").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("Général")).toBeInTheDocument();
+    expect(screen.getByText("Entreprise")).toBeInTheDocument();
+  });
+  it("ouvre le panneau action au clic sur une action du scanner de revenus", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Dividendes & intérêts"));
+    fireEvent.click(screen.getByText("NVIDIA"));
+    expect(
+      screen.getAllByText("NVIDIA Corporation").length,
+    ).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Entreprise"));
+    expect(
+      screen.getByText((_, element) =>
+        element?.textContent === "Santa Clara, CA · United States",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("l'onglet Détails liste les top valeurs de l'ETF", () => {

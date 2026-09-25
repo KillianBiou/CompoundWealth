@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 /**
  * Panneau latéral droit (façon Sheet/Drawer) : s'ouvre en glide depuis la
@@ -30,6 +31,7 @@ export function SidePanel({
   icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,8 +97,8 @@ export function SidePanel({
               <button
                 type="button"
                 onClick={onBack}
-                aria-label={backLabel ?? "Retour"}
-                title={backLabel ?? "Retour"}
+                aria-label={backLabel ?? t.analyse.detail.common.back}
+                title={backLabel ?? t.analyse.detail.common.back}
                 className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
               >
                 <ArrowLeft className="h-5 w-5" aria-hidden />
@@ -105,7 +107,7 @@ export function SidePanel({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Fermer le panneau"
+              aria-label={t.analyse.detail.common.closePanel}
               className="rounded-lg p-1.5 text-text-muted transition-all hover:bg-bg-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500"
             >
               <X className="h-5 w-5" aria-hidden />

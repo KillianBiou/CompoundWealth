@@ -1,5 +1,4 @@
 "use client";
-
 import { useRef, useState } from "react";
 import { useActionState } from "react";
 import { FileUp, Upload } from "lucide-react";
@@ -12,12 +11,13 @@ import {
 import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Card } from "@/components/ui";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Lecture du fichier impossible"));
+    reader.onerror = () => reject(new Error("file read error"));
     reader.readAsDataURL(file);
   });
 }
@@ -32,6 +32,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 export function ImportForm() {
+  const { t } = useI18n();
   const [analyzeState, analyze, analyzing] = useActionState<ImportActionState, FormData>(
     analyzeImportAction,
     {},
@@ -47,37 +48,35 @@ export function ImportForm() {
     analyzeState.preview && analyzeState.preview.length > 0 ? analyzeState.preview : null;
   const state = preview ? confirmState : analyzeState;
   const fileError = state?.errors?.file;
-
   const onFileChange = async (file: File) => {
     setFileName(file.name);
     setStoredFile(await fileToDataUrl(file));
   };
-
   const onConfirm = (formData: FormData) => {
     if (storedFile) {
       formData.set("file", dataUrlToBlob(storedFile));
     }
     return confirm(formData);
   };
-
   const reset = () => {
     setFileName(null);
     setStoredFile(null);
     if (inputRef.current) inputRef.current.value = "";
     window.location.reload();
   };
-
   if (preview) {
     return (
       <form action={onConfirm} className="space-y-5" noValidate>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="accent">{analyzeState.broker ?? "Courtier"}</Badge>
+            <Badge tone="accent">{analyzeState.broker ?? t.envelopes.import.broker}</Badge>
             <span className="text-sm text-text-secondary">{fileName}</span>
             {analyzeState.skippedRows ? (
               <span className="text-xs text-text-muted">
-                {analyzeState.skippedRows} ligne{analyzeState.skippedRows > 1 ? "s" : ""} ignorée
-                {analyzeState.skippedRows > 1 ? "s" : ""} (dividendes, espèces…)
+                {t.envelopes.import.skippedRows
+                  .replace("{count}", String(analyzeState.skippedRows))
+                  .replace("{s}", analyzeState.skippedRows > 1 ? "s" : "")
+                  .replace("{s2}", analyzeState.skippedRows > 1 ? "s" : "")}
               </span>
             ) : null}
           </div>
@@ -86,34 +85,36 @@ export function ImportForm() {
             onClick={reset}
             className="text-xs text-text-muted transition-colors hover:text-text-primary"
           >
-            Choisir un autre fichier
+            {t.envelopes.import.chooseOther}
           </button>
         </div>
-
         {preview.map((envelope) => (
           <Card key={envelope.name} className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-heading text-lg font-semibold">{envelope.name}</h2>
               <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>
-                {envelope.type}
+                {envelope.type === "PRIV" ? t.envelopes.card.priv : envelope.type}
               </Badge>
             </div>
             <p className="text-sm text-text-secondary">
               {envelope.openedAt
-                ? `Premier achat le ${new Date(envelope.openedAt).toLocaleDateString("fr-FR")}`
-                : "Date de premier achat inconnue"}
+                ? t.envelopes.import.firstBuy.replace(
+                    "{date}",
+                    new Date(envelope.openedAt).toLocaleDateString("fr-FR"),
+                  )
+                : t.envelopes.import.firstBuyUnknown}
               {" · "}
-              Versements cumulés : <strong>{formatEurCents(envelope.depositsCents)}</strong>
+              {t.envelopes.import.deposits} <strong>{formatEurCents(envelope.depositsCents)}</strong>
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-t border-border-cw text-left text-xs uppercase tracking-wide text-text-muted">
-                    <th className="py-2 pr-4 font-medium">Position</th>
-                    <th className="py-2 pr-4 font-medium">Parts</th>
-                    <th className="py-2 pr-4 text-right font-medium">Investi</th>
-                    <th className="py-2 pr-4 text-right font-medium">Valeur actuelle</th>
-                    <th className="py-2 text-right font-medium">Historique</th>
+                    <th className="py-2 pr-4 font-medium">{t.envelopes.import.columns.position}</th>
+                    <th className="py-2 pr-4 font-medium">{t.envelopes.import.columns.parts}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t.envelopes.import.columns.invested}</th>
+                    <th className="py-2 pr-4 text-right font-medium">{t.envelopes.import.columns.value}</th>
+                    <th className="py-2 text-right font-medium">{t.envelopes.import.columns.history}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,7 +139,9 @@ export function ImportForm() {
                         {formatEurCents(p.currentValueCents)}
                       </td>
                       <td className="py-2 text-right text-xs text-text-muted">
-                        {p.historyPoints} point{p.historyPoints > 1 ? "s" : ""}
+                        {t.envelopes.import.points
+                          .replace("{count}", String(p.historyPoints))
+                          .replace("{s}", p.historyPoints > 1 ? "s" : "")}
                       </td>
                     </tr>
                   ))}
@@ -147,28 +150,22 @@ export function ImportForm() {
             </div>
           </Card>
         ))}
-
         {confirmState.errors?.file ? (
           <p className="text-sm text-negative">{confirmState.errors.file[0]}</p>
         ) : null}
         {confirmState.message && !confirmState.errors ? (
           <p className="text-sm text-negative">{confirmState.message}</p>
         ) : null}
-
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={confirming}>
             <Upload className="h-4 w-4" aria-hidden />
-            {confirming ? "Import en cours…" : "Importer et créer les enveloppes"}
+            {confirming ? t.envelopes.import.importing : t.envelopes.import.importButton}
           </Button>
-          <p className="text-xs text-text-muted">
-            Les enveloppes seront créées automatiquement avec leurs positions, leurs versements
-            cumulés et l&apos;historique de valorisation reconstruit depuis le fichier.
-          </p>
+          <p className="text-xs text-text-muted">{t.envelopes.import.importNote}</p>
         </div>
       </form>
     );
   }
-
   return (
     <form action={analyze} className="space-y-5" noValidate>
       <label
@@ -181,10 +178,10 @@ export function ImportForm() {
       >
         <FileUp className="h-8 w-8 text-text-muted" aria-hidden />
         <span className="font-medium text-text-primary">
-          {fileName ?? "Choisissez votre fichier d'export"}
+          {fileName ?? t.envelopes.import.chooseFile}
         </span>
         <span className="text-sm text-text-secondary">
-          CSV des transactions — ex. Trade Republic (5 Mo max)
+          {t.envelopes.import.fileHint}
         </span>
         <input
           ref={inputRef}
@@ -198,18 +195,16 @@ export function ImportForm() {
           }}
         />
       </label>
-
       {fileError ? <p className="text-sm text-negative">{fileError[0]}</p> : null}
       {analyzeState.message && !analyzeState.errors ? (
         <p className="text-sm text-positive">{analyzeState.message}</p>
       ) : null}
-
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={analyzing}>
-          Analyser le fichier
+          {t.envelopes.import.analyzeButton}
         </Button>
         <p className="text-xs text-text-muted">
-          Le courtier est détecté automatiquement. Rien n&apos;est enregistré à cette étape.
+          {t.envelopes.import.analyzeNote}
         </p>
       </div>
     </form>

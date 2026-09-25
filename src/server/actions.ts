@@ -227,6 +227,9 @@ export async function closeEnvelopeAction(formData: FormData): Promise<void> {
 async function rebuildPositionValuations(
   position: { id: string; symbol: string; investments: { date: Date; amountCents: number }[] },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (getEtfByIsin(position.symbol)?.isPrivate) {
+    return { ok: false, reason: "fonds non coté : historique manuel uniquement" };
+  }
   const firstDate = position.investments[0].date;
   const history = await fetchMarketHistory(position.symbol, firstDate, new Date());
   if (!history.ok) return { ok: false, reason: history.reason };
@@ -272,6 +275,89 @@ async function rebuildPositionValuations(
   return { ok: true };
 }
 
+async function createPrivatePosition({
+  envelopeId,
+  etf,
+  quantity,
+  date,
+  priceCents,
+}: {
+  envelopeId: string;
+  etf: { ticker: string; name: string; isin: string };
+  quantity: number;
+  date: Date;
+  priceCents: number;
+}): Promise<ActionState> {
+  const amountCents = Math.round(quantity * priceCents);
+  const existing = await prisma.position.findFirst({
+    where: { envelopeId, symbol: etf.ticker },
+    include: { investments: true, valuations: true },
+  });
+  if (existing) {
+    const totalQuantity = (existing.quantity ?? 0) + quantity;
+    const totalInvested =
+      (existing.investedCents ?? 0) +
+      existing.investments.reduce((s, inv) => s + inv.amountCents, 0) +
+      amountCents;
+    await prisma.$transaction([
+      prisma.positionInvestment.create({
+        data: { positionId: existing.id, date, amountCents },
+      }),
+      prisma.position.update({
+        where: { id: existing.id },
+        data: {
+          quantity: totalQuantity,
+          investedCents: totalInvested,
+          unitPriceCents: Math.round(totalInvested / totalQuantity),
+          boughtAt:
+            existing.boughtAt.getTime() > date.getTime() ? date : existing.boughtAt,
+        },
+      }),
+      prisma.positionValuation.upsert({
+        where: { positionId_date: { positionId: existing.id, date } },
+        create: {
+          positionId: existing.id,
+          date,
+          valueCents: amountCents,
+          source: "manuel",
+        },
+        update: { valueCents: amountCents, source: "manuel" },
+      }),
+    ]);
+    revalidatePath(`/envelopes/${envelopeId}`);
+    revalidatePath("/dashboard");
+    return { message: `${quantity} parts ajoutées à ${etf.ticker} (prix manuel)` };
+  }
+  const position = await prisma.position.create({
+    data: {
+      envelopeId,
+      name: `${etf.ticker} — ${etf.name}`,
+      symbol: etf.ticker,
+      category: "FUND",
+      quantity,
+      investedCents: amountCents,
+      unitPriceCents: priceCents,
+      boughtAt: date,
+    },
+  });
+  await prisma.positionInvestment.create({
+    data: { positionId: position.id, date, amountCents },
+  });
+  await prisma.positionValuation.create({
+    data: {
+      positionId: position.id,
+      date,
+      valueCents: amountCents,
+      source: "manuel",
+    },
+  });
+  revalidatePath(`/envelopes/${envelopeId}`);
+  revalidatePath("/dashboard");
+  return {
+    message: `Position ajoutée : ${quantity} parts × ${(priceCents / 100).toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € (fonds non coté, valorisation manuelle)`,
+  };
+}
+
 export async function createPositionAction(
   _state: ActionState,
   formData: FormData,
@@ -289,14 +375,33 @@ export async function createPositionAction(
     isin: str(formData, "isin"),
     quantity: str(formData, "quantity"),
     boughtAt: str(formData, "boughtAt"),
+    manualPriceEur: str(formData, "manualPriceEur") || undefined,
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
 
-  const { isin, quantity, boughtAt } = parsed.data;
+  const { isin, quantity, boughtAt, manualPriceEur } = parsed.data;
   const etf = getEtfByIsin(isin);
   if (!etf) return { errors: { isin: ["ETF introuvable dans le catalog"] } };
 
   const date = new Date(boughtAt);
+  if (etf.isPrivate) {
+    if (manualPriceEur === undefined) {
+      return {
+        errors: {
+          form: [
+            `${etf.ticker} est un fonds non coté : saisissez le prix d'achat (NAV) manuellement`,
+          ],
+        },
+      };
+    }
+    return createPrivatePosition({
+      envelopeId,
+      etf,
+      quantity,
+      date,
+      priceCents: eurosToCents(manualPriceEur),
+    });
+  }
   const symbol = etf.yahooSymbol ?? etf.ticker;
   const history = await fetchMarketHistory(symbol, date, new Date());
   if (!history.ok) {
@@ -576,7 +681,7 @@ export interface ImportPreviewPosition {
 }
 
 export interface ImportPreviewEnvelope {
-  type: "PEA" | "CTO";
+  type: "PEA" | "CTO" | "PRIV";
   name: string;
   broker: string | null;
   openedAt: string | null;
@@ -785,6 +890,10 @@ export async function refreshPricesAction(envelopeId: string): Promise<ActionSta
   let updated = 0;
   const failures: string[] = [];
   for (const [index, position] of envelope.positions.entries()) {
+    if (getEtfByIsin(position.symbol ?? "")?.isPrivate) {
+      failures.push(`${position.name} (fonds non coté : valorisation manuelle)`);
+      continue;
+    }
     const symbol = position.symbol?.trim();
     if (!symbol) {
       failures.push(`${position.name} (symbole manquant)`);
@@ -966,7 +1075,10 @@ export async function refreshAllPricesAction(): Promise<{
       envelope.lastPriceRefreshAt !== null &&
       now - envelope.lastPriceRefreshAt.getTime() < PRICE_REFRESH_COOLDOWN_MS;
     const refreshable = envelope.positions.filter(
-      (p) => p.symbol?.trim() && p.quantity !== null,
+      (p) =>
+        p.symbol?.trim() &&
+        p.quantity !== null &&
+        !getEtfByIsin(p.symbol ?? "")?.isPrivate,
     );
     if (!onCooldown && refreshable.length > 0) {
       for (const position of refreshable) {
@@ -1101,7 +1213,9 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
   });
   if (!envelope) return { errors: { form: ["Enveloppe introuvable"] } };
 
-  const positionsWithHistory = envelope.positions.filter((p) => p.symbol && p.investments.length > 0);
+  const positionsWithHistory = envelope.positions.filter(
+    (p) => p.symbol && p.investments.length > 0 && !getEtfByIsin(p.symbol)?.isPrivate,
+  );
   if (positionsWithHistory.length === 0) {
     return {
       errors: {
@@ -1156,4 +1270,23 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
     };
   }
   return { message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} (valorisations quotidiennes)` };
+}
+
+/** Historique du cours d'une action sur ~6 mois, pour le panneau latéral. */
+export async function fetchActionPriceHistoryAction(
+  symbol: string,
+): Promise<{ ok: true; points: { date: string; price: number }[] } | { ok: false; reason: string }> {
+  const from = new Date();
+  from.setMonth(from.getMonth() - 6);
+  const history = await fetchMarketHistory(symbol, from, new Date());
+  if (!history.ok) return { ok: false, reason: history.reason };
+  // échantillonnage : ~3 points par semaine pour un graphique léger
+  const step = Math.max(1, Math.floor(history.points.length / 80));
+  const points = history.points
+    .filter((_, i) => i % step === 0)
+    .map((p) => ({
+      date: p.date.toISOString().slice(0, 10),
+      price: p.closeCents / 100,
+    }));
+  return { ok: true, points };
 }

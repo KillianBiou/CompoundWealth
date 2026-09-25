@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getEnvelope, getCurrentUser } from "@/server/queries";
-import { getEtfDetailsByIsin, isinOf } from "@/server/analysis";
+import { getEtfDetailsByIsin, getActionDetailsBySymbol, isinOf } from "@/server/analysis";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import { buildEnvelopeValuations } from "@/lib/portfolio/series";
@@ -21,9 +21,11 @@ import { LivretDcaSection } from "./livret-dca-section";
 import { EnvelopeDangerZone } from "./danger-zone";
 import { RefreshPricesButton } from "./refresh-prices-button";
 import { RebuildHistoryButton } from "./rebuild-history-button";
+import { getDictionary, getLocaleFromCookies } from "@/i18n/server";
 
 export default async function EnvelopePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const t = await getLocaleFromCookies().then(getDictionary);
   const [envelope, user] = await Promise.all([getEnvelope(id), getCurrentUser()]);
   if (!envelope || envelope.closedAt) notFound();
 
@@ -84,13 +86,13 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-heading text-2xl font-semibold">{envelope.name}</h1>
-              <Badge tone="accent">Livret A</Badge>
+              <Badge tone="accent">{t.envelopes.card.livretA}</Badge>
             </div>
             <p className="mt-1 text-sm text-text-secondary">
               {envelope.broker ? `${envelope.broker} · ` : ""}
               {envelope.openedAt
-                ? `Ouvert le ${envelope.openedAt.toLocaleDateString("fr-FR")}`
-                : "Date d'ouverture non renseignée"}
+                ? t.envelopes.detail.openedOn.replace("{date}", envelope.openedAt.toLocaleDateString("fr-FR"))
+                : t.envelopes.detail.openedAtUnknown}
             </p>
           </div>
         </div>
@@ -142,7 +144,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-semibold">{envelope.name}</h1>
-            <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type}</Badge>
+            <Badge tone={envelope.type === "PEA" ? "positive" : "warning"}>{envelope.type === "PRIV" ? t.envelopes.detail.priv : envelope.type}</Badge>
           </div>
           <p className="mt-1 text-sm text-text-secondary">
             {envelope.broker ? `${envelope.broker} · ` : ""}
@@ -163,22 +165,22 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         </div>
         <div className="space-y-1.5 text-sm text-text-secondary">
           <p className="font-medium text-text-primary">
-            Flat tax 31,4 %&nbsp;
+            {t.envelopes.detail.flatTax}&nbsp;
             <span className="font-normal text-text-secondary">
-              = {(rules.flatTaxBreakdown[0].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} % d&apos;IR
-              + {(rules.flatTaxBreakdown[1].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} % de prélèvements sociaux
+              {t.envelopes.detail.flatTaxDetail
+                .replace("{ir}", (rules.flatTaxBreakdown[0].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }))
+                .replace("{ps}", (rules.flatTaxBreakdown[1].rate * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }))}
             </span>
           </p>
           {envelope.type === "PEA" && antiquity ? (
             <p className="text-xs">
               {antiquity.acquired
-                ? "Antériorité acquise : 0 % d'IR, seuls les prélèvements sociaux (18,6 %) s'appliquent aux gains."
-                : "Avant 5 ans : flat tax 31,4 %. Après 5 ans : 0 % d'IR, prélèvements sociaux 18,6 % uniquement."}
+                ? t.envelopes.detail.antiquityAcquired
+                : t.envelopes.detail.antiquityBefore}
             </p>
           ) : null}
           <p className="text-xs text-text-muted">
-            La flat tax de 31,4 % est la somme de l&apos;impôt sur le revenu et des prélèvements
-            sociaux — pas un taux en plus de ceux-ci.
+            {t.envelopes.detail.flatTaxNote}
           </p>
         </div>
         <ul className="space-y-1 border-t border-border-cw/60 pt-3 text-xs text-text-muted">
@@ -198,29 +200,29 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
           {antiquity ? (
             <Badge tone={antiquity.acquired ? "positive" : "neutral"}>
               {antiquity.acquired
-                ? "Antériorité fiscale acquise ✓"
-                : `Antériorité : ${antiquity.remainingLabel}`}
+                ? t.envelopes.detail.antiquityAcquiredBadge
+                : t.envelopes.detail.antiquityBadge.replace("{label}", antiquity.remainingLabel)}
             </Badge>
           ) : (
-            <Badge tone="neutral">Date d&apos;ouverture à renseigner pour l&apos;antériorité</Badge>
+            <Badge tone="neutral">{t.envelopes.detail.needOpenedAt}</Badge>
           )}
         </div>
       ) : null}
 
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <Kpi
-          label="Total investi"
+          label={t.envelopes.detail.totalInvested}
           value={hasUnknownInvested ? `${formatEurCents(investedCents)} + ?` : formatEurCents(investedCents)}
         />
         <Kpi
-          label="Valeur actuelle"
+          label={t.envelopes.detail.currentValue}
           value={formatEurCents(valueCents)}
-          sub={lastValuationDate ? `Actualisée le ${lastValuationDate.toLocaleDateString("fr-FR")}` : undefined}
+          sub={lastValuationDate ? t.envelopes.detail.updatedOn.replace("{date}", lastValuationDate.toLocaleDateString("fr-FR")) : undefined}
         />
         {gainCents !== null && gainRatio !== null ? (
           <div className="flex items-start justify-between gap-3">
             <Kpi
-              label={gainCents >= 0 ? "Gain" : "Perte"}
+              label={gainCents >= 0 ? t.envelopes.detail.gain : t.envelopes.detail.loss}
               value={formatEurCents(Math.abs(gainCents))}
               sub={`${gainCents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(gainCents))} (${(gainRatio * 100).toFixed(1).replace(".", ",")} %)`}
               subTone={gainCents >= 0 ? "positive" : "negative"}
@@ -230,9 +232,9 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
         ) : (
           <div className="flex items-start justify-between gap-3">
             <Kpi
-              label="Gain / perte"
+              label={t.envelopes.detail.gainLoss}
               value="—"
-              sub="Complétez les montants investis pour calculer le gain"
+              sub={t.envelopes.detail.fillInvested}
             />
             <div className="flex gap-2"><RebuildHistoryButton envelopeId={envelope.id} /><RefreshPricesButton envelopeId={envelope.id} /></div>
           </div>
@@ -241,7 +243,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
 
 
       <Card>
-        <h2 className="mb-4 font-heading text-lg font-semibold">Évolution de la valeur</h2>
+        <h2 className="mb-4 font-heading text-lg font-semibold">{t.envelopes.detail.valueEvolution}</h2>
         <EnvelopeChart
           valuations={valuations}
           investedCents={hasUnknownInvested ? 0 : investedCents}
@@ -254,6 +256,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       <PositionsTableWithPanel
         envelopeId={envelope.id}
         etfDetails={getEtfDetailsByIsin()}
+        actionDetails={getActionDetailsBySymbol()}
         positions={envelope.positions.map((p) => ({
           id: p.id,
           name: p.name,

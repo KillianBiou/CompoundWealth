@@ -5,24 +5,22 @@ import { RefreshCw } from "lucide-react";
 import { refreshPricesAction } from "@/server/actions";
 import { useToast } from "@/components/toast";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 export function RefreshPricesButton({ envelopeId }: { envelopeId: string }) {
   const [pending, startTransition] = useTransition();
   const toast = useToast();
+  const { t } = useI18n();
 
   return (
     <button
       type="button"
       disabled={pending}
-      title={
-        pending
-          ? "Actualisation en cours…"
-          : "Actualiser les prix actuels de toutes les positions (source ouverte Yahoo Finance, limité à une fois toutes les 5 minutes)"
-      }
-      aria-label="Actualiser les prix des positions"
+      title={pending ? t.envelopes.refresh.pendingTitle : t.envelopes.refresh.title}
+      aria-label={t.envelopes.refresh.aria}
       onClick={() => {
-        const loadingId = toast.loading("Actualisation des prix…", {
-          details: ["Une requête par position, espacée d'une seconde."],
+        const loadingId = toast.loading(t.envelopes.refresh.loading, {
+          details: [t.envelopes.refresh.loadingDetail],
         });
         startTransition(async () => {
           const result = await refreshPricesAction(envelopeId);
@@ -40,7 +38,7 @@ export function RefreshPricesButton({ envelopeId }: { envelopeId: string }) {
       )}
     >
       <RefreshCw className={cn("h-4 w-4", pending && "animate-spin")} aria-hidden />
-      <span className="sr-only">{pending ? "Actualisation en cours…" : "Actualiser les prix"}</span>
+      <span className="sr-only">{pending ? t.envelopes.refresh.pendingSr : t.envelopes.refresh.sr}</span>
     </button>
   );
 }

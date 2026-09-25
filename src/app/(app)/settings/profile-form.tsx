@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { updateProfileAction, type ActionState } from "@/server/actions";
 import { Button, Card, Field, Input } from "@/components/ui";
+import { useI18n } from "@/i18n/provider";
 
 export function ProfileForm({
   email,
@@ -17,33 +18,33 @@ export function ProfileForm({
   job: string;
   salaryEur: string;
 }) {
+  const { t } = useI18n();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updateProfileAction,
     {},
   );
-
   return (
     <Card>
       <form action={action} className="space-y-4" noValidate>
-        <Field label="Email" htmlFor="email-static">
+        <Field label={t.settings.profile.email} htmlFor="email-static">
           <Input id="email-static" value={email} disabled aria-describedby="email-locked" />
           <p id="email-locked" className="text-xs text-text-muted">
-            L&apos;email sert de connexion et ne peut pas être modifié.
+            {t.settings.profile.emailLocked}
           </p>
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nom" htmlFor="pf-name" error={state?.errors?.name}>
-            <Input id="pf-name" name="name" defaultValue={name} placeholder="Optionnel" />
+          <Field label={t.settings.profile.name} htmlFor="pf-name" error={state?.errors?.name}>
+            <Input id="pf-name" name="name" defaultValue={name} placeholder={t.settings.profile.optional} />
           </Field>
-          <Field label="Âge" htmlFor="pf-age" error={state?.errors?.age}>
-            <Input id="pf-age" name="age" type="number" min="18" max="120" defaultValue={age} placeholder="Optionnel" />
+          <Field label={t.settings.profile.age} htmlFor="pf-age" error={state?.errors?.age}>
+            <Input id="pf-age" name="age" type="number" min="18" max="120" defaultValue={age} placeholder={t.settings.profile.optional} />
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Travail" htmlFor="pf-job" error={state?.errors?.job}>
-            <Input id="pf-job" name="job" defaultValue={job} placeholder="Optionnel" />
+          <Field label={t.settings.profile.job} htmlFor="pf-job" error={state?.errors?.job}>
+            <Input id="pf-job" name="job" defaultValue={job} placeholder={t.settings.profile.optional} />
           </Field>
-          <Field label="Salaire mensuel net (€)" htmlFor="pf-salary" error={state?.errors?.salaryEur}>
+          <Field label={t.settings.profile.salary} htmlFor="pf-salary" error={state?.errors?.salaryEur}>
             <Input
               id="pf-salary"
               name="salaryEur"
@@ -51,7 +52,7 @@ export function ProfileForm({
               step="0.01"
               min="0"
               defaultValue={salaryEur}
-              placeholder="Optionnel"
+              placeholder={t.settings.profile.optional}
             />
           </Field>
         </div>
@@ -64,7 +65,7 @@ export function ProfileForm({
           </p>
         ) : null}
         <Button type="submit" disabled={pending}>
-          {pending ? "Enregistrement…" : "Enregistrer"}
+          {pending ? t.settings.profile.saving : t.settings.profile.save}
         </Button>
       </form>
     </Card>
