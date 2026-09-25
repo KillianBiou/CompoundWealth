@@ -619,7 +619,14 @@
     "diversification": {
       "score": "Score",
       "scoreSub": "concentration pénalisée",
-      "scoreHint": "Score de 0 à 10, pénalisé par la concentration (indice de Herfindahl) et le nombre de poches couvertes. Une diversification solide vise : aucune position individuelle > 5 % du portefeuille (règle des 5 %), aucun secteur > 25 %, exposition répartie sur plusieurs zones géographiques (idéal ~60 % marchés développés / 25-40 % international). Le score est plafonné à 5/10 si moins de 3 poches sont couvertes.",
+      "criteria": {
+        "geoTop": "Zone dominante ≤ 25 %",
+        "geoCoverage": "Zones couvertes",
+        "geoBalance": "Équilibre top 3 zones",
+        "sectorTop": "Secteur dominant ≤ 25 %",
+        "sectorCoverage": "Secteurs couverts",
+        "sectorBalance": "Équilibre top 3 secteurs"
+      },
       "topSector": "Secteur n°1",
       "topRegion": "Zone n°1",
       "via": "via {detail}",

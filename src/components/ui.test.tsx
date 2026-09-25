@@ -26,12 +26,28 @@ describe("Kpi", () => {
     expect(sub).toHaveClass("text-positive");
   });
 
-  it("expose une explication au survol de toute la tuile via hint", () => {
-    render(<Kpi label="Score" value="6/10" sub="concentration pénalisée" hint="Détail du calcul" />);
-    const tile = screen.getByText("Score").closest("div")!;
-    fireEvent.mouseEnter(tile);
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Détail du calcul");
-    fireEvent.mouseLeave(tile);
+  it("expose la décomposition du score au survol de l'icône", () => {
+    render(
+      <Kpi
+        label="Score"
+        value="7/10"
+        scoreTone="positive"
+        scoreTotal="7/10"
+        scoreLines={[
+          { label: "Zone dominante ≤ 25 %", delta: "+3/4", tone: "warning" },
+          { label: "Zones couvertes", delta: "+2/3", tone: "warning" },
+          { label: "Équilibre top 3 zones", delta: "+2/3", tone: "warning" },
+        ]}
+      />,
+    );
+    const value = screen.getByText("7/10");
+    expect(value).toHaveClass("text-positive");
+    const icon = screen.getByText("Score").querySelector("svg")!;
+    fireEvent.mouseEnter(icon);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Zone dominante ≤ 25 % +3/4");
+    expect(tooltip).toHaveTextContent("Total 7/10");
+    fireEvent.mouseLeave(icon);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });

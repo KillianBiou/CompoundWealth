@@ -50,6 +50,7 @@ import type {
   FeeLine,
   IncomeAnalysisResult,
   IncomeLine,
+  ScoreCriterionResult,
 } from "@/lib/analysis/scanners";
 
 const CATEGORY_COLORS = [
@@ -450,6 +451,10 @@ function DiversificationPanel({
       : kind === "economy"
         ? ECONOMIES.find((e) => e.key === key)?.flag ?? ""
         : "";
+  const scoreTone = (score: number | null): "positive" | "warning" | "negative" | undefined =>
+    score === null ? undefined : score >= 7 ? "positive" : score >= 4 ? "warning" : "negative";
+  const criterionLabel = (key: ScoreCriterionResult["key"]) =>
+    t.analyse.diversification.criteria[key];
   const pieData = result.lines.slice(0, 8).map((line, index) => ({
     name: kind === "sector" ? line.sector : geoLabel(line.sector),
     value: line.amountCents / 100,
@@ -462,7 +467,13 @@ function DiversificationPanel({
           label={t.analyse.diversification.score}
           value={result.score !== null ? `${result.score}/10` : "—"}
           sub={t.analyse.diversification.scoreSub}
-          hint={t.analyse.diversification.scoreHint}
+          scoreTone={scoreTone(result.score)}
+          scoreTotal={result.score !== null ? `${result.score}/10` : "—"}
+          scoreLines={result.scoreBreakdown.map((c) => ({
+            label: criterionLabel(c.key),
+            delta: `${c.points > 0 ? "+" : ""}${c.points}/${c.max}`,
+            tone: c.points === c.max ? "positive" : c.points > 0 ? "warning" : "negative",
+          }))}
         />
         {result.lines[0] ? (
           <Kpi
