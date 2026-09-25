@@ -7,6 +7,10 @@
     "save": "Enregistrer",
     "delete": "Supprimer",
     "edit": "Modifier",
+    "copySuccess": "« {label} » copié dans le presse-papier",
+    "copyFail": "Impossible de copier « {label} »",
+    "copyAria": "Copier dans le presse-papier",
+    "copyDetail": "Détail",
     "currency": "€"
   },
   "nav": {
@@ -152,6 +156,8 @@
     "importSuccess": "Import réussi — {names} créé{s}",
     "importButton": "Importer un export",
     "newButton": "Nouvelle enveloppe",
+    "copyAll": "Copier",
+    "copyAllTitle": "Copier tout le portefeuille (Markdown, recréable)",
     "empty": "Aucune enveloppe active. Créez un PEA ou un CTO pour commencer.",
     "card": {
       "historyBuilding": "Historique en construction…",
