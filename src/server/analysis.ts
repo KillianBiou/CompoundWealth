@@ -20,6 +20,12 @@ import {
   type IncomeAnalysisResult,
   type DiversificationResult,
 } from "@/lib/analysis/scanners";
+import { DEFAULT_EQUITY_RETURN } from "@/lib/analysis/scanners";
+import {
+  buildPerformanceReport,
+  type PerformanceReport,
+} from "@/lib/analysis/performance-report";
+import { buildLivretBalanceSeries, LIVRET_A_RATE } from "@/lib/livret";
 
 /* -------------------------------------------------------------------------- */
 /*                          Positions agrégées d'analyse                       */
@@ -99,6 +105,10 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
           amountCents: income.amountCents,
         })),
         isStock: position.category === "STOCK" || (isin ? isUSStock(isin) : false),
+        valuations: position.valuations.map((v) => ({
+          date: v.date,
+          valueCents: v.valueCents,
+        })),
       });
     }
   }
@@ -167,6 +177,45 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
   }
   return bySymbol;
 }
+
+/**
+ * Rapport de performance (XIRR / TWR) : flux externes de toutes les
+ * enveloppes (versements des positions + dépôts du livret, qui n'est pas
+ * une position), valeur finale = patrimoine actuel. Trois niveaux de
+ * détail : global, par enveloppe, par actif.
+ */
+export const getPerformanceReport = cache(async (): Promise<PerformanceReport> => {
+  const userId = await requireUserId();
+  const positions = await getAnalysisPositions();
+  const livretEnvelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null, type: "LIVRET_A" },
+    include: { deposits: { orderBy: { date: "asc" } } },
+  });
+  const nowTime = Date.now();
+  const livretFlows: { date: Date; amountCents: number }[] = [];
+  let livretBalance = 0;
+  for (const env of livretEnvelopes) {
+    const rate = env.interestRate ?? LIVRET_A_RATE;
+    const events = env.deposits.map((dep) => ({
+      date: dep.date,
+      amountCents: dep.amountCents,
+    }));
+    const series = buildLivretBalanceSeries(events, rate);
+    const current =
+      [...series].reverse().find((p) => p.date.getTime() <= nowTime) ??
+      series[0] ??
+      null;
+    livretBalance += current ? current.balanceCents : 0;
+    livretFlows.push(...events);
+  }
+  return buildPerformanceReport({
+    positions,
+    livretFlows,
+    livretValueCents: livretBalance,
+    savingsRate: LIVRET_A_RATE,
+    worldEquityRate: DEFAULT_EQUITY_RETURN,
+  });
+});
 
 /** Épargne mensuelle moyenne (12 mois glissants) depuis les versements réels. */
 export const getAverageMonthlySavingsCents = cache(async (): Promise<number | null> => {
