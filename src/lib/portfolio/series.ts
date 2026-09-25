@@ -194,16 +194,20 @@ export function buildEnvelopeInvestedSeries(
 export interface PeriodPerformanceResult {
   /** gain réel sur la période : variation de valeur moins les versements de la période */
   gainCents: number | null;
-  /** gain rapporté au capital investi (début de période, sinon total investi) */
+  /** gain rapporté au capital moyen présent sur la période (Modified Dietz) */
   ratio: number | null;
 }
 
 /**
  * Performance d'une période par rapport au capital investi, et non à la
  * première valeur de la courbe (qui démarre près de zéro et gonfle le %).
- * Pour « tout l'historique » : gain = valeur actuelle − total investi.
+ * Pour « tout l'historique » : gain = valeur actuelle − total investi,
+ * rapporté au total investi.
  * Pour une sous-période : gain = Δvaleur − Δinvesti (les versements de la
- * période sont exclus), rapporté à l'investi en début de période.
+ * période sont exclus), rapporté au capital moyen présent durant la
+ * période — l'investi de début plus chaque versement pondéré par son temps
+ * de présence (Modified Dietz). L'investi de début seul gonfle artificiel-
+ * lement le % quand le portefeuille était tout petit un an plus tôt.
  */
 export function periodPerformance(
   valuations: ValuationPoint[],
@@ -231,23 +235,46 @@ export function periodPerformance(
 
   const investedEnd = sortedInvested[sortedInvested.length - 1].valueCents;
   const days = PERIOD_DAYS[period];
-  let valueStart = 0;
-  let investedStart = 0;
-  if (days !== null) {
-    const cutoff = now.getTime() - days * 24 * 60 * 60 * 1000;
-    const lastValuationBefore = sortedValuations.findLast(
-      (v) => v.date.getTime() <= cutoff,
-    );
-    valueStart = lastValuationBefore ? lastValuationBefore.valueCents : 0;
-    const lastInvestedBefore = sortedInvested.findLast(
-      (v) => v.date.getTime() <= cutoff,
-    );
-    investedStart = lastInvestedBefore ? lastInvestedBefore.valueCents : 0;
+  if (days === null) {
+    const gainCents = valueEnd - investedEnd;
+    return {
+      gainCents,
+      ratio: investedEnd > 0 ? gainCents / investedEnd : null,
+    };
   }
+
+  const endTime = now.getTime();
+  const cutoffTime = endTime - days * 24 * 60 * 60 * 1000;
+  const lastValuationBefore = sortedValuations.findLast(
+    (v) => v.date.getTime() <= cutoffTime,
+  );
+  const valueStart = lastValuationBefore ? lastValuationBefore.valueCents : 0;
+  const lastInvestedBefore = sortedInvested.findLast(
+    (v) => v.date.getTime() <= cutoffTime,
+  );
+  const investedStart = lastInvestedBefore ? lastInvestedBefore.valueCents : 0;
+
+  // versements de la période, pondérés par leur temps de présence (Modified Dietz)
+  let weightedFlows = 0;
+  const windowMs = Math.max(1, endTime - cutoffTime);
+  for (let i = 0; i < sortedInvested.length; i++) {
+    const time = sortedInvested[i].date.getTime();
+    if (time <= cutoffTime) continue;
+    if (time > endTime) break;
+    const previous = i > 0 ? sortedInvested[i - 1].valueCents : 0;
+    const weight = Math.min(1, Math.max(0, (endTime - time) / windowMs));
+    weightedFlows += (sortedInvested[i].valueCents - previous) * weight;
+  }
+
   const gainCents = valueEnd - valueStart - (investedEnd - investedStart);
-  const denominator = investedStart > 0 ? investedStart : investedEnd;
+  const denominator = investedStart + weightedFlows;
   return {
     gainCents,
-    ratio: denominator > 0 ? gainCents / denominator : null,
+    ratio:
+      denominator > 0
+        ? gainCents / denominator
+        : investedEnd > 0
+          ? gainCents / investedEnd
+          : null,
   };
 }
