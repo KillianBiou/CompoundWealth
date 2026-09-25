@@ -76,6 +76,13 @@ describe("valueAt", () => {
     expect(valueAt(sorted, d("2026-02-01"))).toBe(100);
     expect(valueAt(sorted, d("2026-04-01"))).toBe(200);
   });
+
+  it("retourne 0 avant le premier point : une enveloppe ouverte tard ne remplit pas l'historique", () => {
+    const sorted = [{ date: d("2026-09-16"), valueCents: 800_000 }];
+    expect(valueAt(sorted, d("2026-09-15"))).toBe(0);
+    expect(valueAt(sorted, d("2026-01-01"))).toBe(0);
+    expect(valueAt(sorted, d("2026-09-16"))).toBe(800_000);
+  });
 });
 
 describe("investedBefore", () => {

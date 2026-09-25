@@ -204,6 +204,7 @@
       "openedAt": "Opening date",
       "openedAtPeaHint": "Recommended for the PEA (tax seniority)",
       "openedAtHint": "Optional",
+      "openedAtLivretHint": "Livret opening date — the initial deposit and interest run from this date",
       "create": "Create the account",
       "creating": "Creating…"
     },

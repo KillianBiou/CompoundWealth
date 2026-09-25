@@ -204,6 +204,7 @@
       "openedAt": "Date d'ouverture",
       "openedAtPeaHint": "Recommandée pour le PEA (antériorité fiscale)",
       "openedAtHint": "Optionnelle",
+      "openedAtLivretHint": "Date d'ouverture du livret — le versement initial et les intérêts courent depuis cette date",
       "create": "Créer l'enveloppe",
       "creating": "Création…"
     },
