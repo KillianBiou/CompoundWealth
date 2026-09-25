@@ -36,6 +36,7 @@ export function PositionsTable({
   positions,
   onSelectPosition,
   clickableIsins,
+  clickableSymbols,
 }: {
   envelopeId: string;
   positions: PositionRow[];
@@ -43,6 +44,8 @@ export function PositionsTable({
   onSelectPosition?: (position: PositionRow) => void;
   /** ISIN cliquables — les autres lignes restent inertes */
   clickableIsins?: Set<string>;
+  /** tickers/symboles Yahoo cliquables (actions), les autres lignes restent inertes */
+  clickableSymbols?: Set<string>;
 }) {
   return (
     <Card className="p-0">
@@ -74,11 +77,17 @@ export function PositionsTable({
               {positions.map((p) => (
                 <tr key={p.id} className="border-b border-border-cw/40 transition-colors hover:bg-bg-subtle/30">
                   <td className="px-6 py-3">
-                    {p.isin && clickableIsins?.has(p.isin) && onSelectPosition ? (
+                    {onSelectPosition &&
+                    ((p.isin && clickableIsins?.has(p.isin)) ||
+                      (p.symbol && clickableSymbols?.has(p.symbol.trim().toUpperCase()))) ? (
                       <button
                         type="button"
                         onClick={() => onSelectPosition(p)}
-                        title="Voir le détail de l'ETF"
+                        title={
+                          p.isin && clickableIsins?.has(p.isin)
+                            ? "Voir le détail de l'ETF"
+                            : "Voir le détail de l'action"
+                        }
                         className="cursor-pointer text-left font-medium text-text-primary transition-colors hover:text-accent-500"
                       >
                         {p.name}

@@ -1271,3 +1271,22 @@ export async function rebuildHistoryAction(envelopeId: string): Promise<ActionSt
   }
   return { message: `Historique reconstruit pour ${rebuilt} position${rebuilt > 1 ? "s" : ""} (valorisations quotidiennes)` };
 }
+
+/** Historique du cours d'une action sur ~6 mois, pour le panneau latéral. */
+export async function fetchActionPriceHistoryAction(
+  symbol: string,
+): Promise<{ ok: true; points: { date: string; price: number }[] } | { ok: false; reason: string }> {
+  const from = new Date();
+  from.setMonth(from.getMonth() - 6);
+  const history = await fetchMarketHistory(symbol, from, new Date());
+  if (!history.ok) return { ok: false, reason: history.reason };
+  // échantillonnage : ~3 points par semaine pour un graphique léger
+  const step = Math.max(1, Math.floor(history.points.length / 80));
+  const points = history.points
+    .filter((_, i) => i % step === 0)
+    .map((p) => ({
+      date: p.date.toISOString().slice(0, 10),
+      price: p.closeCents / 100,
+    }));
+  return { ok: true, points };
+}

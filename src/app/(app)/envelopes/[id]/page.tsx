@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getEnvelope, getCurrentUser } from "@/server/queries";
-import { getEtfDetailsByIsin, isinOf } from "@/server/analysis";
+import { getEtfDetailsByIsin, getActionDetailsBySymbol, isinOf } from "@/server/analysis";
 import { formatEurCents } from "@/lib/money";
 import { ENVELOPE_RULES, peaAntiquity } from "@/lib/taxes";
 import { buildEnvelopeValuations } from "@/lib/portfolio/series";
@@ -254,6 +254,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
       <PositionsTableWithPanel
         envelopeId={envelope.id}
         etfDetails={getEtfDetailsByIsin()}
+        actionDetails={getActionDetailsBySymbol()}
         positions={envelope.positions.map((p) => ({
           id: p.id,
           name: p.name,
