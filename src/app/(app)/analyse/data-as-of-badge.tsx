@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui";
 import { useI18n } from "@/i18n/provider";
 

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { EnvelopeSummary } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
