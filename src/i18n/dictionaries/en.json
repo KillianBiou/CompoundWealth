@@ -525,12 +525,11 @@
         "detailLine1": "projection: {amount}",
         "detailLine2": "weighted yield {rate}"
       },
-      "subscriptions": {
-        "title": "Subscriptions",
-        "badge": "€0/mo",
-        "kpi": "€0.00",
-        "kpiLabel": "per month",
-        "detail": "Recurring payment detection is coming with card transaction import."
+      "performance": {
+        "title": "Performance",
+        "kpiLabel": "annualized XIRR · whole period",
+        "detailLine1": "Gain: {gain}",
+        "detailLine2": "Annualized TWR: {twr}"
       },
       "exposure": {
         "title": "Exposure",
@@ -569,10 +568,9 @@
         "title": "Wealth simulator",
         "subtitle": "Interactive projection, financial independence"
       },
-      "abonnements": {
-        "title": "Subscriptions",
-        "subtitle": "Recurring payment detection — coming soon",
-        "body": "The subscription scanner analyses card transactions (MCC) — available once these are imported."
+      "performance": {
+        "title": "Performance analysis",
+        "subtitle": "True XIRR and TWR returns, compared to reference strategies"
       },
       "etf": "ETF",
       "action": "Stock",
@@ -616,6 +614,36 @@
       "excludedNoDividend": "No dividend paid",
       "empty": "No position paying a cash dividend — accumulating ETFs (Acc) and non-dividend stocks are excluded.",
       "disclaimer": "Only cash payments are counted. The projection applies the 2025 yield of the reference file to the current value; frequency comes from actual history or the usual quarterly cycle of US stocks. Gross amounts, before flat tax."
+    },
+    "performance": {
+      "xirrLabel": "XIRR",
+      "xirrSub": "annualized money-weighted return",
+      "xirrHint": "XIRR (money-weighted) finds the rate that reconciles all your deposits with the current value: each contribution is only credited for the time it was actually invested. It answers: what did MY money earn?",
+      "twrLabel": "TWR",
+      "twrSub": "{cumulative} cumulative",
+      "twrHint": "Time-weighted return removes the effect of your deposits: it is the strategy's own performance, comparable to the ETF's published return.",
+      "simpleCompare": "Simple return: {simple} · XIRR: {xirr}",
+      "simpleWhy": "The simple return mixes performance with deposit timing: it understates your performance in a rising market (your money was not invested the whole period) and overstates it in a falling one.",
+      "referencesTitle": "Same deposits, reference strategies",
+      "refSavings": "Savings account ({rate}/yr)",
+      "refWorld": "World equity ETF ({rate}/yr)",
+      "vsReference": "{delta}",
+      "referencesHint": "Theoretical final value if the same deposits had been invested at the given rate — the world equities historical average stands in for a basic strategy.",
+      "verdictTitle": "Verdict",
+      "verdictPositive": "Your portfolio beats the reference strategies: complexity adds return.",
+      "verdictWarning": "Your portfolio roughly tracks the references: complexity is not adding extra return yet.",
+      "verdictNegative": "Your portfolio does worse than a basic strategy: complexity is costing you return.",
+      "verdictNeutral": "Not enough history to draw a verdict yet.",
+      "verdictHint": "Indicative comparison: XIRR includes the effect of your deposit dates, the reference is a constant rate. If the gap stays negative, simplifying (broad ETF, low fees) is probably better.",
+      "tabEnvelopes": "By envelope",
+      "tabAssets": "By asset",
+      "colName": "Name",
+      "colValue": "Value",
+      "colContributed": "Contributed",
+      "colXirr": "XIRR",
+      "colTwr": "TWR",
+      "emptyLevels": "No data at this level.",
+      "disclaimer": "Annualized XIRR on real cash flows (deposits), chained TWR on valuations. Minimum period of 30 days. Capitalized dividends are included in the value; cash dividends are not reinvested."
     },
     "diversification": {
       "score": "Score",

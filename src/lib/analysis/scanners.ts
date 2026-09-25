@@ -46,6 +46,8 @@ export interface AnalysisPosition {
   cashIncomeCents: { date: Date; amountCents: number }[];
   /** nature du titre pour l'exposition */
   isStock: boolean;
+  /** historique des valorisations (performance TWR par actif), si présent */
+  valuations?: { date: Date; valueCents: number }[];
 }
 
 export interface EnvelopeFee {

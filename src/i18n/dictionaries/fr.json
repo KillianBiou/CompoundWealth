@@ -525,12 +525,11 @@
         "detailLine1": "projection : {amount}",
         "detailLine2": "yield pondéré {rate}"
       },
-      "subscriptions": {
-        "title": "Abonnements",
-        "badge": "0 €/mois",
-        "kpi": "0,00 €",
-        "kpiLabel": "par mois",
-        "detail": "La détection des paiements récurrents arrive avec l'import des transactions carte."
+      "performance": {
+        "title": "Performance",
+        "kpiLabel": "XIRR annualisé · toute la période",
+        "detailLine1": "Gain : {gain}",
+        "detailLine2": "TWR annualisé : {twr}"
       },
       "exposure": {
         "title": "Exposition",
@@ -569,10 +568,9 @@
         "title": "Simulateur de patrimoine",
         "subtitle": "Projection interactive, indépendance financière"
       },
-      "abonnements": {
-        "title": "Abonnements",
-        "subtitle": "Détection des paiements récurrents — bientôt",
-        "body": "Le scanner d'abonnements analyse les transactions carte (MCC) — disponible dès l'import de ces opérations."
+      "performance": {
+        "title": "Analyse de la performance",
+        "subtitle": "Rendement réel XIRR et TWR, comparé aux stratégies de référence"
       },
       "etf": "ETF",
       "action": "Action",
@@ -616,6 +614,36 @@
       "excludedNoDividend": "Aucun dividende versé",
       "empty": "Aucune position versant un dividende en cash — les ETF capitalisants (Acc) et les valeurs sans dividende sont exclus.",
       "disclaimer": "Seuls les versements en cash sont comptés. La projection applique le yield 2025 du fichier de référence à la valeur actuelle ; la fréquence vient de l'historique réel ou du cycle trimestriel usuel des actions US. Montants bruts, avant flat tax."
+    },
+    "performance": {
+      "xirrLabel": "XIRR",
+      "xirrSub": "rendement annualisé pondéré par l'argent",
+      "xirrHint": "Le XIRR (money-weighted) calcule le taux qui réconcilie tous vos versements avec la valeur actuelle : chaque dépôt n'est crédité que du temps réellement passé sur le marché. C'est la réponse à « qu'a gagné MON argent ? »",
+      "twrLabel": "TWR",
+      "twrSub": "cumulé {cumulative}",
+      "twrHint": "Le rendement pondéré par le temps (time-weighted) neutralise l'effet de vos versements : c'est la performance de la stratégie elle-même, comparable à la performance publiée des ETF.",
+      "simpleCompare": "Rendement simple : {simple} · XIRR : {xirr}",
+      "simpleWhy": "Le rendement simple mélange performance et calendrier des versements : il sous-estime votre performance en marché haussier (votre argent n'était pas investi toute la période) et la surestime en marché baissier.",
+      "referencesTitle": "Mêmes versements, stratégies de référence",
+      "refSavings": "Livret de précaution ({rate}/an)",
+      "refWorld": "ETF actions Monde ({rate}/an)",
+      "vsReference": "{delta}",
+      "referencesHint": "Valeur finale théorique si les mêmes versements avaient été placés au taux indiqué — le rendement moyen historique des actions mondiales sert de référence « stratégie basique ».",
+      "verdictTitle": "Verdict",
+      "verdictPositive": "Votre portefeuille bat les stratégies de référence : la complexité ajoute du rendement.",
+      "verdictWarning": "Votre portefeuille suit à peu près les références : la complexité n'apporte pas encore de rendement supplémentaire.",
+      "verdictNegative": "Votre portefeuille fait moins bien qu'une stratégie basique : la complexité coûte du rendement.",
+      "verdictNeutral": "Pas encore assez d'historique pour tirer un verdict.",
+      "verdictHint": "Comparaison indicative : le XIRR inclut l'effet de vos dates de versement, la référence est un taux constant. Si l'écart est durablement négatif, simplifier (ETF large, frais bas) est probablement meilleur.",
+      "tabEnvelopes": "Par enveloppe",
+      "tabAssets": "Par actif",
+      "colName": "Nom",
+      "colValue": "Valeur",
+      "colContributed": "Versé",
+      "colXirr": "XIRR",
+      "colTwr": "TWR",
+      "emptyLevels": "Aucune donnée à ce niveau.",
+      "disclaimer": "XIRR annualisé sur les flux réels (versements et dépôts), TWR chaîné sur les valorisations. Période minimale de 30 jours. Les dividendes capitalisés sont inclus dans la valeur, les dividendes cash ne sont pas réinvestis."
     },
     "diversification": {
       "score": "Score",

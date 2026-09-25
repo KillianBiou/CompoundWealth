@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  Activity,
   Coins,
   Globe2,
   LineChart as LineIcon,
@@ -52,6 +53,10 @@ import type {
   IncomeLine,
   ScoreCriterionResult,
 } from "@/lib/analysis/scanners";
+import type {
+  PerformanceLevel,
+  PerformanceReport,
+} from "@/lib/analysis/performance-report";
 
 const CATEGORY_COLORS = [
   "#e84545",
@@ -73,7 +78,7 @@ type PanelId =
   | "revenus"
   | "exposition"
   | "simulateur"
-  | "abonnements"
+  | "performance"
   | "etf"
   | "action";
 
@@ -586,6 +591,267 @@ function DiversificationPanel({
         ) : null}
       </div>
       <p className="text-xs text-text-muted">{t.analyse.diversification.disclaimer}</p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                    Panneau performance (XIRR / TWR / niveaux)               */
+/* -------------------------------------------------------------------------- */
+
+function formatSignedPercent(ratio: number | null): string {
+  if (ratio === null) return "—";
+  const formatted = formatPercent(Math.abs(ratio));
+  return `${ratio >= 0 ? "+" : "−"}${formatted}`;
+}
+
+function performanceBadge(xirrValue: number | null) {
+  if (xirrValue === null) return <Badge tone="neutral">—</Badge>;
+  if (xirrValue >= 0.05) return <Badge tone="positive">{formatPercent(xirrValue)}</Badge>;
+  if (xirrValue >= 0) return <Badge tone="warning">{formatPercent(xirrValue)}</Badge>;
+  return <Badge tone="negative">{formatPercent(xirrValue)}</Badge>;
+}
+
+function verdictTone(
+  xirrValue: number | null,
+  savingsRef: number | null,
+): "positive" | "warning" | "negative" | "neutral" {
+  if (xirrValue === null || savingsRef === null) return "neutral";
+  if (xirrValue > savingsRef) return "positive";
+  if (xirrValue >= 0) return "warning";
+  return "negative";
+}
+
+function PerformancePanel({
+  report,
+}: {
+  report: PerformanceReport;
+}) {
+  const { t } = useI18n();
+  const [detailTab, setDetailTab] = useState<"envelopes" | "assets">("envelopes");
+  const total = report.total;
+  const metrics = total.metrics;
+  const xirrValue = metrics?.xirr ?? null;
+  const twrValue = metrics?.twrAnnualized ?? null;
+  const simpleValue = metrics?.simpleReturn ?? null;
+  const savingsRef = report.savingsReferenceValueCents;
+  const worldRef = report.worldReferenceValueCents;
+  const gain = metrics?.gainCents ?? null;
+  const verdict = verdictTone(xirrValue, savingsRef);
+  const verdictText =
+    verdict === "positive"
+      ? t.analyse.performance.verdictPositive
+      : verdict === "warning"
+        ? t.analyse.performance.verdictWarning
+        : verdict === "negative"
+          ? t.analyse.performance.verdictNegative
+          : t.analyse.performance.verdictNeutral;
+  const levels = detailTab === "envelopes" ? report.envelopes : report.positions;
+  const vsSavings =
+    savingsRef !== null && gain !== null ? total.valueCents - savingsRef : null;
+  const vsWorld =
+    worldRef !== null && gain !== null ? total.valueCents - worldRef : null;
+
+  const levelsTable = (rows: PerformanceLevel[]) => (
+    <div className="overflow-x-auto rounded-lg border border-border-cw">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
+            <th className="px-3 py-2 font-medium">{t.analyse.performance.colName}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colValue}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colContributed}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colXirr}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colTwr}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((level) => {
+            const m = level.metrics;
+            return (
+              <tr key={level.id} className="border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30">
+                <td className="px-3 py-2 text-text-primary">{level.name}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatEurCents(level.valueCents)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatEurCents(level.contributedCents)}
+                </td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right font-semibold tabular-nums",
+                    (m?.xirr ?? 0) >= 0 ? "text-positive" : "text-negative",
+                  )}
+                >
+                  {formatSignedPercent(m?.xirr ?? null)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatSignedPercent(m?.twrAnnualized ?? null)}
+                </td>
+              </tr>
+            );
+          })}
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
+                {t.analyse.performance.emptyLevels}
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4">
+        <Kpi
+          label={t.analyse.performance.xirrLabel}
+          value={formatSignedPercent(xirrValue)}
+          sub={t.analyse.performance.xirrSub}
+          hint={t.analyse.performance.xirrHint}
+          scoreTone={
+            xirrValue === null
+              ? undefined
+              : xirrValue >= 0.05
+                ? "positive"
+                : xirrValue >= 0
+                  ? "warning"
+                  : "negative"
+          }
+        />
+        <Kpi
+          label={t.analyse.performance.twrLabel}
+          value={formatSignedPercent(twrValue)}
+          sub={
+            metrics?.twrCumulative != null
+              ? t.analyse.performance.twrSub.replace(
+                  "{cumulative}",
+                  formatSignedPercent(metrics.twrCumulative),
+                )
+              : undefined
+          }
+          hint={t.analyse.performance.twrHint}
+        />
+      </div>
+
+      {simpleValue !== null ? (
+        <div className="rounded-lg border border-border-cw bg-bg-subtle/40 p-4">
+          <p className="text-sm text-text-secondary">
+            {t.analyse.performance.simpleCompare
+              .replace("{simple}", formatSignedPercent(simpleValue))
+              .replace("{xirr}", formatSignedPercent(xirrValue))}
+          </p>
+          <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.simpleWhy}</p>
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-text-secondary">{t.analyse.performance.referencesTitle}</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-info/25 bg-info/5 p-3">
+            <p className="text-xs font-medium text-text-secondary">
+              {t.analyse.performance.refSavings.replace("{rate}", formatPercent(report.savingsRate))}
+            </p>
+            <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
+              {savingsRef !== null ? formatEurCents(savingsRef) : "—"}
+            </p>
+            {vsSavings !== null ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  vsSavings >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {t.analyse.performance.vsReference
+                  .replace("{delta}", formatEurCents(Math.abs(vsSavings)))}
+                {vsSavings >= 0 ? " ↑" : " ↓"}
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-lg border border-accent-500/25 bg-accent-500/5 p-3">
+            <p className="text-xs font-medium text-text-secondary">
+              {t.analyse.performance.refWorld.replace("{rate}", formatPercent(report.worldEquityRate))}
+            </p>
+            <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
+              {worldRef !== null ? formatEurCents(worldRef) : "—"}
+            </p>
+            {vsWorld !== null ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  vsWorld >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {t.analyse.performance.vsReference
+                  .replace("{delta}", formatEurCents(Math.abs(vsWorld)))}
+                {vsWorld >= 0 ? " ↑" : " ↓"}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <p className="text-xs text-text-muted">{t.analyse.performance.referencesHint}</p>
+      </div>
+
+      <div
+        className={cn(
+          "rounded-lg border p-4",
+          verdict === "positive" && "border-positive/25 bg-positive/5",
+          verdict === "warning" && "border-warning/25 bg-warning/5",
+          verdict === "negative" && "border-negative/25 bg-negative/5",
+          verdict === "neutral" && "border-border-cw bg-bg-subtle/40",
+        )}
+      >
+        <p className="text-sm font-medium text-text-secondary">
+          {t.analyse.performance.verdictTitle}
+        </p>
+        <p
+          className={cn(
+            "mt-1 text-sm",
+            verdict === "positive" && "text-positive",
+            verdict === "warning" && "text-warning",
+            verdict === "negative" && "text-negative",
+            verdict === "neutral" && "text-text-secondary",
+          )}
+        >
+          {verdictText}
+        </p>
+        <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.verdictHint}</p>
+      </div>
+
+      <div>
+        <div className="mb-2 flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/30 p-1">
+          <button
+            type="button"
+            onClick={() => setDetailTab("envelopes")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              detailTab === "envelopes"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            <Wallet className="h-4 w-4" aria-hidden />
+            {t.analyse.performance.tabEnvelopes}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailTab("assets")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              detailTab === "assets"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            <PieIcon className="h-4 w-4" aria-hidden />
+            {t.analyse.performance.tabAssets}
+          </button>
+        </div>
+        {levelsTable(levels)}
+      </div>
+
+      <p className="text-xs text-text-muted">{t.analyse.performance.disclaimer}</p>
     </div>
   );
 }
@@ -1285,6 +1551,7 @@ export function AnalysisPageView({
   countries,
   economies,
   simulatorDefaults,
+  performance,
   etfDetails,
   actionDetails,
 }: {
@@ -1298,6 +1565,8 @@ export function AnalysisPageView({
   economies: DiversificationResult;
   sectors: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
+  /** rapport de performance XIRR / TWR par niveau (global, enveloppes, actifs) */
+  performance: PerformanceReport;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
   etfDetails: Record<string, EtfDetail>;
   /** détails CSV des actions, par symbole Yahoo ou ISIN */
@@ -1394,10 +1663,10 @@ export function AnalysisPageView({
       subtitle: t.analyse.panels.simulateur.subtitle,
       icon: <TrendingUp className="h-5 w-5" aria-hidden />,
     },
-    abonnements: {
-      title: t.analyse.panels.abonnements.title,
-      subtitle: t.analyse.panels.abonnements.subtitle,
-      icon: <Wallet className="h-5 w-5" aria-hidden />,
+    performance: {
+      title: t.analyse.panels.performance.title,
+      subtitle: t.analyse.panels.performance.subtitle,
+      icon: <Activity className="h-5 w-5" aria-hidden />,
     },
     etf: {
       title:
@@ -1471,16 +1740,33 @@ export function AnalysisPageView({
           disabled={income.lines.length === 0 && income.excludedLines.length === 0}
         />
         <ScannerCard
-          id="abonnements"
-          title={t.analyse.cards.subscriptions.title}
-          icon={<Wallet className="h-5 w-5" aria-hidden />}
-          gradient="bg-gradient-to-br from-transparent to-transparent"
-          badge={<Badge tone="neutral">{t.analyse.cards.subscriptions.badge}</Badge>}
-          kpi={t.analyse.cards.subscriptions.kpi}
-          kpiLabel={t.analyse.cards.subscriptions.kpiLabel}
-          detail={t.analyse.cards.subscriptions.detail}
+          id="performance"
+          title={t.analyse.cards.performance.title}
+          icon={<Activity className="h-5 w-5" aria-hidden />}
+          gradient="bg-gradient-to-br from-info/10 via-transparent to-positive/10"
+          badge={performanceBadge(performance.total.metrics?.xirr ?? null)}
+          kpi={formatSignedPercent(performance.total.metrics?.xirr ?? null)}
+          kpiLabel={t.analyse.cards.performance.kpiLabel}
+          detail={
+            <>
+              {t.analyse.cards.performance.detailLine1.replace(
+                "{gain}",
+                performance.total.metrics?.gainCents != null
+                  ? formatEurCents(performance.total.metrics.gainCents)
+                  : "—",
+              )}
+              <br />
+              {t.analyse.cards.performance.detailLine2.replace(
+                "{twr}",
+                formatSignedPercent(performance.total.metrics?.twrAnnualized ?? null),
+              )}
+            </>
+          }
           onClick={open}
-          comingSoon
+          disabled={
+            performance.total.metrics?.xirr === null &&
+            performance.total.metrics?.twrAnnualized === null
+          }
         />
         <ExposureCard
           sectors={sectors}
@@ -1546,10 +1832,8 @@ export function AnalysisPageView({
             priceHistory={priceHistory}
           />
         ) : null}
-        {openPanel === "abonnements" ? (
-          <p className="py-8 text-center text-sm text-text-muted">
-            {t.analyse.panels.abonnements.body}
-          </p>
+        {openPanel === "performance" ? (
+          <PerformancePanel report={performance} />
         ) : null}
       </SidePanel>
     </div>
