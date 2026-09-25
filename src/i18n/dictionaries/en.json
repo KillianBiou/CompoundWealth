@@ -636,10 +636,10 @@
       "vsReference": "vs your portfolio: {delta}",
       "referencesHint": "Theoretical final value if the same deposits had been invested at the given annual rate, applied pro rata to each deposit's holding period — the world equities historical average stands in for a basic strategy.",
       "verdictTitle": "Verdict",
-      "verdictPositive": "Your portfolio beats the reference strategies: complexity adds return.",
-      "verdictWarning": "Your portfolio beats precautionary savings but not a basic World ETF: complexity is not adding extra return yet.",
+      "verdictPositive": "Your portfolio beats the references, including the World's real growth over the period: complexity adds return.",
+      "verdictWarning": "Your portfolio beats precautionary savings but underperforms the World's real growth over the period: a simple World ETF would have earned more.",
       "verdictNegative": "Your portfolio does worse than precautionary savings: complexity costs return.",
-      "verdictNeutral": "Not enough history to draw a verdict yet.",
+      "verdictNeutral": "Not enough history for a verdict yet.",
       "verdictHint": "Indicative comparison: XIRR includes the effect of your deposit dates, the reference is a constant rate. If the gap stays negative, simplifying (broad ETF, low fees) is probably better.",
       "tabEnvelopes": "By envelope",
       "tabAssets": "By asset",
@@ -653,7 +653,10 @@
       "refGain": "reference gain: {gain}",
       "worldGrowthLine": "Real MSCI World over the same period: {cumulative} cumulative · {annualized} annualized",
       "worldGrowthNa": "n/a",
-      "worldGrowthHint": "Actual growth of the World ETF from {start} to {end}, to confront the verdict with the real market, not just a constant rate."
+      "worldGrowthHint": "Actual World ETF growth from {start} to {end}; your own deposits replayed at the actual daily price. This is the real counterfactual: \"what would a simple World ETF have given?\"",
+      "aheadReference": "Your portfolio is {delta} better than this reference",
+      "behindReference": "Your portfolio is {delta} worse than this reference",
+      "worldGrowthValue": "Same deposits on this ETF: {value}"
     },
     "diversification": {
       "score": "Score",

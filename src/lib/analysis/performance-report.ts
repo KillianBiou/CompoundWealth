@@ -67,6 +67,10 @@ export interface PerformanceReport {
     startDate: Date;
     /** dernier point de cours utilisé (Date ISO) */
     endDate: Date;
+    /** valeur finale théorique des mêmes versements placés sur le MSCI World réel (la marche d'escalier DCA au cours réel), centimes */
+    referenceValueCents: number;
+    /** écart du portefeuille réel vs cette marche d'escalier World réelle, centimes */
+    deltaCents: number;
   } | null;
 }
 

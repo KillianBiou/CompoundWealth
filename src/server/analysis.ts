@@ -26,6 +26,11 @@ import {
   buildPerformanceReport,
   type PerformanceReport,
 } from "@/lib/analysis/performance-report";
+import {
+  mergeCashFlows,
+  positionCashFlows,
+  toUtcMidnight,
+} from "@/lib/analysis/performance";
 import { buildLivretBalanceSeries, LIVRET_A_RATE } from "@/lib/livret";
 
 /* -------------------------------------------------------------------------- */
@@ -187,10 +192,11 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
  * échec gracieux (null) si l'historique est indisponible.
  */
 async function getWorldGrowth(
-  firstFlowDate: Date | null,
+  flows: { date: Date; amountCents: number }[],
   now: Date,
 ): Promise<PerformanceReport["worldGrowth"]> {
-  if (!firstFlowDate) return null;
+  if (flows.length === 0) return null;
+  const firstFlowDate = flows[0].date;
   // premier ETF « Monde » du catalogue (représentatif du MSCI World)
   const world = ETF_CATALOG.find((e) => e.indexCategory === "Monde");
   if (!world) return null;
@@ -211,7 +217,35 @@ async function getWorldGrowth(
     years > 1 && cumulative > -1
       ? Math.pow(1 + cumulative, 1 / years) - 1
       : null;
-  return { cumulative, annualized, startDate: start.date, endDate: end.date };
+  // « marche d'escalier » DCA au cours réel du Monde : chaque versement
+  // achète au cours du jour (premier cours ≥ sa date), la valeur finale est
+  // la somme des parts au dernier cours — c'est CE qu'un ETF Monde simple
+  // aurait réellement donné avec vos propres versements.
+  let shares = 0;
+  let cursor = 0;
+  for (const point of points) {
+    while (
+      cursor < flows.length &&
+      flows[cursor].date.getTime() <= point.date.getTime()
+    ) {
+      shares += flows[cursor].amountCents / point.closeCents;
+      cursor += 1;
+    }
+  }
+  // versements postérieurs au dernier cours disponible : au dernier cours
+  while (cursor < flows.length) {
+    shares += flows[cursor].amountCents / end.closeCents;
+    cursor += 1;
+  }
+  const referenceValueCents = Math.round(shares * end.closeCents);
+  return {
+    cumulative,
+    annualized,
+    startDate: start.date,
+    endDate: end.date,
+    referenceValueCents,
+    deltaCents: 0,
+  };
 }
 
 /**
@@ -246,20 +280,21 @@ export const getPerformanceReport = cache(async (): Promise<PerformanceReport> =
     livretBalance += current ? current.balanceCents : 0;
     livretFlows.push(...events);
   }
-  const firstFlowDate = positions.reduce<Date | null>((earliest, p) => {
-    const dates = [
-      ...(p.investments.length > 0
-        ? p.investments.map((inv) => inv.date.getTime())
-        : p.boughtAt
-          ? [p.boughtAt.getTime()]
-          : []),
-      ...livretFlows.map((f) => f.date.getTime()),
-    ];
-    if (dates.length === 0) return earliest;
-    const min = Math.min(...dates);
-    return earliest === null || min < earliest.getTime() ? new Date(min) : earliest;
-  }, null);
-  const worldGrowth = await getWorldGrowth(firstFlowDate, now).catch(() => null);
+  // flux externes du portefeuille, triés et normalisés UTC minuit : c'est
+  // la « marche d'escalier » DCA rejouée au cours réel du MSCI World
+  const allFlows = mergeCashFlows([
+    ...positions.flatMap((p) => positionCashFlows(p)),
+    ...livretFlows.map((f) => ({
+      date: toUtcMidnight(f.date),
+      amountCents: f.amountCents,
+    })),
+  ]);
+  const worldGrowth = await getWorldGrowth(allFlows, now).catch(() => null);
+  if (worldGrowth) {
+    const totalValue =
+      positions.reduce((s, p) => s + p.valueCents, 0) + livretBalance;
+    worldGrowth.deltaCents = totalValue - worldGrowth.referenceValueCents;
+  }
   return buildPerformanceReport({
     positions,
     livretFlows,

@@ -601,7 +601,12 @@ function DiversificationPanel({
 
 function formatSignedPercent(ratio: number | null): string {
   if (ratio === null) return "—";
-  const formatted = formatPercent(Math.abs(ratio));
+  // rendu signé en une passe : formatPercent ajouterait un « + » que ce
+  // préfixe doublerait en « ++10,49 % » (ou « −+2,48 % » pour les pertes)
+  const formatted = new Intl.NumberFormat("fr-FR", {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(Math.abs(ratio));
   return `${ratio >= 0 ? "+" : "−"}${formatted}`;
 }
 
@@ -615,17 +620,33 @@ function performanceBadge(xirrValue: number | null) {
 type VerdictTone = "positive" | "warning" | "negative" | "neutral";
 
 /**
- * Verdict sur la valeur finale du portefeuille vs les deux références
- * « mêmes versements » : bat les deux → positive ; bat le livret mais pas
- * le Monde → warning (la complexité n'apporte pas plus qu'un ETF large) ;
- * sous le livret → negative.
+ * Verdict sur la valeur finale du portefeuille, dans l'ordre du juge le plus
+ * exigeant au plus laxiste : (1) la marche d'escalier DCA au cours RÉEL du
+ * MSCI World sur vos propres versements — le vrai contre-factuel « un ETF
+ * Monde simple aurait donné ça » ; (2) la référence à taux constant 8 %/an
+ * ; (3) le livret. Bat le World réel → positive ; bat les références à
+ * taux constant mais pas le World réel → warning ; sous le livret →
+ * negative.
  */
 function verdictTone(
   valueCents: number,
-  savingsRefValueCents: number | null,
+  realWorldValueCents: number | null,
   worldRefValueCents: number | null,
+  savingsRefValueCents: number | null,
 ): VerdictTone {
-  if (savingsRefValueCents === null && worldRefValueCents === null) return "neutral";
+  if (savingsRefValueCents === null && worldRefValueCents === null && realWorldValueCents === null) {
+    return "neutral";
+  }
+  if (realWorldValueCents !== null) {
+    if (valueCents >= realWorldValueCents) return "positive";
+    if (
+      savingsRefValueCents !== null &&
+      valueCents >= savingsRefValueCents
+    ) {
+      return "warning";
+    }
+    return "negative";
+  }
   if (worldRefValueCents !== null && valueCents >= worldRefValueCents) return "positive";
   if (savingsRefValueCents !== null && valueCents >= savingsRefValueCents) return "warning";
   if (savingsRefValueCents !== null) return "negative";
@@ -652,8 +673,9 @@ function PerformancePanel({
   const worldRef = report.worldReference;
   const verdict = verdictTone(
     total.valueCents,
-    savingsRef?.valueCents ?? null,
+    report.worldGrowth?.referenceValueCents ?? null,
     worldRef?.valueCents ?? null,
+    savingsRef?.valueCents ?? null,
   );
   const verdictText =
     verdict === "positive"
@@ -784,9 +806,15 @@ function PerformancePanel({
                   savingsRef.deltaCents >= 0 ? "text-positive" : "text-negative",
                 )}
               >
-                {t.analyse.performance.vsReference
-                  .replace("{delta}", formatEurCents(Math.abs(savingsRef.deltaCents)))}
-                {savingsRef.deltaCents >= 0 ? " ↑" : " ↓"}
+                {savingsRef.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(savingsRef.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(savingsRef.deltaCents)),
+                    )}
               </p>
             ) : null}
           </div>
@@ -810,9 +838,15 @@ function PerformancePanel({
                   worldRef.deltaCents >= 0 ? "text-positive" : "text-negative",
                 )}
               >
-                {t.analyse.performance.vsReference
-                  .replace("{delta}", formatEurCents(Math.abs(worldRef.deltaCents)))}
-                {worldRef.deltaCents >= 0 ? " ↑" : " ↓"}
+                {worldRef.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(worldRef.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(worldRef.deltaCents)),
+                    )}
               </p>
             ) : null}
           </div>
@@ -855,6 +889,26 @@ function PerformancePanel({
                     ? formatSignedPercent(report.worldGrowth.annualized)
                     : t.analyse.performance.worldGrowthNa,
                 )}
+            </p>
+            <p className="mt-1 text-xs text-text-secondary">
+              {t.analyse.performance.worldGrowthValue
+                .replace("{value}", formatEurCents(report.worldGrowth.referenceValueCents))}
+            </p>
+            <p
+              className={cn(
+                "mt-0.5 text-xs tabular-nums",
+                report.worldGrowth.deltaCents >= 0 ? "text-positive" : "text-negative",
+              )}
+            >
+              {report.worldGrowth.deltaCents >= 0
+                ? t.analyse.performance.aheadReference.replace(
+                    "{delta}",
+                    formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                  )
+                : t.analyse.performance.behindReference.replace(
+                    "{delta}",
+                    formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                  )}
             </p>
             <p className="mt-0.5 text-xs text-text-muted">
               {t.analyse.performance.worldGrowthHint

@@ -225,6 +225,8 @@ describe("buildPerformanceReport", () => {
         annualized: 0.12,
         startDate: new Date("2024-01-15"),
         endDate: new Date("2025-01-15"),
+        referenceValueCents: 112_000,
+        deltaCents: -2_000,
       },
       now: NOW,
     });
