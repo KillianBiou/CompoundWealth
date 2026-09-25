@@ -625,7 +625,10 @@
       "empty": "Unknown exposure for your positions.",
       "disclaimer": "Look-through: ETFs unfolded according to their reference index breakdown (approximations meant to be replaced by actual holdings).",
       "tabGeographic": "Geographic",
-      "tabSector": "Sector"
+      "tabSector": "Sector",
+      "viewZone": "Zones",
+      "viewCountry": "Countries ({count})",
+      "otherCountries": "Other countries"
     },
     "simulator": {
       "capitalHorizon": "Capital at horizon ({year})",

@@ -126,7 +126,13 @@ export const getSectorAnalysis = cache(async (): Promise<DiversificationResult> 
 
 export const getRegionAnalysis = cache(async (): Promise<DiversificationResult> => {
   const positions = await getAnalysisPositions();
-  return analyzeRegions(positions);
+  return analyzeRegions(positions, "zone");
+});
+
+/** Répartition géographique détaillée par pays (pays < 1 % regroupés). */
+export const getCountryAnalysis = cache(async (): Promise<DiversificationResult> => {
+  const positions = await getAnalysisPositions();
+  return analyzeRegions(positions, "country");
 });
 
 /**

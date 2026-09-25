@@ -211,10 +211,32 @@ describe("analyzeSectors / analyzeRegions", () => {
     expect(result.alerts.find((a) => a.label === "Technologie")).toBeUndefined();
   });
 
-  it("alerte au-delà du seuil géographique", () => {
-    const result = analyzeRegions([world]);
-    const us = result.lines.find((l) => l.sector === "US");
-    expect(us!.share).toBeCloseTo(0.69, 2);
+  it("agrège les pays du fichier ETF en zones continentales", () => {
+    const result = analyzeRegions([world, france], "zone");
+    const ameriqueNord = result.lines.find((l) => l.sector === "AmeriqueNord");
+    expect(ameriqueNord).toBeDefined();
+    // MSCI World ~69 % US + MSCI France ~89 % France (Europe)
+    expect(ameriqueNord!.share).toBeGreaterThan(0.4);
+    expect(ameriqueNord!.share).toBeLessThan(0.6);
+    const europe = result.lines.find((l) => l.sector === "Europe");
+    expect(europe).toBeDefined();
+    expect(europe!.share).toBeGreaterThan(0.25);
+  });
+  it("liste les pays détaillés et regroupe les petits en « autres pays »", () => {
+    const result = analyzeRegions([world, france], "country");
+    const us = result.lines.find((l) => l.sector === "United States");
+    expect(us).toBeDefined();
+    expect(us!.share).toBeGreaterThan(0.4);
+    for (const line of result.lines) {
+      if (line.sector === "Autres pays") continue;
+      expect(line.share).toBeGreaterThanOrEqual(0.01);
+    }
+    const others = result.lines.find((l) => l.sector === "Autres pays");
+    if (others) {
+      // la ligne agrégée peut dépasser 1 % (somme de plusieurs petits pays),
+      // mais reste minoritaire devant le plus gros pays détaillé
+      expect(others.share).toBeLessThan(us!.share);
+    }
   });
 
   it("retourne un résultat vide sans position analysable", () => {

@@ -87,10 +87,11 @@ Vision en **panels** : une grille de cartes résumé. Au clic sur une carte, un 
 
 **Résumé (carte).**
 - KPI : « Score géographique : 5/10 »
-- Top : « 🇺🇸 US 58 % · 🇪🇺 Europe 27 % · 🌏 Monde 9 % · 🌍 EM 6 % »
-- Carte du monde choroplèthe ou barres par région
+- Top : « 🌎 Amérique du Nord 58 % » (zone continentale)
+- Carte du monde choroplèthe ou barres par zone
 
 **Panel détaillé.**
+0. **Sélecteur de granularité** : vue **Zones** (continents/régions — Amérique du Nord, Amérique latine, Europe, Asie de l'Est développée, Asie émergente, Afrique & Moyen-Orient, Océanie) ou vue **Pays** (chaque pays ≥ 1 % du portefeuille, les petits pays et l'entrée « Other » des fonds étant regroupés en « Autres pays »).
 1. **Répartition par pays** avec look-through ETF (ex. MSCI France → 60 % Total/LVMH/BNP...).
 2. **Exposition devise** : USD/GBP/JPY... (proche mais distincte : un ETF World EUR a ~70 % de risque USD). Croisé avec la fiscalité retenue à la source (W-15 % sur dividendes US).
 3. **Alertes** : « 58 % US, dont risque de change significatif » ; « 0 % obligations » ; « 0 % immobilier » (hors Private Equity).
