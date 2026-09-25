@@ -96,7 +96,7 @@ Vision en **panels** : une grille de cartes résumé. Au clic sur une carte, un 
 2. **Exposition devise** : USD/GBP/JPY... (proche mais distincte : un ETF World EUR a ~70 % de risque USD). Croisé avec la fiscalité retenue à la source (W-15 % sur dividendes US).
 3. **Alertes** : « 58 % US, dont risque de change significatif » ; « 0 % obligations » ; « 0 % immobilier » (hors Private Equity).
 4. **Écarts vs benchmark** MSCI ACWI : sous-exposition EM si LU1681045370 = 6 % du total.
-5. **Score** : combinaison concentration pays max + nombre de régions couvertes.
+5. **Score** : combinaison concentration pays max + nombre de régions couvertes. Le score de diversification (survol du KPI pour le détail) : 0 à 10, pénalisé par l'indice de Herfindahl (somme des parts²) et le nombre de poches couvertes, plafonné à 5/10 si moins de 3 poches. Références d'une diversification solide : aucune position individuelle > 5 % (règle des 5 %, Fidelity/Kiplinger), aucun secteur > 25 %, exposition répartie sur plusieurs zones géographiques.
 
 **User stories.**
 - *En tant qu'investisseur, je veux connaître mon exposition réelle par pays, ETF dépliés, afin d'éviter une concentration cachée US/tech (le duo World + S&P 500 double l'exposition Apple/Microsoft).*

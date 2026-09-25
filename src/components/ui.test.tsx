@@ -25,4 +25,9 @@ describe("Kpi", () => {
     const sub = screen.getByText("+85,00 € (+17,0 %)");
     expect(sub).toHaveClass("text-positive");
   });
+
+  it("expose une explication au survol via hint", () => {
+    render(<Kpi label="Score" value="6/10" hint="Détail du calcul" />);
+    expect(screen.getByText("Score")).toHaveAttribute("title", "Détail du calcul");
+  });
 });

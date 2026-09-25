@@ -120,7 +120,7 @@ const sectors: DiversificationResult = {
 const regions: DiversificationResult = {
   lines: [
     {
-      sector: "US",
+      sector: "AmeriqueNord",
       amountCents: 58_000_00,
       share: 0.58,
       contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
@@ -133,7 +133,13 @@ const regions: DiversificationResult = {
     },
   ],
   score: 5,
-  alerts: [],
+  alerts: [
+    {
+      label: "AmeriqueNord",
+      share: 0.58,
+      detail: "MSCI World Swap PEA + NVIDIA…",
+    },
+  ],
   totalCents: 100_000_00,
 };
 const countries: DiversificationResult = {
@@ -351,6 +357,13 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText(/Pays \(2\)/));
     expect(screen.getAllByText("United States").length).toBeGreaterThan(0);
     expect(screen.getByText("Autres pays")).toBeInTheDocument();
+  });
+  it("l'alerte de concentration affiche le libellé traduit de la zone", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    const alertLine = screen.getByText(/via MSCI World Swap PEA \+ NVIDIA…/);
+    expect(alertLine.textContent).toContain("Amérique du Nord");
+    expect(alertLine.textContent).not.toContain("AmeriqueNord");
   });
   it("la vue économie classe l'exposition développé / émergent / frontière", () => {
     renderView();

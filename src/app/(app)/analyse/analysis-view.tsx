@@ -462,6 +462,7 @@ function DiversificationPanel({
           label={t.analyse.diversification.score}
           value={result.score !== null ? `${result.score}/10` : "—"}
           sub={t.analyse.diversification.scoreSub}
+          hint={t.analyse.diversification.scoreHint}
         />
         {result.lines[0] ? (
           <Kpi
@@ -476,8 +477,9 @@ function DiversificationPanel({
       {result.alerts.length > 0 ? (
         <div className="space-y-1 rounded-lg border border-warning/25 bg-warning/5 p-3">
           {result.alerts.map((alert) => (
-            <p key={alert.label} className="text-sm text-warning">
-              ⚠ {alert.label} : {formatPercent(alert.share)} — {t.analyse.diversification.via.replace("{detail}", alert.detail)}
+            <p key={alert.label} className="break-words text-sm text-warning">
+              ⚠ {geoLabel(alert.label)} : {formatPercent(alert.share)} —{" "}
+              {t.analyse.diversification.via.replace("{detail}", alert.detail)}
             </p>
           ))}
         </div>
