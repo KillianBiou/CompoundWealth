@@ -1691,6 +1691,44 @@ export function AnalysisPageView({
 
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
 
+  // texte copié depuis le panneau ouvert : un résumé structuré selon le scanner
+  const panelCopyText = useMemo<string | undefined>(() => {
+    if (openPanel === "etf" && selectedIsin && etfDetails[selectedIsin]) {
+      return JSON.stringify(etfDetails[selectedIsin], null, 2);
+    }
+    if (openPanel === "action" && selectedAction) {
+      return JSON.stringify(selectedAction, null, 2);
+    }
+    if (openPanel === "frais") return JSON.stringify(fees, null, 2);
+    if (openPanel === "revenus") return JSON.stringify(income, null, 2);
+    if (openPanel === "exposition") {
+      return JSON.stringify({ sectors, regions, countries, economies }, null, 2);
+    }
+    if (openPanel === "simulateur") {
+      return JSON.stringify(
+        { defaults: simulatorDefaults, params: simParams },
+        null,
+        2,
+      );
+    }
+    if (openPanel === "performance") return JSON.stringify(performance, null, 2);
+    return undefined;
+  }, [
+    openPanel,
+    selectedIsin,
+    selectedAction,
+    etfDetails,
+    fees,
+    income,
+    sectors,
+    regions,
+    countries,
+    economies,
+    simulatorDefaults,
+    simParams,
+    performance,
+  ]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -1801,7 +1839,9 @@ export function AnalysisPageView({
         title={openPanel !== null ? panels[openPanel].title : ""}
         subtitle={openPanel !== null ? panels[openPanel].subtitle : undefined}
         icon={openPanel !== null ? panels[openPanel].icon : undefined}
-      >
+        copyText={panelCopyText}
+        copyLabel={t.common.copyDetail}
+     >
         {openPanel === "frais" ? (
           <FeePanel fees={fees} onSelectLine={openPosition} />
         ) : null}

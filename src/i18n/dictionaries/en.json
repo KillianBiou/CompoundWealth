@@ -7,6 +7,10 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
+    "copySuccess": "\"{label}\" copied to clipboard",
+    "copyFail": "Could not copy \"{label}\"",
+    "copyAria": "Copy to clipboard",
+    "copyDetail": "Detail",
     "currency": "€"
   },
   "nav": {
@@ -152,6 +156,8 @@
     "importSuccess": "Import successful — {names} created",
     "importButton": "Import an export",
     "newButton": "New account",
+    "copyAll": "Copy",
+    "copyAllTitle": "Copy the whole portfolio (Markdown, recreatable)",
     "empty": "No active account. Create a PEA or a CTO to get started.",
     "card": {
       "historyBuilding": "History building…",

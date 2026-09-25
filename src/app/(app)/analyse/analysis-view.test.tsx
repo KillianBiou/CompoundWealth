@@ -1,5 +1,5 @@
 import { screen, fireEvent } from "@testing-library/react";
-import { renderWithI18n } from "../../../../tests/test-utils";
+import { renderWithToast } from "../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { AnalysisPageView } from "./analysis-view";
 import type {
@@ -287,7 +287,7 @@ const performance: PerformanceReport = {
 };
 
 function renderView() {
-  return renderWithI18n(
+  return renderWithToast(
     <AnalysisPageView
       fees={fees}
       income={income}
