@@ -43,16 +43,17 @@ Vision en **panels** : une grille de cartes résumé. Au clic sur une carte, un 
 **Panel détaillé.**
 1. **Calendrier 12 mois** : barres mensuelles glissantes, drapeaux par source (NVIDIA trimestriel, intérêts TR mensuels).
 2. **Table par source** : valeur, type (action/ETF Dist/interest), montant par versement, fréquence, yield sur capital investi (ex. NVIDIA : 0,44 € net en juin, [données export]).
-3. **Yield global pondéré** du portefeuille : Σ(revenu) / Σ(valeur). Pour un portefeuille 100 % ETF Acc, distinguer revenus **cash** (CTO NVIDIA/intérêts) et revenus **capitalisés** (estimation via yield des indices, cf. analyse PEA).
-4. **Historique** : cumul annuel par année fiscale.
-5. **Taux de couverture** : revenus passifs / dépenses mensuelles moyennes (lien avec scanner d'abonnements).
+3. **Yield global pondéré** du portefeuille : Σ(revenu estimé) / Σ(valeur), cash uniquement.
+4. **Positions sans dividende en cash** : les ETF capitalisants (Acc — dividende réinvesti dans le cours) et les valeurs ne versant aucun dividende sont explicitement listés à part, hors compteur de revenus.
+5. **Historique** : cumul annuel par année fiscale.
+6. **Taux de couverture** : revenus passifs / dépenses mensuelles moyennes (lien avec scanner d'abonnements).
 
 **User stories.**
 - *En tant qu'investisseur, je veux un calendrier des versements à venir afin d'anticiper ma trésorerie.*
-- *En tant qu'investisseur en ETF Acc, je veux une estimation des dividendes capitalisés afin de connaître mon vrai rendement total.*
+- *En tant qu'investisseur, je veux connaître la fréquence et la date estimée du prochain versement de chaque ligne payante.*
 - *En tant qu'utilisateur, je veux le taux de couverture de mes dépenses afin de mesurer ma progression vers l'indépendance financière.*
 
-**Logique.** Revenus cash depuis l'export (`DIVIDEND`, `INTEREST_PAYMENT`). Conversion devise via `original_amount`/`fx_rate`. Revenus capitalisés : Σ(valeur ligne × yield indice × durée). Prérequis : date de détachement < date d'entrée en position (règle competition, [source](https://help.competition.com/fr/articles/7973821-suivre-ses-dividendes)).
+**Logique.** Seules les positions versant des dividendes **en cash** sont listées : ETF distribuants (`distributing=true` du fichier `data/etfDetail.csv`, projection = valeur × `dividend_yield_2025`) et actions payantes (`dividend_yield` du fichier `data/actionDetail.csv`). Revenus cash depuis l'export (`DIVIDEND`, `INTEREST_PAYMENT`), conversion devise via `original_amount`/`fx_rate`. Fréquence et calendrier : mois réels des versements de l'historique, sinon cycle trimestriel usuel des actions US (mars/juin/septembre/décembre) ; le prochain versement en est déduit avec son montant estimé. Les ETF capitalisants ne versent rien en cash : leurs dividendes sont réinvestis dans le cours et suivis par la performance, pas par ce scanner.
 
 ---
 

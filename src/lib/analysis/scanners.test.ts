@@ -10,6 +10,7 @@ import {
   type AnalysisPosition,
 } from "./scanners";
 import { ETF_EXPOSURES, getEtfExposureByIsin } from "./exposure-catalog";
+import { getActionDetailBySymbol } from "./action-detail";
 
 const now = new Date("2026-09-24T12:00:00Z");
 
@@ -117,17 +118,52 @@ describe("analyzeIncome", () => {
     expect(result.cashTwelveMonthsCents).toBe(2);
   });
 
-  it("estime les dividendes capitalisés des ETF Acc via le yield du catalogue", () => {
+  it("exclut les ETF capitalisants du scanner de revenus", () => {
     const world = makePosition({ valueCents: 100_000, ter: 0.002 });
     const result = analyzeIncome([world], now);
-    const worldExposure = getEtfExposureByIsin("IE0002XZSHO1")!;
-    expect(result.capitalizedTwelveMonthsCents).toBe(
-      Math.round(100_000 * worldExposure.dividendYield),
-    );
+    expect(result.lines).toHaveLength(0);
+    expect(result.excludedLines).toHaveLength(1);
+    expect(result.excludedLines[0].reason).toBe("capitalizing");
+    expect(result.projectedTwelveMonthsCents).toBe(0);
+  });
+  it("exclut une action ne versant aucun dividende", () => {
+    const spacex = makePosition({
+      name: "SpaceX",
+      isStock: true,
+      isin: "US84615Q1031",
+      ter: null,
+      valueCents: 20_000,
+    });
+    const result = analyzeIncome([spacex], now);
+    expect(result.lines).toHaveLength(0);
+    expect(result.excludedLines[0].reason).toBe("no_dividend");
+  });
+  it("liste une action payante avec sa fréquence et son prochain versement estimés", () => {
+    const nvidia = makePosition({
+      name: "NVIDIA",
+      isStock: true,
+      isin: "US67066G1040",
+      ter: null,
+      valueCents: 100_000,
+    });
+    const result = analyzeIncome([nvidia], now);
+    expect(result.lines).toHaveLength(1);
+    const line = result.lines[0];
+    const nvda = getActionDetailBySymbol("US67066G1040")!;
+    expect(line.projectedCents).toBe(Math.round(100_000 * nvda.dividendYield!));
+    expect(line.paymentsPerYear).toBe(4);
+    expect(line.paymentMonths).toEqual([2, 5, 8, 11]);
+    expect(line.nextPayment).toEqual({
+      year: 2026,
+      month: 8,
+      amountCents: Math.round(line.projectedCents / 4),
+    });
+    expect(result.monthlyCalendar.length).toBe(4);
   });
 
-  it("remplit le calendrier mensuel à partir des versements cash", () => {
-    const nvidia = makePosition({
+  it("remplit le calendrier prévisionnel depuis l'historique réel des versements", () => {
+    const payer = makePosition({
+      name: "Action payante",
       isStock: true,
       isin: "US67066G1040",
       ter: null,
@@ -137,8 +173,13 @@ describe("analyzeIncome", () => {
         { date: new Date("2026-03-25"), amountCents: 5 },
       ],
     });
-    const result = analyzeIncome([nvidia], now);
-    expect(result.monthlyCalendar).toEqual([{ year: 2026, month: 2, amountCents: 15 }]);
+    const result = analyzeIncome([payer], now);
+    const line = result.lines[0];
+    expect(result.monthlyCalendar).toEqual([
+      { year: 2027, month: 2, amountCents: line.projectedCents },
+    ]);
+    expect(line.paymentMonths).toEqual([2]);
+    expect(line.paymentsPerYear).toBe(1);
   });
 });
 

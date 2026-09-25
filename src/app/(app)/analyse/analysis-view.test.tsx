@@ -68,7 +68,6 @@ const fees: FeeAnalysisResult = {
 const income: IncomeAnalysisResult = {
   cashTwelveMonthsCents: 237_00,
   projectedTwelveMonthsCents: 500_00,
-  capitalizedTwelveMonthsCents: 260_00,
   lines: [
     {
       positionId: "pos-1",
@@ -76,10 +75,22 @@ const income: IncomeAnalysisResult = {
       isin: "US67066G1040",
       symbol: "US67066G1040",
       envelopeName: "CTO Trade Republic",
-      kind: "cash",
       twelveMonthsCents: 237_00,
       projectedCents: 237_00,
       yieldOnValue: 0.0044,
+      paymentMonths: [2, 5, 8, 11],
+      paymentsPerYear: 4,
+      nextPayment: { year: 2026, month: 8, amountCents: 59_00 },
+    },
+  ],
+  excludedLines: [
+    {
+      positionId: "pos-3",
+      name: "MSCI World Swap PEA",
+      isin: "IE0002XZSHO1",
+      symbol: "IE0002XZSHO1",
+      envelopeName: "PEA Trade Republic",
+      reason: "capitalizing",
     },
   ],
   yieldOnValue: 0.0031,
