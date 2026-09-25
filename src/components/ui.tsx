@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, HelpCircle } from "lucide-react";
 
 import { cn } from "./cn";
 
@@ -133,23 +134,67 @@ export function Select({ className, ...props }: ComponentProps<"select">) {
   return <select className={cn(inputClass, "appearance-none", className)} {...props} />;
 }
 
+export interface KpiScoreLine {
+  /** libellé du critère, traduit côté appelant */
+  label: string;
+  /** points obtenus sur le maximum du critère, ex. "-1" ou "+2" */
+  delta: string;
+  /** couleur du delta selon le résultat du critère */
+  tone: "positive" | "negative" | "warning";
+}
+
 export function Kpi({
   label,
   value,
   sub,
   subTone,
+  hint,
+  scoreLines,
+  scoreTotal,
+  scoreTone,
 }: {
   label: string;
   value: string;
   sub?: string;
   subTone?: "positive" | "negative";
+  /** explication au survol de l'icône (bulle comme les fiches ETF) */
+  hint?: string;
+  /** décomposition ligne par ligne du score, affichée dans la bulle */
+  scoreLines?: KpiScoreLine[];
+  /** ligne de total du score, ex. "7/10" */
+  scoreTotal?: string;
+  /** couleur du total selon le score */
+  scoreTone?: "positive" | "negative" | "warning";
 }) {
+  const [open, setOpen] = useState(false);
+  const hasTooltip = Boolean(hint || (scoreLines && scoreTotal));
+  const deltaColor = (tone: KpiScoreLine["tone"]) =>
+    tone === "positive" ? "text-positive" : tone === "warning" ? "text-warning" : "text-negative";
   return (
-    <div>
-      <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+    <div className="relative">
+      <p className="flex items-center gap-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
         {label}
+        {hasTooltip ? (
+          <HelpCircle
+            className="h-3 w-3 cursor-help text-text-muted/70 transition-colors hover:text-accent-500"
+            aria-hidden
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            tabIndex={0}
+          />
+        ) : null}
       </p>
-      <p className="mt-1 font-heading text-2xl font-semibold text-text-primary tabular-nums">
+      <p
+        className={cn(
+          "mt-1 font-heading text-2xl font-semibold tabular-nums",
+          scoreTone === "positive" && "text-positive",
+          scoreTone === "warning" && "text-warning",
+          scoreTone === "negative" && "text-negative",
+          !scoreTone && "text-text-primary",
+        )}
+      >
         {value}
       </p>
       {sub ? (
@@ -163,6 +208,41 @@ export function Kpi({
         >
           {sub}
         </p>
+      ) : null}
+      {hasTooltip && open ? (
+        <span
+          role="tooltip"
+          className="absolute top-full left-0 z-20 mt-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case"
+        >
+          {scoreLines && scoreTotal ? (
+            <>
+              {scoreLines.map((line) => (
+                <span key={line.label} className="block whitespace-nowrap">
+                  {line.label}{" "}
+                  <span className={cn("font-semibold tabular-nums", deltaColor(line.tone))}>
+                    {line.delta}
+                  </span>
+                </span>
+              ))}
+              <span className="mt-1 block border-t border-border-cw pt-1 font-semibold">
+                Total{" "}
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    scoreTone === "positive" && "text-positive",
+                    scoreTone === "warning" && "text-warning",
+                    scoreTone === "negative" && "text-negative",
+                    !scoreTone && "text-text-primary",
+                  )}
+                >
+                  {scoreTotal}
+                </span>
+              </span>
+            </>
+          ) : (
+            hint
+          )}
+        </span>
       ) : null}
     </div>
   );

@@ -10,6 +10,7 @@ import {
   type AnalysisPosition,
 } from "./scanners";
 import { ETF_EXPOSURES, getEtfExposureByIsin } from "./exposure-catalog";
+import { getActionDetailBySymbol } from "./action-detail";
 
 const now = new Date("2026-09-24T12:00:00Z");
 
@@ -117,17 +118,52 @@ describe("analyzeIncome", () => {
     expect(result.cashTwelveMonthsCents).toBe(2);
   });
 
-  it("estime les dividendes capitalisés des ETF Acc via le yield du catalogue", () => {
+  it("exclut les ETF capitalisants du scanner de revenus", () => {
     const world = makePosition({ valueCents: 100_000, ter: 0.002 });
     const result = analyzeIncome([world], now);
-    const worldExposure = getEtfExposureByIsin("IE0002XZSHO1")!;
-    expect(result.capitalizedTwelveMonthsCents).toBe(
-      Math.round(100_000 * worldExposure.dividendYield),
-    );
+    expect(result.lines).toHaveLength(0);
+    expect(result.excludedLines).toHaveLength(1);
+    expect(result.excludedLines[0].reason).toBe("capitalizing");
+    expect(result.projectedTwelveMonthsCents).toBe(0);
+  });
+  it("exclut une action ne versant aucun dividende", () => {
+    const spacex = makePosition({
+      name: "SpaceX",
+      isStock: true,
+      isin: "US84615Q1031",
+      ter: null,
+      valueCents: 20_000,
+    });
+    const result = analyzeIncome([spacex], now);
+    expect(result.lines).toHaveLength(0);
+    expect(result.excludedLines[0].reason).toBe("no_dividend");
+  });
+  it("liste une action payante avec sa fréquence et son prochain versement estimés", () => {
+    const nvidia = makePosition({
+      name: "NVIDIA",
+      isStock: true,
+      isin: "US67066G1040",
+      ter: null,
+      valueCents: 100_000,
+    });
+    const result = analyzeIncome([nvidia], now);
+    expect(result.lines).toHaveLength(1);
+    const line = result.lines[0];
+    const nvda = getActionDetailBySymbol("US67066G1040")!;
+    expect(line.projectedCents).toBe(Math.round(100_000 * nvda.dividendYield!));
+    expect(line.paymentsPerYear).toBe(4);
+    expect(line.paymentMonths).toEqual([2, 5, 8, 11]);
+    expect(line.nextPayment).toEqual({
+      year: 2026,
+      month: 8,
+      amountCents: Math.round(line.projectedCents / 4),
+    });
+    expect(result.monthlyCalendar.length).toBe(4);
   });
 
-  it("remplit le calendrier mensuel à partir des versements cash", () => {
-    const nvidia = makePosition({
+  it("remplit le calendrier prévisionnel depuis l'historique réel des versements", () => {
+    const payer = makePosition({
+      name: "Action payante",
       isStock: true,
       isin: "US67066G1040",
       ter: null,
@@ -137,8 +173,13 @@ describe("analyzeIncome", () => {
         { date: new Date("2026-03-25"), amountCents: 5 },
       ],
     });
-    const result = analyzeIncome([nvidia], now);
-    expect(result.monthlyCalendar).toEqual([{ year: 2026, month: 2, amountCents: 15 }]);
+    const result = analyzeIncome([payer], now);
+    const line = result.lines[0];
+    expect(result.monthlyCalendar).toEqual([
+      { year: 2027, month: 2, amountCents: line.projectedCents },
+    ]);
+    expect(line.paymentMonths).toEqual([2]);
+    expect(line.paymentsPerYear).toBe(1);
   });
 });
 
@@ -170,10 +211,62 @@ describe("analyzeSectors / analyzeRegions", () => {
     expect(result.alerts.find((a) => a.label === "Technologie")).toBeUndefined();
   });
 
-  it("alerte au-delà du seuil géographique", () => {
-    const result = analyzeRegions([world]);
-    const us = result.lines.find((l) => l.sector === "US");
-    expect(us!.share).toBeCloseTo(0.69, 2);
+  it("agrège les pays du fichier ETF en zones continentales", () => {
+    const result = analyzeRegions([world, france], "zone");
+    const ameriqueNord = result.lines.find((l) => l.sector === "AmeriqueNord");
+    expect(ameriqueNord).toBeDefined();
+    // MSCI World ~69 % US + MSCI France ~89 % France (Europe)
+    expect(ameriqueNord!.share).toBeGreaterThan(0.4);
+    expect(ameriqueNord!.share).toBeLessThan(0.6);
+    const europe = result.lines.find((l) => l.sector === "Europe");
+    expect(europe).toBeDefined();
+    expect(europe!.share).toBeGreaterThan(0.25);
+  });
+  it("liste les pays détaillés et regroupe les petits en « autres pays »", () => {
+    const result = analyzeRegions([world, france], "country");
+    const us = result.lines.find((l) => l.sector === "United States");
+    expect(us).toBeDefined();
+    expect(us!.share).toBeGreaterThan(0.4);
+    for (const line of result.lines) {
+      if (line.sector === "Autres pays") continue;
+      expect(line.share).toBeGreaterThanOrEqual(0.01);
+    }
+    const others = result.lines.find((l) => l.sector === "Autres pays");
+    if (others) {
+      // la ligne agrégée peut dépasser 1 % (somme de plusieurs petits pays),
+      // mais reste minoritaire devant le plus gros pays détaillé
+      expect(others.share).toBeLessThan(us!.share);
+    }
+  });
+
+  it("agrège les pays par type d'économie MSCI", () => {
+    const result = analyzeRegions([world, france], "economy");
+    const developpe = result.lines.find((l) => l.sector === "Developpe");
+    expect(developpe).toBeDefined();
+    // MSCI World + MSCI France : tout est développé (US, Japon, Europe de l'Ouest),
+    // hors la part « Other » du fichier ETF non détaillée par le fonds
+    expect(developpe!.share).toBeGreaterThan(0.9);
+    expect(developpe!.amountCents).toBeGreaterThan(140_000_00);
+    expect(developpe!.amountCents).toBeLessThan(150_000_00);
+    // pas d'exposition émergente ni frontière sur ces deux positions
+    expect(result.lines.find((l) => l.sector === "Emergent")).toBeUndefined();
+    expect(result.lines.find((l) => l.sector === "Frontiere")).toBeUndefined();
+  });
+
+  it("décompose le score sectoriel en critères notés", () => {
+    const result = analyzeSectors([world, france]);
+    expect(result.scoreBreakdown).toHaveLength(3);
+    const keys = result.scoreBreakdown.map((c) => c.key);
+    expect(keys).toContain("sectorTop");
+    expect(keys).toContain("sectorCoverage");
+    expect(keys).toContain("sectorBalance");
+    const total = result.scoreBreakdown.reduce((s, c) => s + c.points, 0);
+    expect(result.score).toBe(Math.min(10, Math.max(0, total)));
+    // chaque critère respecte son maximum
+    for (const c of result.scoreBreakdown) {
+      expect(c.points).toBeGreaterThanOrEqual(0);
+      expect(c.points).toBeLessThanOrEqual(c.max);
+    }
   });
 
   it("retourne un résultat vide sans position analysable", () => {

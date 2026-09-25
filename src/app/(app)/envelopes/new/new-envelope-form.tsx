@@ -129,20 +129,21 @@ export function NewEnvelopeForm() {
               placeholder="10 000,00"
             />
           </Field>
-        ) : (
-          <Field
-            label={t.envelopes.new.openedAt}
-            htmlFor="openedAt"
-            error={state?.errors?.openedAt}
-            hint={
-              type === "PEA"
-                ? t.envelopes.new.openedAtPeaHint
+        ) : null}
+        <Field
+          label={t.envelopes.new.openedAt}
+          htmlFor="openedAt"
+          error={state?.errors?.openedAt}
+          hint={
+            type === "PEA"
+              ? t.envelopes.new.openedAtPeaHint
+              : type === "LIVRET_A"
+                ? t.envelopes.new.openedAtLivretHint
                 : t.envelopes.new.openedAtHint
-            }
-          >
-            <Input id="openedAt" name="openedAt" type="date" />
-          </Field>
-        )}
+          }
+        >
+          <Input id="openedAt" name="openedAt" type="date" />
+        </Field>
       </div>
       <Button type="submit" disabled={pending} className="w-full sm:w-auto">
         {pending ? t.envelopes.new.creating : t.envelopes.new.create}

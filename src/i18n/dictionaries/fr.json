@@ -204,6 +204,7 @@
       "openedAt": "Date d'ouverture",
       "openedAtPeaHint": "Recommandée pour le PEA (antériorité fiscale)",
       "openedAtHint": "Optionnelle",
+      "openedAtLivretHint": "Date d'ouverture du livret — le versement initial et les intérêts courent depuis cette date",
       "create": "Créer l'enveloppe",
       "creating": "Création…"
     },
@@ -558,7 +559,7 @@
       },
       "revenus": {
         "title": "Dividendes & intérêts",
-        "subtitle": "Dividendes versés en cash et rendements capitalisés (ETF Acc)"
+        "subtitle": "Dividendes versés en cash uniquement — calendrier et fréquence des versements"
       },
       "exposition": {
         "title": "Exposition",
@@ -595,29 +596,49 @@
     "income": {
       "cash12": "Cash 12 mois",
       "projection12": "Projection 12 mois",
-      "projectionSub": "capitalisés inclus",
-      "calendar": "Calendrier des versements",
-      "tooltipReceived": "Reçu",
+      "projectionSub": "cash uniquement",
+      "calendar": "Calendrier des versements estimés",
+      "tooltipReceived": "Estimé",
       "colSource": "Source",
-      "colType": "Type",
+      "colFrequency": "Fréquence",
+      "colNextPayment": "Prochain versement",
       "col12": "12 mois",
       "colProjection": "Projection",
       "colYield": "Yield",
-      "typeCash": "Cash",
-      "typeAcc": "Capitalisé",
-      "empty": "Aucun revenu détecté — importez un export broker.",
-      "disclaimer": "Les dividendes capitalisés (ETF Acc) sont estimés via le yield 2025 du fichier ETF de référence, jamais versés en cash."
+      "freqMonthly": "Mensuel",
+      "freqQuarterly": "Trimestriel",
+      "freqSemiAnnual": "Semestriel",
+      "freqAnnual": "Annuel",
+      "freqTimes": "{count}×/an",
+      "nextPaymentValue": "{month} {year} · {amount}",
+      "excludedTitle": "Positions sans dividende en cash",
+      "excludedAcc": "ETF capitalisant — dividende réinvesti dans le cours",
+      "excludedNoDividend": "Aucun dividende versé",
+      "empty": "Aucune position versant un dividende en cash — les ETF capitalisants (Acc) et les valeurs sans dividende sont exclus.",
+      "disclaimer": "Seuls les versements en cash sont comptés. La projection applique le yield 2025 du fichier de référence à la valeur actuelle ; la fréquence vient de l'historique réel ou du cycle trimestriel usuel des actions US. Montants bruts, avant flat tax."
     },
     "diversification": {
       "score": "Score",
       "scoreSub": "concentration pénalisée",
+      "criteria": {
+        "geoTop": "Zone dominante ≤ 25 %",
+        "geoCoverage": "Zones couvertes",
+        "geoBalance": "Équilibre top 3 zones",
+        "sectorTop": "Secteur dominant ≤ 25 %",
+        "sectorCoverage": "Secteurs couverts",
+        "sectorBalance": "Équilibre top 3 secteurs"
+      },
       "topSector": "Secteur n°1",
       "topRegion": "Zone n°1",
       "via": "via {detail}",
       "empty": "Exposition inconnue pour vos positions.",
       "disclaimer": "Look-through : ETF dépliés selon la répartition de leur indice de référence (approximations destinées à être remplacées par les holdings réelles).",
       "tabGeographic": "Géographique",
-      "tabSector": "Sectoriel"
+      "tabSector": "Sectoriel",
+      "viewZone": "Zones",
+      "viewCountry": "Pays ({count})",
+      "viewEconomy": "Économie",
+      "otherCountries": "Autres pays"
     },
     "simulator": {
       "capitalHorizon": "Capital à l'horizon ({year})",

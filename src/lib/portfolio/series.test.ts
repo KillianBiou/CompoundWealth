@@ -76,6 +76,13 @@ describe("valueAt", () => {
     expect(valueAt(sorted, d("2026-02-01"))).toBe(100);
     expect(valueAt(sorted, d("2026-04-01"))).toBe(200);
   });
+
+  it("retourne 0 avant le premier point : une enveloppe ouverte tard ne remplit pas l'historique", () => {
+    const sorted = [{ date: d("2026-09-16"), valueCents: 800_000 }];
+    expect(valueAt(sorted, d("2026-09-15"))).toBe(0);
+    expect(valueAt(sorted, d("2026-01-01"))).toBe(0);
+    expect(valueAt(sorted, d("2026-09-16"))).toBe(800_000);
+  });
 });
 
 describe("investedBefore", () => {
@@ -249,15 +256,19 @@ describe("periodPerformance", () => {
     expect(result.ratio).toBeCloseTo(20_000 / 110_000, 5);
   });
 
-  it("sur 6 mois : exclut les versements de la période du gain", () => {
+  it("sur 6 mois : exclut les versements du gain, ratio au capital moyen (Modified Dietz)", () => {
     const investedLate = [
       { date: d("2026-01-01"), valueCents: 10_000 },
       { date: d("2026-08-01"), valueCents: 110_000 },
     ];
     const result = periodPerformance(valuations, investedLate, "6m", now);
-    // Δvaleur = 70 000, Δinvesti = 100 000 → gain = −30 000 sur 10 000 investis au début
+    // Δvaleur = 70 000, Δinvesti = 100 000 → gain = −30 000
     expect(result.gainCents).toBe(130_000 - 60_000 - (110_000 - 10_000));
-    expect(result.ratio).toBe(-30_000 / 10_000);
+    // versement de 100 000 pondéré par son temps de présence (152 j / 182 j)
+    const day = 24 * 60 * 60 * 1000;
+    const weight =
+      (d("2026-12-31").getTime() - d("2026-08-01").getTime()) / (182 * day);
+    expect(result.ratio).toBeCloseTo(-30_000 / (10_000 + 100_000 * weight), 5);
   });
 
   it("sans historique d'investissement : repli sur la variation de valeur", () => {
@@ -278,6 +289,32 @@ describe("periodPerformance", () => {
     const shortInvested = [{ date: d("2026-12-05"), valueCents: 5_000 }];
     const result = periodPerformance(short, shortInvested, "1m", now);
     expect(result.gainCents).toBe(7_000 - 0 - 5_000);
-    expect(result.ratio).toBeCloseTo(2_000 / 5_000, 5);
+    // 5 000 investis le 5/12, pondérés 26 j / 30 j
+    const day = 24 * 60 * 60 * 1000;
+    const weight =
+      (d("2026-12-31").getTime() - d("2026-12-05").getTime()) / (30 * day);
+    expect(result.ratio).toBeCloseTo(2_000 / (5_000 * weight), 5);
+  });
+
+  it("1 an : le ratio ne bondit pas quand l'investi de départ était minuscule", () => {
+    // 411 € investis début 2025, 8 000 € versés mi-2026, +380 € de gain :
+    // l'ancien dénominateur (investi de début seul) affichait ~+93 %
+    const yearValuations = [
+      { date: d("2025-06-01"), valueCents: 43_000 },
+      { date: d("2026-06-30"), valueCents: 843_000 },
+      { date: d("2026-12-31"), valueCents: 881_000 },
+    ];
+    const yearInvested = [
+      { date: d("2025-06-01"), valueCents: 41_000 },
+      { date: d("2026-06-30"), valueCents: 841_000 },
+    ];
+    const result = periodPerformance(yearValuations, yearInvested, "1y", now);
+    expect(result.gainCents).toBe(881_000 - 43_000 - (841_000 - 41_000));
+    const day = 24 * 60 * 60 * 1000;
+    const weight =
+      (now.getTime() - d("2026-06-30").getTime()) / (365 * day);
+    expect(result.ratio).toBeCloseTo(38_000 / (41_000 + 800_000 * weight), 5);
+    expect(38_000 / 41_000).toBeGreaterThan(0.9);
+    expect(result.ratio ?? 1).toBeLessThan(0.15);
   });
 });

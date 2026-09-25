@@ -204,6 +204,7 @@
       "openedAt": "Opening date",
       "openedAtPeaHint": "Recommended for the PEA (tax seniority)",
       "openedAtHint": "Optional",
+      "openedAtLivretHint": "Livret opening date — the initial deposit and interest run from this date",
       "create": "Create the account",
       "creating": "Creating…"
     },
@@ -558,7 +559,7 @@
       },
       "revenus": {
         "title": "Dividends & interest",
-        "subtitle": "Cash dividends and accumulated returns (Acc ETFs)"
+        "subtitle": "Cash dividends only — payment calendar and frequency"
       },
       "exposition": {
         "title": "Exposure",
@@ -595,29 +596,49 @@
     "income": {
       "cash12": "Cash 12 months",
       "projection12": "12-month projection",
-      "projectionSub": "accumulated included",
-      "calendar": "Payment calendar",
-      "tooltipReceived": "Received",
+      "projectionSub": "cash only",
+      "calendar": "Estimated payment calendar",
+      "tooltipReceived": "Estimated",
       "colSource": "Source",
-      "colType": "Type",
+      "colFrequency": "Frequency",
+      "colNextPayment": "Next payment",
       "col12": "12 months",
       "colProjection": "Projection",
       "colYield": "Yield",
-      "typeCash": "Cash",
-      "typeAcc": "Accumulated",
-      "empty": "No income detected — import a broker export.",
-      "disclaimer": "Accumulated dividends (Acc ETFs) are estimated from the 2025 yield of the reference ETF file, never paid in cash."
+      "freqMonthly": "Monthly",
+      "freqQuarterly": "Quarterly",
+      "freqSemiAnnual": "Semi-annual",
+      "freqAnnual": "Annual",
+      "freqTimes": "{count}×/year",
+      "nextPaymentValue": "{month} {year} · {amount}",
+      "excludedTitle": "Positions with no cash dividend",
+      "excludedAcc": "Accumulating ETF — dividend reinvested in the price",
+      "excludedNoDividend": "No dividend paid",
+      "empty": "No position paying a cash dividend — accumulating ETFs (Acc) and non-dividend stocks are excluded.",
+      "disclaimer": "Only cash payments are counted. The projection applies the 2025 yield of the reference file to the current value; frequency comes from actual history or the usual quarterly cycle of US stocks. Gross amounts, before flat tax."
     },
     "diversification": {
       "score": "Score",
       "scoreSub": "concentration penalised",
+      "criteria": {
+        "geoTop": "Dominant zone ≤ 25%",
+        "geoCoverage": "Zones covered",
+        "geoBalance": "Top 3 zones balance",
+        "sectorTop": "Dominant sector ≤ 25%",
+        "sectorCoverage": "Sectors covered",
+        "sectorBalance": "Top 3 sectors balance"
+      },
       "topSector": "#1 sector",
       "topRegion": "#1 zone",
       "via": "via {detail}",
       "empty": "Unknown exposure for your positions.",
       "disclaimer": "Look-through: ETFs unfolded according to their reference index breakdown (approximations meant to be replaced by actual holdings).",
       "tabGeographic": "Geographic",
-      "tabSector": "Sector"
+      "tabSector": "Sector",
+      "viewZone": "Zones",
+      "viewCountry": "Countries ({count})",
+      "viewEconomy": "Economy",
+      "otherCountries": "Other countries"
     },
     "simulator": {
       "capitalHorizon": "Capital at horizon ({year})",

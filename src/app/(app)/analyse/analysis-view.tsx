@@ -29,7 +29,11 @@ import { Badge, Kpi } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { useI18n } from "@/i18n/provider";
 import type { Dictionary } from "@/i18n/server";
-import { REGIONS } from "@/lib/analysis/exposure-catalog";
+import {
+  ECONOMIES,
+  OTHER_COUNTRIES_LABEL,
+  ZONES,
+} from "@/lib/analysis/geo-zones";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
 import { fetchActionPriceHistoryAction } from "@/server/actions";
@@ -46,6 +50,7 @@ import type {
   FeeLine,
   IncomeAnalysisResult,
   IncomeLine,
+  ScoreCriterionResult,
 } from "@/lib/analysis/scanners";
 
 const CATEGORY_COLORS = [
@@ -286,6 +291,22 @@ function IncomePanel({
     label: `${t.analyse.months[m.month]} ${String(m.year).slice(2)}`,
     amountEur: m.amountCents / 100,
   }));
+  const frequencyLabel = (line: IncomeLine) => {
+    if (line.paymentsPerYear === null) return "—";
+    if (line.paymentsPerYear === 12) return t.analyse.income.freqMonthly;
+    if (line.paymentsPerYear === 4) return t.analyse.income.freqQuarterly;
+    if (line.paymentsPerYear === 2) return t.analyse.income.freqSemiAnnual;
+    if (line.paymentsPerYear === 1) return t.analyse.income.freqAnnual;
+    return t.analyse.income.freqTimes.replace("{count}", String(line.paymentsPerYear));
+  };
+  const nextPaymentLabel = (line: IncomeLine) => {
+    if (line.nextPayment === null) return "—";
+    const { year, month, amountCents } = line.nextPayment;
+    return t.analyse.income.nextPaymentValue
+      .replace("{month}", t.analyse.months[month])
+      .replace("{year}", String(year))
+      .replace("{amount}", formatEurCents(amountCents));
+  };
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
@@ -332,7 +353,8 @@ function IncomePanel({
           <thead>
             <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
               <th className="px-3 py-2 font-medium">{t.analyse.income.colSource}</th>
-              <th className="px-3 py-2 font-medium">{t.analyse.income.colType}</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colFrequency}</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colNextPayment}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.col12}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colProjection}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colYield}</th>
@@ -341,7 +363,7 @@ function IncomePanel({
           <tbody>
             {income.lines.map((line) => (
               <tr
-                key={`${line.positionId}-${line.kind}`}
+                key={line.positionId}
                 className={cn(
                   "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
                   (line.isin || line.symbol) && "cursor-pointer",
@@ -349,13 +371,8 @@ function IncomePanel({
                 onClick={() => (line.isin || line.symbol) && onSelectLine(line)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
-                <td className="px-3 py-2">
-                  {line.kind === "cash" ? (
-                    <Badge tone="positive">{t.analyse.income.typeCash}</Badge>
-                  ) : (
-                    <Badge tone="neutral">{t.analyse.income.typeAcc}</Badge>
-                  )}
-                </td>
+                <td className="px-3 py-2 text-text-secondary">{frequencyLabel(line)}</td>
+                <td className="px-3 py-2 text-text-secondary">{nextPaymentLabel(line)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
                   {formatEurCents(line.twelveMonthsCents)}
                 </td>
@@ -369,7 +386,7 @@ function IncomePanel({
             ))}
             {income.lines.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
+                <td colSpan={6} className="px-3 py-6 text-center text-text-muted">
                   {t.analyse.income.empty}
                 </td>
               </tr>
@@ -377,6 +394,31 @@ function IncomePanel({
           </tbody>
         </table>
       </div>
+      {income.excludedLines.length > 0 ? (
+        <div className="rounded-lg border border-border-cw bg-bg-subtle/30 p-3">
+          <p className="mb-2 text-xs font-medium text-text-secondary">
+            {t.analyse.income.excludedTitle}
+          </p>
+          <ul className="space-y-1">
+            {income.excludedLines.map((line) => (
+              <li
+                key={line.positionId}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="truncate text-text-secondary">
+                  {line.name}
+                  <span className="text-text-muted"> · {line.envelopeName}</span>
+                </span>
+                <span className="whitespace-nowrap text-text-muted">
+                  {line.reason === "capitalizing"
+                    ? t.analyse.income.excludedAcc
+                    : t.analyse.income.excludedNoDividend}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="text-xs text-text-muted">{t.analyse.income.disclaimer}</p>
     </div>
   );
@@ -391,14 +433,30 @@ function DiversificationPanel({
   kind,
 }: {
   result: DiversificationResult;
-  kind: "sector" | "region";
+  kind: "sector" | "zone" | "country" | "economy";
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<number | null>(null);
+  const geoLabel = (key: string) =>
+    kind === "zone"
+      ? ZONES.find((z) => z.key === key)?.label ?? key
+      : kind === "economy"
+        ? ECONOMIES.find((e) => e.key === key)?.label ?? key
+        : key === OTHER_COUNTRIES_LABEL
+          ? t.analyse.diversification.otherCountries
+          : key;
+  const geoFlag = (key: string) =>
+    kind === "zone"
+      ? ZONES.find((z) => z.key === key)?.flag ?? ""
+      : kind === "economy"
+        ? ECONOMIES.find((e) => e.key === key)?.flag ?? ""
+        : "";
+  const scoreTone = (score: number | null): "positive" | "warning" | "negative" | undefined =>
+    score === null ? undefined : score >= 7 ? "positive" : score >= 4 ? "warning" : "negative";
+  const criterionLabel = (key: ScoreCriterionResult["key"]) =>
+    t.analyse.diversification.criteria[key];
   const pieData = result.lines.slice(0, 8).map((line, index) => ({
-    name: kind === "region"
-      ? REGIONS.find((r) => r.key === line.sector)?.label ?? line.sector
-      : line.sector,
+    name: kind === "sector" ? line.sector : geoLabel(line.sector),
     value: line.amountCents / 100,
     color: colorFor(index),
   }));
@@ -409,15 +467,19 @@ function DiversificationPanel({
           label={t.analyse.diversification.score}
           value={result.score !== null ? `${result.score}/10` : "—"}
           sub={t.analyse.diversification.scoreSub}
+          scoreTone={scoreTone(result.score)}
+          scoreTotal={result.score !== null ? `${result.score}/10` : "—"}
+          scoreLines={result.scoreBreakdown.map((c) => ({
+            label: criterionLabel(c.key),
+            delta: `${c.points > 0 ? "+" : ""}${c.points}/${c.max}`,
+            tone: c.points === c.max ? "positive" : c.points > 0 ? "warning" : "negative",
+          }))}
         />
         {result.lines[0] ? (
           <Kpi
             label={kind === "sector" ? t.analyse.diversification.topSector : t.analyse.diversification.topRegion}
             value={
-              kind === "sector"
-                ? result.lines[0].sector
-                : REGIONS.find((r) => r.key === result.lines[0].sector)?.label ??
-                  result.lines[0].sector
+              kind === "sector" ? result.lines[0].sector : geoLabel(result.lines[0].sector)
             }
             sub={formatPercent(result.lines[0].share)}
           />
@@ -426,8 +488,9 @@ function DiversificationPanel({
       {result.alerts.length > 0 ? (
         <div className="space-y-1 rounded-lg border border-warning/25 bg-warning/5 p-3">
           {result.alerts.map((alert) => (
-            <p key={alert.label} className="text-sm text-warning">
-              ⚠ {alert.label} : {formatPercent(alert.share)} — {t.analyse.diversification.via.replace("{detail}", alert.detail)}
+            <p key={alert.label} className="break-words text-sm text-warning">
+              ⚠ {geoLabel(alert.label)} : {formatPercent(alert.share)} —{" "}
+              {t.analyse.diversification.via.replace("{detail}", alert.detail)}
             </p>
           ))}
         </div>
@@ -465,11 +528,9 @@ function DiversificationPanel({
       <div className="space-y-2">
         {result.lines.map((line, index) => {
           const label =
-            kind === "region"
-              ? `${REGIONS.find((r) => r.key === line.sector)?.flag ?? ""} ${
-                  REGIONS.find((r) => r.key === line.sector)?.label ?? line.sector
-                }`
-              : line.sector;
+            kind === "sector"
+              ? line.sector
+              : `${geoFlag(line.sector)} ${geoLabel(line.sector)}`.trim();
           const max = result.lines[0]?.amountCents ?? 1;
           return (
             <div key={line.sector}>
@@ -1054,7 +1115,7 @@ function ExposureCard({
   const { t } = useI18n();
   const disabled = sectors.lines.length === 0 && regions.lines.length === 0;
   const topRegion = regions.lines[0]
-    ? REGIONS.find((r) => r.key === regions.lines[0].sector)
+    ? ZONES.find((z) => z.key === regions.lines[0].sector)
     : null;
   return (
     <button
@@ -1117,13 +1178,23 @@ function ExposureCard({
 function ExposurePanel({
   sectors,
   regions,
+  countries,
+  economies,
 }: {
   sectors: DiversificationResult;
   regions: DiversificationResult;
+  /** répartition par pays (vue détaillée), pays < 1 % regroupés */
+  countries: DiversificationResult;
+  /** répartition par type d'économie MSCI (développée / émergente / frontière) */
+  economies: DiversificationResult;
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<"sector" | "region">("region");
-  const result = tab === "region" ? regions : sectors;
+  const [geoView, setGeoView] = useState<"zone" | "country" | "economy">("zone");
+  const geoResult =
+    geoView === "zone" ? regions : geoView === "country" ? countries : economies;
+  const result = tab === "region" ? geoResult : sectors;
+  const geoKind = tab === "region" ? geoView : "sector";
   return (
     <div className="space-y-5">
       <div className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/50 p-1">
@@ -1154,7 +1225,50 @@ function ExposurePanel({
           {t.analyse.diversification.tabSector}
         </button>
       </div>
-      <DiversificationPanel result={result} kind={tab} />
+      {tab === "region" ? (
+        <div className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/30 p-1">
+          <button
+            type="button"
+            onClick={() => setGeoView("zone")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              geoView === "zone"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t.analyse.diversification.viewZone}
+          </button>
+          <button
+            type="button"
+            onClick={() => setGeoView("country")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              geoView === "country"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t.analyse.diversification.viewCountry.replace(
+              "{count}",
+              String(countries.lines.filter((l) => l.sector !== OTHER_COUNTRIES_LABEL).length),
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setGeoView("economy")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              geoView === "economy"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t.analyse.diversification.viewEconomy}
+          </button>
+        </div>
+      ) : null}
+      <DiversificationPanel result={result} kind={geoKind} />
     </div>
   );
 }
@@ -1168,14 +1282,21 @@ export function AnalysisPageView({
   income,
   sectors,
   regions,
+  countries,
+  economies,
   simulatorDefaults,
   etfDetails,
   actionDetails,
 }: {
   fees: FeeAnalysisResult;
   income: IncomeAnalysisResult;
-  sectors: DiversificationResult;
+  /** répartition par zone continentale */
   regions: DiversificationResult;
+  /** répartition par pays (vue détaillée), pays < 1 % regroupés */
+  countries: DiversificationResult;
+  /** répartition par type d'économie MSCI (développée / émergente / frontière) */
+  economies: DiversificationResult;
+  sectors: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
   etfDetails: Record<string, EtfDetail>;
@@ -1347,7 +1468,7 @@ export function AnalysisPageView({
             </>
           }
           onClick={open}
-          disabled={income.lines.length === 0}
+          disabled={income.lines.length === 0 && income.excludedLines.length === 0}
         />
         <ScannerCard
           id="abonnements"
@@ -1402,7 +1523,12 @@ export function AnalysisPageView({
           <IncomePanel income={income} onSelectLine={openPosition} />
         ) : null}
         {openPanel === "exposition" ? (
-          <ExposurePanel sectors={sectors} regions={regions} />
+          <ExposurePanel
+            sectors={sectors}
+            regions={regions}
+            countries={countries}
+            economies={economies}
+          />
         ) : null}
         {openPanel === "simulateur" ? (
           <SimulationPanel

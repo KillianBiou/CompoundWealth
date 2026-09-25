@@ -76,8 +76,10 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
     const inflation = envelope.inflationRate ?? LIVRET_A_DEFAULT_INFLATION;
     const livretSeries = buildLivretBalanceSeries(livretEvents, rate);
     const nowTime = new Date().getTime();
+    // la série inclut 12 mois de projection : l'historique s'arrête à maintenant
+    const pastSeries = livretSeries.filter((p) => p.date.getTime() <= nowTime);
     const currentPoint =
-      [...livretSeries].reverse().find((p) => p.date.getTime() <= nowTime) ?? null;
+      [...pastSeries].reverse().find((p) => p.date.getTime() <= nowTime) ?? null;
     const balanceCents = currentPoint ? currentPoint.balanceCents : 0;
     const projection = projectOneYear(livretEvents, rate, inflation);
     return (
@@ -103,7 +105,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             date: dep.date,
             amountCents: dep.amountCents,
           }))}
-          series={livretSeries}
+          series={pastSeries}
           balanceCents={balanceCents}
           interestRate={envelope.interestRate}
           inflationRate={envelope.inflationRate}
