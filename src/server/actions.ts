@@ -154,10 +154,13 @@ export async function createEnvelopeAction(
     },
   });
   if (type === "LIVRET_A" && initialAmountEur !== undefined && initialAmountEur > 0) {
+    // le versement initial est rattaché à la quinzaine de la date d'ouverture
+    // du livret (si saisie), sinon à celle du jour
+    const livretOpenedAt = openedAt ? new Date(openedAt) : new Date();
     await prisma.envelopeDeposit.create({
       data: {
         envelopeId: envelope.id,
-        date: fortnightStart(new Date()),
+        date: fortnightStart(livretOpenedAt),
         amountCents: eurosToCents(initialAmountEur),
       },
     });

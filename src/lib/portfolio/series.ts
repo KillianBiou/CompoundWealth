@@ -67,11 +67,11 @@ export function valueAt(sorted: ValuationPoint[], date: Date): number {
       break;
     }
   }
+  // avant le premier point connu, l'enveloppe n'existait pas : 0, pas le
+  // premier point (sinon un livret ouvert tard gonfle la courbe sur toute
+  // l'historique alors que son investi n'a pas encore commencé)
   if (current !== null) return current;
-  const hasEarlier = sorted.some((v) => v.date.getTime() <= date.getTime());
-  if (hasEarlier && current !== null) return current;
-  const firstPoint = sorted[0];
-  return firstPoint ? firstPoint.valueCents : 0;
+  return 0;
 }
 
 export function currentValueCents(
