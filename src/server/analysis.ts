@@ -135,6 +135,12 @@ export const getCountryAnalysis = cache(async (): Promise<DiversificationResult>
   return analyzeRegions(positions, "country");
 });
 
+/** Répartition par type d'économie MSCI (développée / émergente / frontière). */
+export const getEconomyAnalysis = cache(async (): Promise<DiversificationResult> => {
+  const positions = await getAnalysisPositions();
+  return analyzeRegions(positions, "economy");
+});
+
 /**
  * Détails CSV complets des ETF, indexés par ISIN — passés au client pour le
  * panneau latéral de détail (frais, identifiants, répartitions, holdings).

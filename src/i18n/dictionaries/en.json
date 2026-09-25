@@ -628,6 +628,7 @@
       "tabSector": "Sector",
       "viewZone": "Zones",
       "viewCountry": "Countries ({count})",
+      "viewEconomy": "Economy",
       "otherCountries": "Other countries"
     },
     "simulator": {

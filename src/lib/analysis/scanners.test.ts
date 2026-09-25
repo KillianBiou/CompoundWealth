@@ -239,6 +239,20 @@ describe("analyzeSectors / analyzeRegions", () => {
     }
   });
 
+  it("agrège les pays par type d'économie MSCI", () => {
+    const result = analyzeRegions([world, france], "economy");
+    const developpe = result.lines.find((l) => l.sector === "Developpe");
+    expect(developpe).toBeDefined();
+    // MSCI World + MSCI France : tout est développé (US, Japon, Europe de l'Ouest),
+    // hors la part « Other » du fichier ETF non détaillée par le fonds
+    expect(developpe!.share).toBeGreaterThan(0.9);
+    expect(developpe!.amountCents).toBeGreaterThan(140_000_00);
+    expect(developpe!.amountCents).toBeLessThan(150_000_00);
+    // pas d'exposition émergente ni frontière sur ces deux positions
+    expect(result.lines.find((l) => l.sector === "Emergent")).toBeUndefined();
+    expect(result.lines.find((l) => l.sector === "Frontiere")).toBeUndefined();
+  });
+
   it("retourne un résultat vide sans position analysable", () => {
     const result = analyzeSectors([]);
     expect(result.lines).toHaveLength(0);

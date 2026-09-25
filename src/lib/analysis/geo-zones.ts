@@ -88,3 +88,97 @@ const COUNTRY_TO_ZONE: Record<string, ZoneKey> = {
 export function zoneOfCountry(name: string): ZoneKey | null {
   return COUNTRY_TO_ZONE[name] ?? null;
 }
+
+export type EconomyKey = "Developpe" | "Emergent" | "Frontiere";
+
+export const ECONOMIES: { key: EconomyKey; label: string; flag: string }[] = [
+  { key: "Developpe", label: "Marchés développés", flag: "🏙️" },
+  { key: "Emergent", label: "Marchés émergents", flag: "🌱" },
+  { key: "Frontiere", label: "Marchés frontières", flag: "🧭" },
+];
+
+/**
+ * Mapping pays → type d'économie selon la classification MSCI des marchés
+ * (Developed / Emerging / Frontier) — éditions 2025. Cas particuliers :
+ * Grèce émergente (reclassification DM effective mai 2027), Corée du Sud et
+ * Taïwan émergentes (MSCI, quand FTSE/S&P les classent développées), Luxembourg
+ * développé (FTSE/IMF, MSCI ne le couvre pas), Russie rattachée aux émergents
+ * (standalone MSCI depuis 2022, sans catégorie dédiée ici) et Slovénie,
+ * Vietnam, Maroc, Kenya, Croatie, Roumanie, États baltes et Islande
+ * frontières (dont la sous-catégorie MSCI « advanced frontier »).
+ */
+const COUNTRY_TO_ECONOMY: Record<string, EconomyKey> = {
+  "United States": "Developpe",
+  Canada: "Developpe",
+  Japan: "Developpe",
+  "Hong Kong": "Developpe",
+  Singapore: "Developpe",
+  Australia: "Developpe",
+  "New Zealand": "Developpe",
+  Israel: "Developpe",
+  "United Kingdom": "Developpe",
+  France: "Developpe",
+  Germany: "Developpe",
+  Netherlands: "Developpe",
+  Switzerland: "Developpe",
+  Italy: "Developpe",
+  Spain: "Developpe",
+  Sweden: "Developpe",
+  Finland: "Developpe",
+  Ireland: "Developpe",
+  Belgium: "Developpe",
+  Denmark: "Developpe",
+  Luxembourg: "Developpe",
+  Norway: "Developpe",
+  Austria: "Developpe",
+  Portugal: "Developpe",
+  Mexico: "Emergent",
+  Brazil: "Emergent",
+  Chile: "Emergent",
+  Colombia: "Emergent",
+  Peru: "Emergent",
+  China: "Emergent",
+  "South Korea": "Emergent",
+  Taiwan: "Emergent",
+  India: "Emergent",
+  Thailand: "Emergent",
+  Malaysia: "Emergent",
+  Indonesia: "Emergent",
+  Philippines: "Emergent",
+  Poland: "Emergent",
+  "Czech Republic": "Emergent",
+  Greece: "Emergent",
+  Hungary: "Emergent",
+  Turkey: "Emergent",
+  Russia: "Emergent",
+  "Saudi Arabia": "Emergent",
+  "United Arab Emirates": "Emergent",
+  Qatar: "Emergent",
+  Kuwait: "Emergent",
+  "South Africa": "Emergent",
+  Egypt: "Emergent",
+  Vietnam: "Frontiere",
+  Slovenia: "Frontiere",
+  Morocco: "Frontiere",
+  Kenya: "Frontiere",
+  Nigeria: "Frontiere",
+  Croatia: "Frontiere",
+  Romania: "Frontiere",
+  Estonia: "Frontiere",
+  Latvia: "Frontiere",
+  Lithuania: "Frontiere",
+  Iceland: "Frontiere",
+  Pakistan: "Frontiere",
+  Bangladesh: "Frontiere",
+  "Sri Lanka": "Frontiere",
+  Jordan: "Frontiere",
+  Kazakhstan: "Frontiere",
+  Oman: "Frontiere",
+  Bahrain: "Frontiere",
+  Serbia: "Frontiere",
+  Tunisia: "Frontiere",
+};
+
+export function economyOfCountry(name: string): EconomyKey | null {
+  return COUNTRY_TO_ECONOMY[name] ?? null;
+}
