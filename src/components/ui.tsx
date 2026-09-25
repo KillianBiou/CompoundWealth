@@ -138,15 +138,21 @@ export function Kpi({
   value,
   sub,
   subTone,
+  hint,
 }: {
   label: string;
   value: string;
   sub?: string;
   subTone?: "positive" | "negative";
+  /** explication au survol du libellé (title natif) */
+  hint?: string;
 }) {
   return (
     <div>
-      <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+      <p
+        className="text-xs font-medium tracking-wide text-text-secondary uppercase"
+        title={hint}
+      >
         {label}
       </p>
       <p className="mt-1 font-heading text-2xl font-semibold text-text-primary tabular-nums">
