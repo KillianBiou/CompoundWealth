@@ -619,7 +619,14 @@
     "diversification": {
       "score": "Score",
       "scoreSub": "concentration penalised",
-      "scoreHint": "0 to 10 score, penalised by concentration (Herfindahl index) and the number of buckets covered. Solid diversification targets: no single holding above 5% of the portfolio (5% rule), no sector above 25%, exposure spread across several geographic zones (ideal ~60% developed markets / 25-40% international). The score is capped at 5/10 if fewer than 3 buckets are covered.",
+      "criteria": {
+        "geoTop": "Dominant zone ≤ 25%",
+        "geoCoverage": "Zones covered",
+        "geoBalance": "Top 3 zones balance",
+        "sectorTop": "Dominant sector ≤ 25%",
+        "sectorCoverage": "Sectors covered",
+        "sectorBalance": "Top 3 sectors balance"
+      },
       "topSector": "#1 sector",
       "topRegion": "#1 zone",
       "via": "via {detail}",

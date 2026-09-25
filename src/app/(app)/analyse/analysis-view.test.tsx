@@ -113,6 +113,7 @@ const sectors: DiversificationResult = {
     },
   ],
   score: 6,
+  scoreBreakdown: [],
   alerts: [],
   totalCents: 100_000_00,
 };
@@ -133,6 +134,11 @@ const regions: DiversificationResult = {
     },
   ],
   score: 5,
+  scoreBreakdown: [
+    { key: "geoTop", points: 2, max: 4 },
+    { key: "geoCoverage", points: 2, max: 3 },
+    { key: "geoBalance", points: 1, max: 3 },
+  ],
   alerts: [
     {
       label: "AmeriqueNord",
@@ -164,6 +170,7 @@ const countries: DiversificationResult = {
     },
   ],
   score: 5,
+  scoreBreakdown: [],
   alerts: [],
   totalCents: 100_000_00,
 };
@@ -184,6 +191,7 @@ const economies: DiversificationResult = {
     },
   ],
   score: 4,
+  scoreBreakdown: [],
   alerts: [],
   totalCents: 100_000_00,
 };
@@ -358,6 +366,17 @@ describe("AnalysisPageView", () => {
     expect(screen.getAllByText("United States").length).toBeGreaterThan(0);
     expect(screen.getByText("Autres pays")).toBeInTheDocument();
   });
+  it("la bulle du score détaille les critères un par un", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    const scoreLabel = screen.getByText("Score");
+    fireEvent.mouseEnter(scoreLabel.querySelector("svg")!);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Zone dominante ≤ 25 %");
+    expect(tooltip).toHaveTextContent("Zones couvertes");
+    expect(tooltip).toHaveTextContent("Total");
+  });
+
   it("l'alerte de concentration affiche le libellé traduit de la zone", () => {
     renderView();
     fireEvent.click(screen.getAllByText("Exposition")[0]);

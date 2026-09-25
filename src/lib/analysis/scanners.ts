@@ -381,10 +381,27 @@ export interface SectorBreakdownLine {
   contributors: { name: string; amountCents: number }[];
 }
 
+export interface ScoreCriterionResult {
+  /** identifiant du critère, mappé vers le libellé i18n côté client */
+  key:
+    | "geoTop"
+    | "geoCoverage"
+    | "geoBalance"
+    | "sectorCoverage"
+    | "sectorTop"
+    | "sectorBalance";
+  /** points obtenus */
+  points: number;
+  /** points maximaux du critère */
+  max: number;
+}
+
 export interface DiversificationResult {
   lines: SectorBreakdownLine[];
-  /** score de 0 à 10 : pénalise la concentration (Herfindahl) et récompense le nombre de secteurs */
+  /** score de 0 à 10 : somme des points des critères de diversification */
   score: number | null;
+  /** décomposition du score par critère, affichée dans la bulle du score */
+  scoreBreakdown: ScoreCriterionResult[];
   /** parts supérieures au seuil d'alerte */
   alerts: { label: string; share: number; detail: string }[];
   totalCents: number;
@@ -397,6 +414,7 @@ function diversification(
   positions: AnalysisPosition[],
   keyOf: (position: AnalysisPosition) => { label: string; weight: number; exposureCents: number }[],
   alertThreshold: number,
+  criteria: (shares: number[]) => ScoreCriterionResult[],
 ): DiversificationResult {
   const byBucket = new Map<string, { amountCents: number; contributors: Map<string, number> }>();
   let total = 0;
@@ -419,7 +437,7 @@ function diversification(
     }
   }
   if (total <= 0 || byBucket.size === 0) {
-    return { lines: [], score: null, alerts: [], totalCents: 0 };
+    return { lines: [], score: null, scoreBreakdown: [], alerts: [], totalCents: 0 };
   }
 
   const lines = [...byBucket.entries()]
@@ -437,12 +455,11 @@ function diversification(
     })
     .sort((a, b) => b.amountCents - a.amountCents);
 
-  const herfindahl = lines.reduce((sum, line) => sum + line.share * line.share, 0);
-  const effectiveCount = lines.length;
-  const concentrationPenalty = Math.max(0, herfindahl - 1 / Math.max(effectiveCount, 1));
+  const shares = lines.map((line) => line.share);
+  const breakdown = criteria(shares);
   const score = Math.max(
     0,
-    Math.min(10, Math.round((10 - concentrationPenalty * 8) * (effectiveCount >= 3 ? 1 : 0.5))),
+    Math.min(10, breakdown.reduce((sum, c) => sum + c.points, 0)),
   );
 
   const alerts = lines
@@ -456,7 +473,53 @@ function diversification(
         .join(" + ")}${line.contributors.length > 2 ? "…" : ""}`,
     }));
 
-  return { lines, score, alerts, totalCents: total };
+  return { lines, score, scoreBreakdown: breakdown, alerts, totalCents: total };
+}
+
+/**
+ * Critères du score géographique (10 points) :
+ * - poids de la plus grande zone (0-4) : 25 % ou moins = 4 pts, pénalité
+ *   progressive jusqu'à 70 % et plus = 0 pt (règle des 25-40 % d'international)
+ * - zones couvertes (0-3) : 7+ zones = 3 pts, 5-6 = 2 pts, 3-4 = 1 pt
+ * - équilibre des 3 plus grandes zones (0-3) : aucune ne dépasse 45 % = 3 pts,
+ *   tolérance 60 % = 1 pt
+ */
+function geoCriteria(shares: number[]): ScoreCriterionResult[] {
+  const top = shares[0] ?? 0;
+  const topPoints = top <= 0.25 ? 4 : top <= 0.4 ? 3 : top <= 0.6 ? 2 : top <= 0.7 ? 1 : 0;
+  const count = shares.length;
+  const coveragePoints = count >= 7 ? 3 : count >= 5 ? 2 : count >= 3 ? 1 : 0;
+  const top3 = shares.slice(0, 3);
+  const balancePoints =
+    top3.every((s) => s <= 0.45) ? 3 : top3.every((s) => s <= 0.6) ? 1 : 0;
+  return [
+    { key: "geoTop", points: topPoints, max: 4 },
+    { key: "geoCoverage", points: coveragePoints, max: 3 },
+    { key: "geoBalance", points: balancePoints, max: 3 },
+  ];
+}
+
+/**
+ * Critères du score sectoriel (10 points) :
+ * - poids du plus grand secteur (0-4) : 25 % ou moins = 4 pts (règle des 25 %),
+ *   pénalité progressive jusqu'à 50 % et plus = 0 pt
+ * - secteurs couverts (0-3) : 8+ secteurs = 3 pts, 6-7 = 2 pts, 4-5 = 1 pt
+ * - équilibre des 3 plus grands secteurs (0-3) : aucun ne dépasse 35 % = 3 pts,
+ *   tolérance 45 % = 1 pt
+ */
+function sectorCriteria(shares: number[]): ScoreCriterionResult[] {
+  const top = shares[0] ?? 0;
+  const topPoints = top <= 0.25 ? 4 : top <= 0.3 ? 3 : top <= 0.4 ? 2 : top <= 0.5 ? 1 : 0;
+  const count = shares.length;
+  const coveragePoints = count >= 8 ? 3 : count >= 6 ? 2 : count >= 4 ? 1 : 0;
+  const top3 = shares.slice(0, 3);
+  const balancePoints =
+    top3.every((s) => s <= 0.35) ? 3 : top3.every((s) => s <= 0.45) ? 1 : 0;
+  return [
+    { key: "sectorTop", points: topPoints, max: 4 },
+    { key: "sectorCoverage", points: coveragePoints, max: 3 },
+    { key: "sectorBalance", points: balancePoints, max: 3 },
+  ];
 }
 
 /** Répartition sectorielle réelle, ETF dépliés (look-through). */
@@ -475,6 +538,7 @@ export function analyzeSectors(positions: AnalysisPosition[]): DiversificationRe
       }));
     },
     SECTOR_ALERT_THRESHOLD,
+    sectorCriteria,
   );
 }
 
@@ -501,6 +565,7 @@ export function analyzeRegions(
           exposureCents: Math.round(position.valueCents * c.weight),
         })),
       GEO_ALERT_THRESHOLD,
+      geoCriteria,
     );
     return mergeSmallCountries(result);
   }
@@ -522,6 +587,7 @@ export function analyzeRegions(
         }));
       },
       GEO_ALERT_THRESHOLD,
+      geoCriteria,
     );
   }
   return diversification(
@@ -540,6 +606,7 @@ export function analyzeRegions(
       }));
     },
     GEO_ALERT_THRESHOLD,
+    geoCriteria,
   );
 }
 

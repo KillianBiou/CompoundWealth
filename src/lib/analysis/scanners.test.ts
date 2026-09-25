@@ -253,6 +253,22 @@ describe("analyzeSectors / analyzeRegions", () => {
     expect(result.lines.find((l) => l.sector === "Frontiere")).toBeUndefined();
   });
 
+  it("décompose le score sectoriel en critères notés", () => {
+    const result = analyzeSectors([world, france]);
+    expect(result.scoreBreakdown).toHaveLength(3);
+    const keys = result.scoreBreakdown.map((c) => c.key);
+    expect(keys).toContain("sectorTop");
+    expect(keys).toContain("sectorCoverage");
+    expect(keys).toContain("sectorBalance");
+    const total = result.scoreBreakdown.reduce((s, c) => s + c.points, 0);
+    expect(result.score).toBe(Math.min(10, Math.max(0, total)));
+    // chaque critère respecte son maximum
+    for (const c of result.scoreBreakdown) {
+      expect(c.points).toBeGreaterThanOrEqual(0);
+      expect(c.points).toBeLessThanOrEqual(c.max);
+    }
+  });
+
   it("retourne un résultat vide sans position analysable", () => {
     const result = analyzeSectors([]);
     expect(result.lines).toHaveLength(0);
