@@ -613,12 +613,12 @@ function performanceBadge(xirrValue: number | null) {
 }
 
 function verdictTone(
-  xirrValue: number | null,
+  valueCents: number | null,
   savingsRef: number | null,
 ): "positive" | "warning" | "negative" | "neutral" {
-  if (xirrValue === null || savingsRef === null) return "neutral";
-  if (xirrValue > savingsRef) return "positive";
-  if (xirrValue >= 0) return "warning";
+  if (valueCents === null || savingsRef === null) return "neutral";
+  if (valueCents > savingsRef) return "positive";
+  if (valueCents >= 0) return "warning";
   return "negative";
 }
 
@@ -637,7 +637,7 @@ function PerformancePanel({
   const savingsRef = report.savingsReferenceValueCents;
   const worldRef = report.worldReferenceValueCents;
   const gain = metrics?.gainCents ?? null;
-  const verdict = verdictTone(xirrValue, savingsRef);
+  const verdict = verdictTone(total.valueCents, savingsRef);
   const verdictText =
     verdict === "positive"
       ? t.analyse.performance.verdictPositive
