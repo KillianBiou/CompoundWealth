@@ -58,6 +58,8 @@ export interface EtfDetail {
   countries: { name: string; weight: number }[];
   /** répartition par secteur : nom et poids en fraction */
   sectors: { name: string; weight: number }[];
+  /** date de la dernière mise à jour des données de référence (ISO) */
+  dataAsOf: string;
 }
 
 const CACHE_TTL_MS = 60 * 1000;
@@ -111,6 +113,7 @@ export function parseEtfDetailCsv(content: string): EtfDetail[] {
   const iWkn = idx("wkn");
   const iHoldingsAsOf = idx("holdings_as_of");
   const iTopHoldings = idx("top_holdings");
+  const iDataAsOf = idx("data_as_of");
   const iCountries = idx("countries");
   const iSectors = idx("sectors");
 
@@ -157,6 +160,7 @@ export function parseEtfDetailCsv(content: string): EtfDetail[] {
       topHoldings: iTopHoldings >= 0 ? parseWeightedEntries(cells[iTopHoldings] ?? "") : [],
       countries: iCountries >= 0 ? parseWeightedEntries(cells[iCountries] ?? "") : [],
       sectors: iSectors >= 0 ? parseWeightedEntries(cells[iSectors] ?? "") : [],
+      dataAsOf: iDataAsOf >= 0 ? (cells[iDataAsOf] ?? "").trim() : "",
     });
   }
   return details;

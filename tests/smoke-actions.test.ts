@@ -53,6 +53,13 @@ describe("CSV des 105 actions (actionDetail.csv)", () => {
     expect(ko!.dividendYield!).toBeLessThan(0.1);
   });
 
+  it("traçabilité : date de dernière mise à jour présente sur chaque ligne", () => {
+    const details = getAllActionDetails();
+    const undated = details.filter((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d.dataAsOf));
+    expect(undated).toHaveLength(0);
+    expect(details[0].dataAsOf).toBe("2026-09-25");
+  });
+
   it("aucune ligne sans prix ni capitalisation", () => {
     const details = getAllActionDetails();
     const withoutPrice = details.filter((d) => d.price === null || d.price <= 0);

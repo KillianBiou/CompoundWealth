@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
+import { DataAsOfBadge } from "./data-as-of-badge";
 
 const SECTOR_LABELS_FR: Record<string, string> = {
   Technology: "Technologie",
@@ -242,6 +243,9 @@ export function ActionDetailPanel({
               <Badge tone="neutral">{sectorFr(action.sector) || "—"}</Badge>
               {action.industry ? <Badge tone="neutral">{action.industry}</Badge> : null}
               <Badge tone="neutral">{action.exchange}</Badge>
+            </div>
+            <div className="mt-3">
+              <DataAsOfBadge dataAsOf={action.dataAsOf} source="Yahoo Finance" />
             </div>
           </div>
 

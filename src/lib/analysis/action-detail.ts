@@ -39,6 +39,8 @@ export interface ActionDetail {
   fullTimeEmployees: number | null;
   businessSummary: string;
   notes: string;
+  /** date de la dernière mise à jour des données de référence (ISO) */
+  dataAsOf: string;
 }
 
 const CACHE_TTL_MS = 60 * 1000;
@@ -99,6 +101,7 @@ export function parseActionDetailCsv(content: string): ActionDetail[] {
   const iEmployees = idx("full_time_employees");
   const iSummary = idx("business_summary");
   const iNotes = idx("notes");
+  const iDataAsOf = idx("data_as_of");
 
   const details: ActionDetail[] = [];
   for (const line of lines.slice(1)) {
@@ -140,6 +143,7 @@ export function parseActionDetailCsv(content: string): ActionDetail[] {
       fullTimeEmployees: iEmployees >= 0 ? toNumberOrNull(cells[iEmployees] ?? "") : null,
       businessSummary: iSummary >= 0 ? (cells[iSummary] ?? "").trim() : "",
       notes: iNotes >= 0 ? (cells[iNotes] ?? "").trim() : "",
+      dataAsOf: iDataAsOf >= 0 ? (cells[iDataAsOf] ?? "").trim() : "",
     });
   }
   return details;
