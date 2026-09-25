@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, HelpCircle } from "lucide-react";
 
 import { cn } from "./cn";
 
@@ -144,16 +145,24 @@ export function Kpi({
   value: string;
   sub?: string;
   subTone?: "positive" | "negative";
-  /** explication au survol du libellé (title natif) */
+  /** explication au survol de toute la tuile (bulle comme les fiches ETF) */
   hint?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div>
-      <p
-        className="text-xs font-medium tracking-wide text-text-secondary uppercase"
-        title={hint}
-      >
+    <div
+      className={cn(hint && "relative cursor-help")}
+      onMouseEnter={hint ? () => setOpen(true) : undefined}
+      onMouseLeave={hint ? () => setOpen(false) : undefined}
+      onFocus={hint ? () => setOpen(true) : undefined}
+      onBlur={hint ? () => setOpen(false) : undefined}
+      tabIndex={hint ? 0 : undefined}
+    >
+      <p className="flex items-center gap-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
         {label}
+        {hint ? (
+          <HelpCircle className="h-3 w-3 text-text-muted/70 transition-colors hover:text-accent-500" aria-hidden />
+        ) : null}
       </p>
       <p className="mt-1 font-heading text-2xl font-semibold text-text-primary tabular-nums">
         {value}
@@ -169,6 +178,14 @@ export function Kpi({
         >
           {sub}
         </p>
+      ) : null}
+      {hint && open ? (
+        <span
+          role="tooltip"
+          className="absolute bottom-full left-0 z-20 mb-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case"
+        >
+          {hint}
+        </span>
       ) : null}
     </div>
   );

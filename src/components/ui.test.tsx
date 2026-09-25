@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Badge, Button, Kpi } from "./ui";
 
@@ -26,8 +26,12 @@ describe("Kpi", () => {
     expect(sub).toHaveClass("text-positive");
   });
 
-  it("expose une explication au survol via hint", () => {
-    render(<Kpi label="Score" value="6/10" hint="Détail du calcul" />);
-    expect(screen.getByText("Score")).toHaveAttribute("title", "Détail du calcul");
+  it("expose une explication au survol de toute la tuile via hint", () => {
+    render(<Kpi label="Score" value="6/10" sub="concentration pénalisée" hint="Détail du calcul" />);
+    const tile = screen.getByText("Score").closest("div")!;
+    fireEvent.mouseEnter(tile);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Détail du calcul");
+    fireEvent.mouseLeave(tile);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
 });
