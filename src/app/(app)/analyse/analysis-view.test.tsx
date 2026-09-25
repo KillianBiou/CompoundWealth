@@ -282,8 +282,24 @@ const performance: PerformanceReport = {
   ],
   savingsRate: 0.017,
   worldEquityRate: 0.08,
-  savingsReferenceValueCents: 10_600_00,
-  worldReferenceValueCents: 11_100_00,
+  savingsReference: {
+    rate: 0.017,
+    valueCents: 10_600_00,
+    gainCents: 150_00,
+    deltaCents: 631_00,
+  },
+  worldReference: {
+    rate: 0.08,
+    valueCents: 11_100_00,
+    gainCents: 650_00,
+    deltaCents: 131_00,
+  },
+  worldGrowth: {
+    cumulative: 0.11,
+    annualized: 0.11,
+    startDate: new Date("2024-01-15T00:00:00Z"),
+    endDate: new Date("2025-01-15T00:00:00Z"),
+  },
 };
 
 function renderView() {
@@ -433,6 +449,24 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText(/Par actif/)).toBeInTheDocument();
     // le tableau enveloppes est visible par défaut
     expect(screen.getByText("PEA Trade Republic")).toBeInTheDocument();
+  });
+
+  it("les cartes de référence affichent le vrai gain de chaque référence, jamais l'écart du portefeuille", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    // gain de la référence livret : 150 € (référence − contribué)
+    expect(screen.getByText(/gain de la référence : \+150,00 €/)).toBeInTheDocument();
+    // gain de la référence Monde : 650 €, toujours > gain livret
+    expect(screen.getByText(/gain de la référence : \+650,00 €/)).toBeInTheDocument();
+    // l'écart vs portefeuille est explicitement libellé « vs votre portefeuille »
+    expect(screen.getAllByText(/vs votre portefeuille/).length).toBe(2);
+  });
+
+  it("le verdict affiche la croissance réelle du MSCI World sur la même période", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    expect(screen.getByText(/MSCI World réel sur la même période/)).toBeInTheDocument();
+    expect(screen.getByText(/\+11 %/)).toBeInTheDocument();
   });
   it("le panneau performance bascule vers le détail par actif", () => {
     renderView();

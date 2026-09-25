@@ -13,9 +13,30 @@ export interface CashFlow {
   amountCents: number;
 }
 
-export interface ValuationPoint {
-  date: Date;
-  valueCents: number;
+const MS_PER_DAY = 24 * 3600 * 1000;
+/** convention Excel/Sheets XIRR : Act/365, dates tronquées au jour entier */
+const DAYS_PER_YEAR = 365;
+
+/**
+ * Normalise une date en minuit UTC. Les dépôts du livret sont stockés à
+ * minuit local (22:00Z en heure d'été parisienne) alors que les autres flux
+ * sont à minuit UTC : sans normalisation, un même jour de versement donne
+ * deux exponents d'actualisation différents.
+ */
+export function toUtcMidnight(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
+/**
+ * Écart en jours entiers entre deux dates (convention Excel : chaque date est
+ * tronquée au jour). 2025-09-25 → 2026-09-25 = 365 jours, bornes exclues.
+ */
+function dayDiff(from: Date, to: Date): number {
+  const a = toUtcMidnight(from).getTime();
+  const b = toUtcMidnight(to).getTime();
+  return Math.round((b - a) / MS_PER_DAY);
 }
 
 /**
@@ -29,12 +50,12 @@ export function positionCashFlows(
 ): CashFlow[] {
   if (position.investments.length > 0) {
     return position.investments.map((inv) => ({
-      date: inv.date,
+      date: toUtcMidnight(inv.date),
       amountCents: inv.amountCents,
     }));
   }
   if (position.investedCents !== null && position.investedCents !== 0) {
-    return [{ date: position.boughtAt, amountCents: position.investedCents }];
+    return [{ date: toUtcMidnight(position.boughtAt), amountCents: position.investedCents }];
   }
   return [];
 }
@@ -53,17 +74,22 @@ export function envelopeCashFlows(positions: AnalysisPosition[]): CashFlow[] {
 
 /**
  * Fusionne les flux d'investissements et les dépôts du livret en une série
- * unique triée par date, en additionnant les flux du même jour.
+ * unique triée par date, en additionnant les flux du même jour. Les dates
+ * sont normalisées à minuit UTC : un dépôt livret saisi à minuit Paris
+ * (22:00Z) et un versement position à minuit UTC le même jour fusionnent.
  */
 export function mergeCashFlows(flows: Iterable<CashFlow>): CashFlow[] {
   const byTime = new Map<number, CashFlow>();
   for (const flow of flows) {
-    const time = flow.date.getTime();
+    const time = toUtcMidnight(flow.date).getTime();
     const existing = byTime.get(time);
     if (existing) {
       existing.amountCents += flow.amountCents;
     } else {
-      byTime.set(time, { ...flow });
+      byTime.set(time, {
+        date: new Date(time),
+        amountCents: flow.amountCents,
+      });
     }
   }
   return [...byTime.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
@@ -73,23 +99,31 @@ export function mergeCashFlows(flows: Iterable<CashFlow>): CashFlow[] {
 /*                          XIRR — rendement pondéré par l'argent              */
 /* -------------------------------------------------------------------------- */
 
-const MS_PER_DAY = 24 * 3600 * 1000;
-/** nombre de jours par an utilisé par Excel/Sheets pour XIRR (365,25 de préférence) */
-const DAYS_PER_YEAR = 365;
-
-function npv(rate: number, flows: CashFlow[], finalValueCents: number, finalTime: number): number {
+/**
+ * VAN du profil « versements puis valeur finale » :
+ * NPV(r) = Σ flux_i × (1+r)^((d_fin − d_i)/365) − valeur_finale.
+ * Même racine que la convention Excel XIRR (Act/365, dates tronquées au
+ * jour entier, premier flux non actualisé dans sa forme relative) : la
+ * valeur terminale est actualisée à sa date de valorisation, pas à J+1.
+ */
+function npv(
+  rate: number,
+  flows: CashFlow[],
+  finalValueCents: number,
+  finalDate: Date,
+): number {
   let sum = -finalValueCents;
   for (const flow of flows) {
-    const years = (finalTime - flow.date.getTime()) / (MS_PER_DAY * DAYS_PER_YEAR);
+    const years = dayDiff(flow.date, finalDate) / DAYS_PER_YEAR;
     sum += flow.amountCents * Math.pow(1 + rate, years);
   }
   return sum;
 }
 
 /**
- * Rendement annuel pondéré par l'argent (XIRR) : taux r qui annule la VAN de
- * tous les flux (versements, retraits négatifs) face à la valeur finale.
- * Résolution par bisection robuste, même équation qu'Excel XIRR.
+ * Rendement annuel pondéré par l'argent (XIRR), même racine qu'Excel
+ * =XIRR(flux, dates) : Act/365, dates tronquées au jour entier.
+ * Résolution par bisection sur [-0.9999, 10].
  * Retourne null si non calculable (un seul flux, racine hors bornes…).
  */
 export function xirr(
@@ -98,23 +132,22 @@ export function xirr(
   finalDate: Date,
 ): number | null {
   if (flows.length === 0 || finalValueCents <= 0) return null;
-  const finalTime = finalDate.getTime();
+  const end = toUtcMidnight(finalDate);
   const sorted = [...flows].sort((a, b) => a.date.getTime() - b.date.getTime());
-  if (sorted[0].date.getTime() >= finalTime) return null;
+  if (toUtcMidnight(sorted[0].date).getTime() >= end.getTime()) return null;
   const totalInvested = sorted.reduce((s, f) => s + f.amountCents, 0);
   if (totalInvested <= 0) return null;
 
   // VAN croît avec le taux pour un profil standard (versements puis valeur
-  // finale) : on cherche le changement de signe par bisection sur
-  // [-0.9999, 10]. Borne haute élargie pour les cas brefs.
+  // finale) : on cherche le changement de signe par bisection.
   let low = -0.9999;
   let high = 10;
-  let lowNpv = npv(low, sorted, finalValueCents, finalTime);
-  let highNpv = npv(high, sorted, finalValueCents, finalTime);
+  let lowNpv = npv(low, sorted, finalValueCents, end);
+  let highNpv = npv(high, sorted, finalValueCents, end);
   if (lowNpv * highNpv > 0) return null;
   for (let i = 0; i < 200; i += 1) {
     const mid = (low + high) / 2;
-    const midNpv = npv(mid, sorted, finalValueCents, finalTime);
+    const midNpv = npv(mid, sorted, finalValueCents, end);
     if (Math.abs(midNpv) < 0.005) return mid;
     if (lowNpv * midNpv <= 0) {
       high = mid;
@@ -128,83 +161,59 @@ export function xirr(
 }
 
 /* -------------------------------------------------------------------------- */
-/*                          TWR — rendement pondéré par le temps               */
+/*        TWR — approximation Modified Dietz (sans valorisations)              */
 /* -------------------------------------------------------------------------- */
 
+export interface ModifiedDietzResult {
+  /** rendement cumulé sur la période (fraction) */
+  cumulative: number;
+  /** rendement annualisé géométriquement si la période > 1 an, sinon null */
+  annualized: number | null;
+  /** durée de la période en années */
+  years: number;
+}
+
 /**
- * TWR chaîné : sous-périodes délimitées par chaque flux externe, rendement
- * de chaque sous-période neutralisé des flux, puis chaînage multiplicatif.
- * Retourne le TWR cumulé sur la période (fraction), et la durée en années
- * pour annualiser si besoin.
+ * Rendement pondéré par le temps approché par la méthode Modified Dietz —
+ * l'approximation standard quand on n'a pas de valorisation à chaque date de
+ * flux (le TWR chaîné GIPS l'exige) :
+ *
+ *   r = (V_fin − V_début − flux_net) / (V_début + Σ w_i × flux_i)
+ *
+ * avec w_i le poids temporel de chaque flux (temps de présence sur la
+ * période). V_début = 0 : l'enveloppe démarre avec son premier versement.
+ * Avec un flux unique, r = rendement simple exactement. Retourne null si non
+ * calculable (dénominateur ≤ 0, période nulle).
  */
-export function timeWeightedReturn(
-  valuations: ValuationPoint[],
+export function modifiedDietzReturn(
   flows: CashFlow[],
   finalValueCents: number,
   finalDate: Date,
-): { cumulative: number; annualized: number | null; years: number | null } {
-  if (valuations.length === 0) return { cumulative: 0, annualized: null, years: null };
-  const sortedValuations = [...valuations].sort(
-    (a, b) => a.date.getTime() - b.date.getTime(),
-  );
-  const sortedFlows = [...flows].sort((a, b) => a.date.getTime() - b.date.getTime());
-  const start = sortedValuations[0];
-  const finalTime = finalDate.getTime();
-  if (finalTime <= start.date.getTime()) {
-    return { cumulative: 0, annualized: null, years: null };
-  }
-  // timeline : points de valorisation + dates de flux + date finale
-  const times = new Set<number>(sortedValuations.map((v) => v.date.getTime()));
-  for (const flow of sortedFlows) {
-    if (flow.date.getTime() > start.date.getTime() && flow.date.getTime() < finalTime) {
-      times.add(flow.date.getTime());
-    }
-  }
-  times.add(finalTime);
-  const sortedTimes = [...times].sort((a, b) => a - b);
+): ModifiedDietzResult | null {
+  const end = toUtcMidnight(finalDate);
+  const endTime = end.getTime();
+  const sorted = flows
+    .filter((f) => toUtcMidnight(f.date).getTime() <= endTime)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+  if (sorted.length === 0) return null;
+  const start = toUtcMidnight(sorted[0].date);
+  const totalDays = dayDiff(start, end);
+  if (totalDays <= 0) return null;
 
-  // convention : un flux à la date t est crédité à la sous-période SUIVANTE
-  // (la valorisation snapshot précède les flux de même date), et la
-  // valorisation initiale est post-flows (elle inclut déjà le premier achat).
-  let chained = 1;
-  for (let i = 1; i < sortedTimes.length; i += 1) {
-    const beginTime = sortedTimes[i - 1];
-    const time = sortedTimes[i];
-    const flowAtBegin = i > 1 ? externalFlowAtTime(sortedFlows, beginTime) : 0;
-    const beginValue = valueAtTime(sortedValuations, beginTime) + flowAtBegin;
-    const endValue = time === finalTime ? finalValueCents : valueAtTime(sortedValuations, time);
-    if (beginValue > 0) {
-      const subReturn = (endValue - beginValue) / beginValue;
-      if (subReturn > -1) {
-        chained *= 1 + subReturn;
-      } else {
-        chained = 0;
-      }
-    }
+  const netFlow = sorted.reduce((s, f) => s + f.amountCents, 0);
+  const gain = finalValueCents - netFlow;
+  let denominator = 0;
+  for (const flow of sorted) {
+    const weight = dayDiff(flow.date, end) / totalDays;
+    denominator += flow.amountCents * weight;
   }
-  const cumulative = chained - 1;
-  const years = (finalTime - start.date.getTime()) / (MS_PER_DAY * DAYS_PER_YEAR);
+  if (denominator <= 0) return null;
+
+  const cumulative = gain / denominator;
+  const years = totalDays / DAYS_PER_YEAR;
   const annualized =
-    cumulative > -1 && years > 0 ? Math.pow(1 + cumulative, 1 / years) - 1 : null;
+    years > 1 && cumulative > -1 ? Math.pow(1 + cumulative, 1 / years) - 1 : null;
   return { cumulative, annualized, years };
-}
-
-function valueAtTime(sortedValuations: ValuationPoint[], time: number): number {
-  let current: number | null = null;
-  for (const v of sortedValuations) {
-    if (v.date.getTime() <= time) current = v.valueCents;
-    else break;
-  }
-  return current ?? 0;
-}
-
-function externalFlowAtTime(sortedFlows: CashFlow[], time: number): number {
-  let sum = 0;
-  for (const f of sortedFlows) {
-    if (f.date.getTime() === time) sum += f.amountCents;
-    else if (f.date.getTime() > time) break;
-  }
-  return sum;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -212,8 +221,6 @@ function externalFlowAtTime(sortedFlows: CashFlow[], time: number): number {
 /* -------------------------------------------------------------------------- */
 
 export interface PerformanceScope {
-  /** valorisations observées, triées par date */
-  valuations: ValuationPoint[];
   /** flux externes : versements (positifs) et retraits (négatifs) */
   flows: CashFlow[];
   /** valeur finale en centimes */
@@ -225,9 +232,9 @@ export interface PerformanceScope {
 export interface PerformanceMetricsResult {
   /** XIRR annualisé (fraction), null si non calculable */
   xirr: number | null;
-  /** TWR annualisé (fraction), null si non calculable */
+  /** TWR annualisé (Modified Dietz, fraction), null si période ≤ 1 an ou non calculable */
   twrAnnualized: number | null;
-  /** TWR cumulé sur la période (fraction) */
+  /** TWR cumulé sur la période (Modified Dietz, fraction) */
   twrCumulative: number | null;
   /** simple : (valeur finale − versé) / versé, null si versé ≤ 0 */
   simpleReturn: number | null;
@@ -235,7 +242,7 @@ export interface PerformanceMetricsResult {
   gainCents: number | null;
   /** total versé, centimes */
   contributedCents: number;
-  /** durée de la période en années, null si < 1 point */
+  /** durée de la période en années, null si < 1 flux */
   years: number | null;
 }
 
@@ -245,39 +252,34 @@ export const MIN_PERIOD_DAYS = 30;
 export function computePerformanceMetrics(
   scope: PerformanceScope,
 ): PerformanceMetricsResult {
-  const { valuations, flows, finalValueCents, finalDate } = scope;
-  const contributedCents = flows.reduce((s, f) => s + f.amountCents, 0);
-  const gainCents = finalValueCents - contributedCents;
-  const sortedValuations = [...valuations].sort(
-    (a, b) => a.date.getTime() - b.date.getTime(),
-  );
-  const firstDate = sortedValuations[0]?.date ?? null;
-  const lastDate =
-    sortedValuations.length > 0
-      ? sortedValuations[sortedValuations.length - 1].date
-      : null;
-  const effectiveEnd = lastDate && lastDate.getTime() > finalDate.getTime() ? lastDate : finalDate;
-  const years =
-    firstDate && effectiveEnd.getTime() > firstDate.getTime()
-      ? (effectiveEnd.getTime() - firstDate.getTime()) / (MS_PER_DAY * DAYS_PER_YEAR)
-      : null;
-  const simpleReturn =
-    contributedCents > 0 && gainCents !== null ? gainCents / contributedCents : null;
+  const finalDate = toUtcMidnight(scope.finalDate);
+  const endTime = finalDate.getTime();
+  const flows = scope.flows
+    .map((f) => ({ date: toUtcMidnight(f.date), amountCents: f.amountCents }))
+    .filter((f) => f.date.getTime() <= endTime)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  const days = firstDate ? (effectiveEnd.getTime() - firstDate.getTime()) / MS_PER_DAY : 0;
-  const enoughData = flows.length > 0 && days >= MIN_PERIOD_DAYS && finalValueCents > 0;
+  const contributedCents = flows.reduce((s, f) => s + f.amountCents, 0);
+  const gainCents = scope.finalValueCents - contributedCents;
+  const firstDate = flows[0]?.date ?? null;
+  const days = firstDate ? dayDiff(firstDate, finalDate) : 0;
+  const years = days > 0 ? days / DAYS_PER_YEAR : null;
+  const simpleReturn =
+    contributedCents > 0 ? gainCents / contributedCents : null;
+
+  const enoughData = flows.length > 0 && days >= MIN_PERIOD_DAYS && scope.finalValueCents > 0;
 
   const xirrValue = enoughData
-    ? xirr(flows, finalValueCents, effectiveEnd)
+    ? xirr(flows, scope.finalValueCents, finalDate)
     : null;
-  const twr = enoughData
-    ? timeWeightedReturn(valuations, flows, finalValueCents, effectiveEnd)
+  const dietz = enoughData
+    ? modifiedDietzReturn(flows, scope.finalValueCents, finalDate)
     : null;
 
   return {
     xirr: xirrValue,
-    twrAnnualized: twr?.annualized ?? null,
-    twrCumulative: twr?.cumulative ?? null,
+    twrAnnualized: dietz?.annualized ?? null,
+    twrCumulative: dietz?.cumulative ?? null,
     simpleReturn,
     gainCents,
     contributedCents,
@@ -296,17 +298,20 @@ export const WORLD_EQUITY_REFERENCE_RETURN = DEFAULT_EQUITY_RETURN;
  * Valeur finale théorique des mêmes versements au taux constant `rate` :
  * la référence « stratégie basique » (livret de précaution ou ETF Monde
  * au rendement historique moyen) appliquée à vos propres versements.
+ * Le taux annualisé est appliqué au prorata de la durée de détention de
+ * chaque versement (convention Act/365 en jours entiers, comme le XIRR).
  */
 export function referenceFinalValue(
   flows: CashFlow[],
   finalDate: Date,
   rate: number,
 ): number {
+  const end = toUtcMidnight(finalDate);
   let futureValue = 0;
   for (const flow of flows) {
-    const years = (finalDate.getTime() - flow.date.getTime()) / (MS_PER_DAY * DAYS_PER_YEAR);
-    if (years < 0) continue;
-    futureValue += flow.amountCents * Math.pow(1 + rate, years);
+    const days = dayDiff(flow.date, end);
+    if (days < 0) continue;
+    futureValue += flow.amountCents * Math.pow(1 + rate, days / DAYS_PER_YEAR);
   }
   return Math.round(futureValue);
 }
