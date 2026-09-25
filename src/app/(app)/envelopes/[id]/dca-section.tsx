@@ -1,6 +1,6 @@
+"use client";
 import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 import {
-  DCA_FREQUENCY_LABELS,
   estimateSpendCents,
   nextOccurrence,
   windowSummaries,
@@ -12,6 +12,7 @@ import { Badge, Card } from "@/components/ui";
 import { DcaTable, type DcaTableRow } from "./dca-table";
 import { DcaRecap } from "./dca-recap";
 import { DcaCreateDialog } from "./dca-create-dialog";
+import { useI18n } from "@/i18n/provider";
 
 export interface DcaPlanRow {
   id: string;
@@ -78,6 +79,7 @@ export function DcaSection({
     valuations: { valueCents: number }[];
   }[];
 }) {
+  const { t } = useI18n();
   const activeLines: DcaPricedLine[] = [];
   for (const plan of plans) {
     for (const line of plan.lines) {
@@ -114,13 +116,20 @@ export function DcaSection({
         ticker: etf?.ticker ?? line.isin,
         name: etf?.name ?? line.name,
         maxAmountCents: line.maxAmountCents,
-        frequencyLabel: DCA_FREQUENCY_LABELS[plan.frequency],
+        frequencyLabel: t.envelopes.dcaFrequency[plan.frequency],
         nextDateLabel: next.toLocaleDateString("fr-FR"),
         nextDateRelative:
-          daysUntil === 0 ? "aujourd'hui" : daysUntil === 1 ? "demain" : `dans ${daysUntil} jours`,
+          daysUntil === 0
+            ? t.envelopes.relativeDate.today
+            : daysUntil === 1
+              ? t.envelopes.relativeDate.tomorrow
+              : t.envelopes.relativeDate.inDays.replace("{count}", String(daysUntil)),
         estimateLabel:
           estimate && envelopeType === "PEA"
-            ? `≈ ${formatEurCents(estimate.estimatedCents)} · ${estimate.quantity} part${estimate.quantity > 1 ? "s" : ""}`
+            ? t.envelopes.dca.recap.estimate
+                .replace("{amount}", formatEurCents(estimate.estimatedCents))
+                .replace("{count}", String(estimate.quantity))
+                .replace("{s}", estimate.quantity > 1 ? "s" : "")
             : null,
         active: line.active && plan.active,
       };
@@ -132,12 +141,12 @@ export function DcaSection({
   return (
     <Card className="p-0">
       <div className="flex items-center justify-between border-b border-border-cw p-6 pb-4">
-        <h2 className="font-heading text-lg font-semibold">Investissements réguliers</h2>
+        <h2 className="font-heading text-lg font-semibold">{t.envelopes.dca.title}</h2>
         <Badge tone="neutral">{activeCount}</Badge>
       </div>
       {rows.length === 0 ? (
         <p className="px-6 pb-2 pt-4 text-sm text-text-secondary">
-          Aucun investissement régulier pour le moment. Planifiez votre premier DCA.
+          {t.envelopes.dca.empty}
         </p>
       ) : (
         <DcaRecap envelopeType={envelopeType} summaries={summaries} slices={slices} />

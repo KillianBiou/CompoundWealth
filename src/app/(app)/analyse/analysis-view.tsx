@@ -27,6 +27,8 @@ import {
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Kpi } from "@/components/ui";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
+import type { Dictionary } from "@/i18n/server";
 import { REGIONS } from "@/lib/analysis/exposure-catalog";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
@@ -70,11 +72,6 @@ type PanelId =
   | "etf"
   | "action";
 
-const MONTHS = [
-  "janv.", "févr.", "mars", "avr.", "mai", "juin",
-  "juil.", "août", "sept.", "oct.", "nov.", "déc.",
-];
-
 /* -------------------------------------------------------------------------- */
 /*                              Cartes scanners                                */
 /* -------------------------------------------------------------------------- */
@@ -104,6 +101,7 @@ function ScannerCard({
   disabled?: boolean;
   comingSoon?: boolean;
 }) {
+  const { t } = useI18n();
   const isOpenable = !disabled && !comingSoon;
   return (
     <button
@@ -123,7 +121,7 @@ function ScannerCard({
       />
       {comingSoon ? (
         <span className="absolute right-4 top-4 text-[10px] font-medium uppercase tracking-wide text-text-muted">
-          bientôt
+          {t.analyse.comingSoon}
         </span>
       ) : null}
       <div className="relative flex items-center justify-between">
@@ -144,11 +142,12 @@ function ScannerCard({
   );
 }
 
-function feeBadge(rate: number | null) {
-  if (rate === null) return <Badge tone="warning">TER inconnu</Badge>;
-  if (rate < 0.005) return <Badge tone="positive">Faible</Badge>;
-  if (rate <= 0.01) return <Badge tone="warning">Moyen</Badge>;
-  return <Badge tone="negative">Élevé</Badge>;
+function feeBadge(rate: number | null, t: Dictionary) {
+  const labels = t.analyse.cards.fees;
+  if (rate === null) return <Badge tone="warning">{labels.badgeUnknown}</Badge>;
+  if (rate < 0.005) return <Badge tone="positive">{labels.badgeLow}</Badge>;
+  if (rate <= 0.01) return <Badge tone="warning">{labels.badgeMedium}</Badge>;
+  return <Badge tone="negative">{labels.badgeHigh}</Badge>;
 }
 
 function scoreBadge(score: number | null) {
@@ -169,34 +168,33 @@ function FeePanel({
   fees: FeeAnalysisResult;
   onSelectLine: (line: FeeLine) => void;
 }) {
+  const { t } = useI18n();
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <Kpi
-          label="Frais annuels"
+          label={t.analyse.fee.annualFees}
           value={formatEurCents(fees.annualCostCents)}
           sub={fees.feeRate !== null ? formatPercent(fees.feeRate) : undefined}
         />
-        <Kpi label="Transactions cumulées" value={formatEurCents(fees.transactionFeesCents)} />
+        <Kpi label={t.analyse.fee.transactions} value={formatEurCents(fees.transactionFeesCents)} />
       </div>
       <div className="rounded-lg border border-negative/25 bg-negative/5 p-4">
-        <p className="text-sm text-text-secondary">Impact estimé sur 20 ans</p>
+        <p className="text-sm text-text-secondary">{t.analyse.fee.impact20}</p>
         <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-negative">
           −{formatEurCents(loss20?.lossCents ?? 0)}
         </p>
-        <p className="mt-1 text-xs text-text-muted">
-          vs même portefeuille à 0,15 %/an — rendement actions 6,2 % avant frais.
-        </p>
+        <p className="mt-1 text-xs text-text-muted">{t.analyse.fee.impactDetail}</p>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border-cw">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
-              <th className="px-3 py-2 font-medium">Titre</th>
-              <th className="px-3 py-2 text-right font-medium">Valeur</th>
-              <th className="px-3 py-2 text-right font-medium">TER</th>
-              <th className="px-3 py-2 text-right font-medium">Coût/an</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.fee.colTitle}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.fee.colValue}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.fee.colTer}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.fee.colCost}</th>
             </tr>
           </thead>
           <tbody>
@@ -224,7 +222,7 @@ function FeePanel({
             {fees.lines.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-text-muted">
-                  Aucune position analysée.
+                  {t.analyse.fee.empty}
                 </td>
               </tr>
             ) : null}
@@ -232,7 +230,7 @@ function FeePanel({
         </table>
       </div>
       <div>
-        <p className="mb-2 text-sm font-medium text-text-secondary">Manque à gagner projeté</p>
+        <p className="mb-2 text-sm font-medium text-text-secondary">{t.analyse.fee.projectedLoss}</p>
         <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
@@ -241,7 +239,7 @@ function FeePanel({
               <CartesianGrid stroke="var(--border)" strokeDasharray="4 4" vertical={false} />
               <XAxis
                 dataKey="horizonYears"
-                tickFormatter={(v: number) => `${v} ans`}
+                tickFormatter={(v: number) => t.analyse.fee.yearsUnit.replace("{years}", String(v))}
                 stroke="var(--text-muted)"
                 fontSize={12}
                 tickLine={false}
@@ -256,7 +254,7 @@ function FeePanel({
                   borderRadius: 8,
                   fontSize: 12,
                 }}
-                formatter={(value) => [formatEurCents(Number(value) * 100), "Manque à gagner"]}
+                formatter={(value) => [formatEurCents(Number(value) * 100), t.analyse.fee.tooltipLoss]}
               />
               <Bar dataKey="lossEur" radius={[4, 4, 0, 0]}>
                 {fees.projectedLossCents.map((entry, index) => (
@@ -267,9 +265,7 @@ function FeePanel({
           </ResponsiveContainer>
         </div>
       </div>
-      <p className="text-xs text-text-muted">
-        Frais d&apos;entrée SCPI et certains frais d&apos;assurance-vie ne sont pas modélisés.
-      </p>
+      <p className="text-xs text-text-muted">{t.analyse.fee.disclaimer}</p>
     </div>
   );
 }
@@ -285,23 +281,24 @@ function IncomePanel({
   income: IncomeAnalysisResult;
   onSelectLine: (line: IncomeLine) => void;
 }) {
+  const { t } = useI18n();
   const calendarData = income.monthlyCalendar.map((m) => ({
-    label: `${MONTHS[m.month]} ${String(m.year).slice(2)}`,
+    label: `${t.analyse.months[m.month]} ${String(m.year).slice(2)}`,
     amountEur: m.amountCents / 100,
   }));
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
-        <Kpi label="Cash 12 mois" value={formatEurCents(income.cashTwelveMonthsCents)} />
+        <Kpi label={t.analyse.income.cash12} value={formatEurCents(income.cashTwelveMonthsCents)} />
         <Kpi
-          label="Projection 12 mois"
+          label={t.analyse.income.projection12}
           value={formatEurCents(income.projectedTwelveMonthsCents)}
-          sub="capitalisés inclus"
+          sub={t.analyse.income.projectionSub}
         />
       </div>
       {calendarData.length > 0 ? (
         <div>
-          <p className="mb-2 text-sm font-medium text-text-secondary">Calendrier des versements</p>
+          <p className="mb-2 text-sm font-medium text-text-secondary">{t.analyse.income.calendar}</p>
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={calendarData}>
@@ -322,7 +319,7 @@ function IncomePanel({
                     borderRadius: 8,
                     fontSize: 12,
                   }}
-                  formatter={(value) => [formatEurCents(Number(value) * 100), "Reçu"]}
+                  formatter={(value) => [formatEurCents(Number(value) * 100), t.analyse.income.tooltipReceived]}
                 />
                 <Bar dataKey="amountEur" fill="var(--positive)" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -334,11 +331,11 @@ function IncomePanel({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
-              <th className="px-3 py-2 font-medium">Source</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 text-right font-medium">12 mois</th>
-              <th className="px-3 py-2 text-right font-medium">Projection</th>
-              <th className="px-3 py-2 text-right font-medium">Yield</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colSource}</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colType}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.income.col12}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colProjection}</th>
+              <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colYield}</th>
             </tr>
           </thead>
           <tbody>
@@ -354,9 +351,9 @@ function IncomePanel({
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
                 <td className="px-3 py-2">
                   {line.kind === "cash" ? (
-                    <Badge tone="positive">Cash</Badge>
+                    <Badge tone="positive">{t.analyse.income.typeCash}</Badge>
                   ) : (
-                    <Badge tone="neutral">Capitalisé</Badge>
+                    <Badge tone="neutral">{t.analyse.income.typeAcc}</Badge>
                   )}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
@@ -373,17 +370,14 @@ function IncomePanel({
             {income.lines.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
-                  Aucun revenu détecté — importez un export broker.
+                  {t.analyse.income.empty}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-text-muted">
-        Les dividendes capitalisés (ETF Acc) sont estimés via le yield 2025 du fichier ETF
-        de référence, jamais versés en cash.
-      </p>
+      <p className="text-xs text-text-muted">{t.analyse.income.disclaimer}</p>
     </div>
   );
 }
@@ -399,6 +393,7 @@ function DiversificationPanel({
   result: DiversificationResult;
   kind: "sector" | "region";
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState<number | null>(null);
   const pieData = result.lines.slice(0, 8).map((line, index) => ({
     name: kind === "region"
@@ -411,13 +406,13 @@ function DiversificationPanel({
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <Kpi
-          label="Score"
+          label={t.analyse.diversification.score}
           value={result.score !== null ? `${result.score}/10` : "—"}
-          sub="concentration pénalisée"
+          sub={t.analyse.diversification.scoreSub}
         />
         {result.lines[0] ? (
           <Kpi
-            label={kind === "sector" ? "Secteur n°1" : "Zone n°1"}
+            label={kind === "sector" ? t.analyse.diversification.topSector : t.analyse.diversification.topRegion}
             value={
               kind === "sector"
                 ? result.lines[0].sector
@@ -432,7 +427,7 @@ function DiversificationPanel({
         <div className="space-y-1 rounded-lg border border-warning/25 bg-warning/5 p-3">
           {result.alerts.map((alert) => (
             <p key={alert.label} className="text-sm text-warning">
-              ⚠ {alert.label} : {formatPercent(alert.share)} — via {alert.detail}
+              ⚠ {alert.label} : {formatPercent(alert.share)} — {t.analyse.diversification.via.replace("{detail}", alert.detail)}
             </p>
           ))}
         </div>
@@ -525,14 +520,11 @@ function DiversificationPanel({
         })}
         {result.lines.length === 0 ? (
           <p className="py-6 text-center text-text-muted">
-            Exposition inconnue pour vos positions.
+            {t.analyse.diversification.empty}
           </p>
         ) : null}
       </div>
-      <p className="text-xs text-text-muted">
-        Look-through : ETF dépliés selon la répartition de leur indice de référence
-        (approximations destinées à être remplacées par les holdings réelles).
-      </p>
+      <p className="text-xs text-text-muted">{t.analyse.diversification.disclaimer}</p>
     </div>
   );
 }
@@ -705,6 +697,7 @@ function SimulationPanel({
   params: SimParams;
   onParamChange: (patch: Partial<SimParams>) => void;
 }) {
+  const { t } = useI18n();
   const { horizonYears, withdrawalRate, equityReturn, extraSavings, useInflation, inflationRate } =
     params;
   const setHorizonYears = (v: number) => onParamChange({ horizonYears: v });
@@ -747,30 +740,30 @@ function SimulationPanel({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-positive/25 bg-gradient-to-br from-positive/10 to-transparent p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Capital à l&apos;horizon ({finalPoint.year})
+            {t.analyse.simulator.capitalHorizon.replace("{year}", String(finalPoint.year))}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
             {formatEurCents(finalPoint.totalCents)}
           </p>
           <div className="mt-1 space-y-0.5 text-xs text-gold">
-            <p>dont {formatEurCents(totalGainCents)} d&apos;intérêts</p>
-            <p>{formatEurCents(totalContributionsCents)} d&apos;apports</p>
+            <p>{t.analyse.simulator.interests.replace("{amount}", formatEurCents(totalGainCents))}</p>
+            <p>{t.analyse.simulator.contributions.replace("{amount}", formatEurCents(totalContributionsCents))}</p>
             {useInflation ? (
-              <p>{formatEurCents(finalPoint.totalRealCents)} en euros constants</p>
+              <p>{t.analyse.simulator.realEuros.replace("{amount}", formatEurCents(finalPoint.totalRealCents))}</p>
             ) : null}
           </div>
         </div>
         <div className="rounded-lg border border-accent-500/25 bg-gradient-to-br from-accent-500/10 to-transparent p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-            Rente mensuelle ({withdrawalRate.toFixed(2).replace(".", ",")} %/an)
+            {t.analyse.simulator.renteMonthly.replace("{rate}", withdrawalRate.toFixed(2))}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
-            {formatEurCents(monthlyRenteCents)}/mois
+            {t.analyse.simulator.renteValue.replace("{amount}", formatEurCents(monthlyRenteCents))}
           </p>
           <div className="mt-1 space-y-0.5 text-xs text-gold">
-            <p>retrait de {formatPercent(withdrawalRate / 100)} du capital par an</p>
+            <p>{t.analyse.simulator.renteDetail.replace("{rate}", formatPercent(withdrawalRate / 100))}</p>
             {useInflation ? (
-              <p>{formatEurCents(monthlyRenteRealCents)}/mois en euros constants</p>
+              <p>{t.analyse.simulator.renteReal.replace("{amount}", formatEurCents(monthlyRenteRealCents))}</p>
             ) : null}
           </div>
         </div>
@@ -809,7 +802,7 @@ function SimulationPanel({
               stroke="var(--positive)"
               strokeWidth={2}
               dot={false}
-              name="Investissement"
+              name={t.analyse.simulator.seriesInvested}
             />
             <Line
               type="monotone"
@@ -817,7 +810,7 @@ function SimulationPanel({
               stroke="var(--info)"
               strokeWidth={2}
               dot={false}
-              name="Épargne"
+              name={t.analyse.simulator.seriesSavings}
             />
             {useInflation ? (
               <Line
@@ -827,7 +820,7 @@ function SimulationPanel({
                 strokeWidth={1.5}
                 strokeDasharray="5 4"
                 dot={false}
-                name="Euros constants"
+                name={t.analyse.simulator.seriesReal}
               />
             ) : null}
           </LineChart>
@@ -835,52 +828,54 @@ function SimulationPanel({
       </div>
       <div className="space-y-4 rounded-lg border border-border-cw bg-bg-subtle/40 p-4">
         <Slider
-          label="Horizon"
+          label={t.analyse.simulator.sliderHorizon}
           value={horizonYears}
           min={5}
           max={40}
           step={5}
           onChange={setHorizonYears}
-          format={(v) => `${v} ans`}
+          format={(v) => t.analyse.simulator.yearsUnit.replace("{years}", String(v))}
         />
         <Slider
-          label="Taux de retrait (indépendance)"
+          label={t.analyse.simulator.sliderWithdrawal}
           value={withdrawalRate}
           min={3}
           max={5}
           step={0.25}
           onChange={setWithdrawalRate}
           format={(v) => `${v.toFixed(2).replace(".", ",")} %`}
-          hint="3,25 % = plus prudent, 4 % = règle classique"
+          hint={t.analyse.simulator.withdrawalHint}
         />
         <Slider
-          label="Rendement actions"
+          label={t.analyse.simulator.sliderEquityReturn}
           value={equityReturn}
           min={2}
           max={12}
           step={0.5}
           onChange={setEquityReturn}
           format={(v) => `${v.toFixed(1).replace(".", ",")} %/an`}
-          hint={`défaut : ${formatPercent(defaults.equityReturn)} (${
-            defaults.returnSource === "historique" ? "votre historique" : "moyenne actions"
-          })`}
+          hint={t.analyse.simulator.equityReturnHint
+            .replace("{rate}", formatPercent(defaults.equityReturn))
+            .replace("{source}", defaults.returnSource === "historique"
+              ? t.analyse.simulator.sourceHistorical
+              : t.analyse.simulator.sourceAverage)}
         />
         <Slider
-          label="Épargne mensuelle supplémentaire"
+          label={t.analyse.simulator.sliderExtraSavings}
           value={extraSavings}
           min={0}
           max={200000}
           step={5000}
           onChange={setExtraSavings}
           format={(v) => formatEurCents(v)}
-          hint={`s'ajoute au DCA actuel (${formatEurCents(defaults.monthlyDcaCents)}/mois) et va à l'investissement`}
+          hint={t.analyse.simulator.extraSavingsHint.replace("{amount}", formatEurCents(defaults.monthlyDcaCents))}
         />
         <div className="flex items-center justify-between">
           <label
             htmlFor="sim-inflation-toggle"
             className="text-sm font-medium text-text-secondary"
           >
-            Prendre en compte l&apos;inflation
+            {t.analyse.simulator.inflationToggle}
           </label>
           <button
             id="sim-inflation-toggle"
@@ -903,22 +898,21 @@ function SimulationPanel({
         </div>
         {useInflation ? (
           <Slider
-            label="Inflation moyenne par an"
+            label={t.analyse.simulator.sliderInflation}
             value={inflationRate}
             min={0}
             max={10}
             step={0.25}
             onChange={setInflationRate}
             format={(v) => `${v.toFixed(2).replace(".", ",")} %`}
-            hint="moyenne historique euro : ~2 %/an"
+            hint={t.analyse.simulator.inflationHint}
           />
         ) : null}
       </div>
       <p className="text-xs text-text-muted">
-        Investissement (actions/ETF) : composition au rendement choisi. Épargne (livrets) :
-        taux contractuel {formatPercent(defaults.savingsReturn)}, versements réels de{" "}
-        {formatEurCents(Math.max(0, defaults.monthlySavingsCents - defaults.monthlyDcaCents))}/mois.
-        Le DCA actif va toujours à l&apos;investissement, jamais à l&apos;épargne.
+        {t.analyse.simulator.disclaimer
+          .replace("{rate}", formatPercent(defaults.savingsReturn))
+          .replace("{amount}", formatEurCents(Math.max(0, defaults.monthlySavingsCents - defaults.monthlyDcaCents)))}
       </p>
     </div>
   );
@@ -937,6 +931,7 @@ function SimulatorCard({
   params: SimParams;
   onClick: (id: PanelId) => void;
 }) {
+  const { t } = useI18n();
   const simulation = useMemo(() => simulateFromParams(defaults, params), [defaults, params]);
   const finalPoint = simulation.points[simulation.points.length - 1];
   const chartData = simulation.points.map((p) => ({
@@ -962,19 +957,20 @@ function SimulatorCard({
           </span>
           <div>
             <p className="font-heading text-base font-semibold text-text-primary">
-              Simulateur de patrimoine
+              {t.analyse.cards.simulator.title}
             </p>
             <p className="mt-0.5 text-xs text-text-muted">
-              projection à {params.horizonYears} ans · rendement{" "}
-              {formatPercent(params.equityReturn / 100)} · DCA{" "}
-              {formatEurCents(defaults.monthlyDcaCents + params.extraSavings)}/mois
+              {t.analyse.cards.simulator.subtitle
+                .replace("{years}", String(params.horizonYears))
+                .replace("{rate}", formatPercent(params.equityReturn / 100))
+                .replace("{amount}", formatEurCents(defaults.monthlyDcaCents + params.extraSavings))}
             </p>
           </div>
         </div>
         <div className="flex items-end gap-8">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Capital projeté ({finalPoint.year})
+              {t.analyse.cards.simulator.capitalProjected.replace("{year}", String(finalPoint.year))}
             </p>
             <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
               {formatEurCents(finalPoint.totalCents)}
@@ -982,12 +978,12 @@ function SimulatorCard({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Rente {params.withdrawalRate.toFixed(2).replace(".", ",")} %/an
+              {t.analyse.cards.simulator.rente.replace("{rate}", params.withdrawalRate.toFixed(2))}
             </p>
             <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-accent-500">
-              {formatEurCents(
+              {t.analyse.cards.simulator.perMonth.length > 0 ? formatEurCents(
                 Math.round((finalPoint.totalCents * (params.withdrawalRate / 100)) / 12),
-              )}/mois
+              ) : ""}{t.analyse.cards.simulator.perMonth}
             </p>
           </div>
         </div>
@@ -1012,7 +1008,7 @@ function SimulatorCard({
               stroke="var(--positive)"
               strokeWidth={2}
               dot={false}
-              name="Investissement"
+              name={t.analyse.cards.simulator.seriesInvested}
             />
             <Line
               type="monotone"
@@ -1020,7 +1016,7 @@ function SimulatorCard({
               stroke="var(--info)"
               strokeWidth={2}
               dot={false}
-              name="Épargne"
+              name={t.analyse.cards.simulator.seriesSavings}
             />
             <Line
               type="monotone"
@@ -1028,15 +1024,15 @@ function SimulatorCard({
               stroke="var(--text-secondary)"
               strokeWidth={2.5}
               dot={false}
-              name="Total"
+              name={t.analyse.cards.simulator.seriesTotal}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
       <p className="relative text-xs text-text-muted">
-        Investissement {formatEurCents(defaults.investedWealthCents)} + épargne{" "}
-        {formatEurCents(defaults.savingsWealthCents)} — cliquez pour affiner horizon,
-        rendement et épargne.
+        {t.analyse.cards.simulator.detail
+          .replace("{invested}", formatEurCents(defaults.investedWealthCents))
+          .replace("{savings}", formatEurCents(defaults.savingsWealthCents))}
       </p>
     </button>
   );
@@ -1055,6 +1051,7 @@ function ExposureCard({
   regions: DiversificationResult;
   onClick: (id: PanelId) => void;
 }) {
+  const { t } = useI18n();
   const disabled = sectors.lines.length === 0 && regions.lines.length === 0;
   const topRegion = regions.lines[0]
     ? REGIONS.find((r) => r.key === regions.lines[0].sector)
@@ -1082,36 +1079,33 @@ function ExposureCard({
         {scoreBadge(sectors.score ?? regions.score)}
       </div>
       <p className="relative font-heading text-base font-semibold text-text-primary">
-        Exposition
+        {t.analyse.cards.exposure.title}
       </p>
       <div className="relative grid grid-cols-1 divide-y divide-border-cw sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         <div className="sm:pr-6 sm:border-0">
           <p className="font-heading text-base font-semibold text-text-primary">
-            {topRegion?.flag ?? ""} {topRegion?.label ?? "Géographie"}
+            {topRegion?.flag ?? ""} {topRegion?.label ?? t.analyse.cards.exposure.geography}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {regions.lines[0] ? formatPercent(regions.lines[0].share) : "—"}
           </p>
           <p className="mt-0.5 text-xs font-medium tracking-wide text-text-secondary uppercase">
-            zone dominante · {regions.lines.length} zones
+            {t.analyse.cards.exposure.dominantZone.replace("{count}", String(regions.lines.length))}
           </p>
         </div>
         <div className="sm:pl-6">
           <p className="font-heading text-base font-semibold text-text-primary">
-            {sectors.lines[0]?.sector ?? "Secteurs"}
+            {sectors.lines[0]?.sector ?? t.analyse.cards.exposure.sectors}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {sectors.lines[0] ? formatPercent(sectors.lines[0].share) : "—"}
           </p>
           <p className="mt-0.5 text-xs font-medium tracking-wide text-text-secondary uppercase">
-            secteur dominant · {sectors.lines.length} secteurs
+            {t.analyse.cards.exposure.dominantSector.replace("{count}", String(sectors.lines.length))}
           </p>
         </div>
       </div>
-      <p className="relative text-xs text-text-muted">
-        Répartition réelle ETF dépliés (look-through) — cliquez pour le détail
-        sectoriel et géographique.
-      </p>
+      <p className="relative text-xs text-text-muted">{t.analyse.cards.exposure.detail}</p>
     </button>
   );
 }
@@ -1127,6 +1121,7 @@ function ExposurePanel({
   sectors: DiversificationResult;
   regions: DiversificationResult;
 }) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<"sector" | "region">("region");
   const result = tab === "region" ? regions : sectors;
   return (
@@ -1143,7 +1138,7 @@ function ExposurePanel({
           )}
         >
           <Globe2 className="h-4 w-4" aria-hidden />
-          Géographique
+          {t.analyse.diversification.tabGeographic}
         </button>
         <button
           type="button"
@@ -1156,7 +1151,7 @@ function ExposurePanel({
           )}
         >
           <PieIcon className="h-4 w-4" aria-hidden />
-          Sectoriel
+          {t.analyse.diversification.tabSector}
         </button>
       </div>
       <DiversificationPanel result={result} kind={tab} />
@@ -1187,6 +1182,7 @@ export function AnalysisPageView({
   /** détails CSV des actions, par symbole Yahoo ou ISIN */
   actionDetails: Record<string, ActionDetail>;
 }) {
+  const { t } = useI18n();
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionDetail | null>(null);
@@ -1258,28 +1254,28 @@ export function AnalysisPageView({
     { title: string; subtitle?: string; icon: React.ReactNode }
   > = {
     frais: {
-      title: "Scanner de frais",
-      subtitle: "Coût annuel de chaque ligne et impact projeté long terme",
+      title: t.analyse.panels.frais.title,
+      subtitle: t.analyse.panels.frais.subtitle,
       icon: <Receipt className="h-5 w-5" aria-hidden />,
     },
     revenus: {
-      title: "Dividendes & intérêts",
-      subtitle: "Dividendes versés en cash et rendements capitalisés (ETF Acc)",
+      title: t.analyse.panels.revenus.title,
+      subtitle: t.analyse.panels.revenus.subtitle,
       icon: <Coins className="h-5 w-5" aria-hidden />,
     },
     exposition: {
-      title: "Exposition",
-      subtitle: "Répartition sectorielle et géographique, ETF dépliés (look-through)",
+      title: t.analyse.panels.exposition.title,
+      subtitle: t.analyse.panels.exposition.subtitle,
       icon: <PieIcon className="h-5 w-5" aria-hidden />,
     },
     simulateur: {
-      title: "Simulateur de patrimoine",
-      subtitle: "Projection interactive, indépendance financière",
+      title: t.analyse.panels.simulateur.title,
+      subtitle: t.analyse.panels.simulateur.subtitle,
       icon: <TrendingUp className="h-5 w-5" aria-hidden />,
     },
     abonnements: {
-      title: "Abonnements",
-      subtitle: "Détection des paiements récurrents — bientôt",
+      title: t.analyse.panels.abonnements.title,
+      subtitle: t.analyse.panels.abonnements.subtitle,
       icon: <Wallet className="h-5 w-5" aria-hidden />,
     },
     etf: {
@@ -1288,14 +1284,14 @@ export function AnalysisPageView({
           ? (etfDetails[selectedIsin]?.trName ||
             etfDetails[selectedIsin]?.name ||
             selectedIsin)
-          : "ETF",
+          : t.analyse.panels.etf,
       subtitle: selectedIsin !== null ? selectedIsin : undefined,
       icon: <PieIcon className="h-5 w-5" aria-hidden />,
     },
     action: {
       title: selectedAction
         ? selectedAction.longName || selectedAction.name
-        : "Action",
+        : t.analyse.panels.action,
       subtitle: selectedAction
         ? `${selectedAction.ticker} · ${selectedAction.exchange || selectedAction.tickerYahoo}`
         : undefined,
@@ -1308,27 +1304,28 @@ export function AnalysisPageView({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold">Analyse</h1>
-        <p className="mt-0.5 text-sm text-text-secondary">
-          Vos portefeuilles passés au crible : frais, revenus, diversification, projection.
-          Cliquez sur un scanner pour le détail.
-        </p>
+        <h1 className="font-heading text-2xl font-semibold">{t.analyse.title}</h1>
+        <p className="mt-0.5 text-sm text-text-secondary">{t.analyse.subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <ScannerCard
           id="frais"
-          title="Frais"
+          title={t.analyse.cards.fees.title}
           icon={<Receipt className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-negative/10 via-transparent to-transparent"
-          badge={feeBadge(fees.feeRate)}
+          badge={feeBadge(fees.feeRate, t)}
           kpi={fees.feeRate !== null ? formatPercent(fees.feeRate) : "—"}
-          kpiLabel={fees.feeRate !== null ? `du patrimoine · ${formatEurCents(fees.annualCostCents)}/an` : "TER partiellement inconnu"}
+          kpiLabel={
+            fees.feeRate !== null
+              ? t.analyse.cards.fees.kpiLabel.replace("{amount}", formatEurCents(fees.annualCostCents))
+              : t.analyse.cards.fees.kpiLabelUnknown
+          }
           detail={
             <>
-              {formatEurCents(fees.annualCostCents)} de frais annuels
+              {t.analyse.cards.fees.detailLine1.replace("{amount}", formatEurCents(fees.annualCostCents))}
               <br />
-              −{formatEurCents(loss20?.lossCents ?? 0)} projetés sur 20 ans
+              {t.analyse.cards.fees.detailLine2.replace("{amount}", formatEurCents(loss20?.lossCents ?? 0))}
             </>
           }
           onClick={open}
@@ -1336,17 +1333,17 @@ export function AnalysisPageView({
         />
         <ScannerCard
           id="revenus"
-          title="Dividendes & intérêts"
+          title={t.analyse.cards.income.title}
           icon={<Coins className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-positive/10 via-transparent to-transparent"
-          badge={<Badge tone="neutral">12 mois</Badge>}
+          badge={<Badge tone="neutral">{t.analyse.cards.income.badge}</Badge>}
           kpi={formatEurCents(income.cashTwelveMonthsCents)}
-          kpiLabel="dividendes perçus sur 12 mois"
+          kpiLabel={t.analyse.cards.income.kpiLabel}
           detail={
             <>
-              projection : {formatEurCents(income.projectedTwelveMonthsCents)}
+              {t.analyse.cards.income.detailLine1.replace("{amount}", formatEurCents(income.projectedTwelveMonthsCents))}
               <br />
-              yield pondéré {income.yieldOnValue !== null ? formatPercent(income.yieldOnValue) : "—"}
+              {t.analyse.cards.income.detailLine2.replace("{rate}", income.yieldOnValue !== null ? formatPercent(income.yieldOnValue) : "—")}
             </>
           }
           onClick={open}
@@ -1354,13 +1351,13 @@ export function AnalysisPageView({
         />
         <ScannerCard
           id="abonnements"
-          title="Abonnements"
+          title={t.analyse.cards.subscriptions.title}
           icon={<Wallet className="h-5 w-5" aria-hidden />}
           gradient="bg-gradient-to-br from-transparent to-transparent"
-          badge={<Badge tone="neutral">0 €/mois</Badge>}
-          kpi="0,00 €"
-          kpiLabel="par mois"
-          detail="La détection des paiements récurrents arrive avec l'import des transactions carte."
+          badge={<Badge tone="neutral">{t.analyse.cards.subscriptions.badge}</Badge>}
+          kpi={t.analyse.cards.subscriptions.kpi}
+          kpiLabel={t.analyse.cards.subscriptions.kpiLabel}
+          detail={t.analyse.cards.subscriptions.detail}
           onClick={open}
           comingSoon
         />
@@ -1374,11 +1371,9 @@ export function AnalysisPageView({
             <Wallet className="h-5 w-5" aria-hidden />
           </span>
           <p className="font-heading text-base font-semibold text-text-muted">
-            Bientôt disponible
+            {t.analyse.soonTitle}
           </p>
-          <p className="text-xs text-text-muted">
-            Un nouvel onglet d&apos;analyse prendra place ici.
-          </p>
+          <p className="text-xs text-text-muted">{t.analyse.soonText}</p>
         </div>
         <SimulatorCard defaults={simulatorDefaults} params={simParams} onClick={open} />
       </div>
@@ -1393,7 +1388,7 @@ export function AnalysisPageView({
         }
         backLabel={
           (openPanel === "etf" || openPanel === "action") && previousPanel !== null
-            ? `Retour — ${panels[previousPanel].title}`
+            ? t.analyse.panels.back.replace("{title}", panels[previousPanel].title)
             : undefined
         }
         title={openPanel !== null ? panels[openPanel].title : ""}
@@ -1427,8 +1422,7 @@ export function AnalysisPageView({
         ) : null}
         {openPanel === "abonnements" ? (
           <p className="py-8 text-center text-sm text-text-muted">
-            Le scanner d&apos;abonnements analyse les transactions carte (MCC) — disponible
-            dès l&apos;import de ces opérations.
+            {t.analyse.panels.abonnements.body}
           </p>
         ) : null}
       </SidePanel>

@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
+import { useI18n } from "@/i18n/provider";
+import type { Dictionary } from "@/i18n/server";
 import { HintLabel } from "./hint-label";
 import { InfoRow } from "./info-row";
 import { DataAsOfBadge } from "./data-as-of-badge";
@@ -55,59 +57,21 @@ const COUNTRY_FLAGS: Record<string, string> = {
   "Other": "🌍",
 };
 
-const COUNTRY_LABELS_FR: Record<string, string> = {
-  "United States": "États-Unis",
-  "Japan": "Japon",
-  "United Kingdom": "Royaume-Uni",
-  "Canada": "Canada",
-  "France": "France",
-  "Germany": "Allemagne",
-  "Switzerland": "Suisse",
-  "Netherlands": "Pays-Bas",
-  "Luxembourg": "Luxembourg",
-  "Ireland": "Irlande",
-  "Italy": "Italie",
-  "Spain": "Espagne",
-  "Sweden": "Suède",
-  "Australia": "Australie",
-  "Denmark": "Danemark",
-  "China": "Chine",
-  "India": "Inde",
-  "Taiwan": "Taïwan",
-  "South Korea": "Corée du Sud",
-  "Brazil": "Brésil",
-};
+function countryLabel(country: string, t: Dictionary): string {
+  const labels = t.analyse.detail.countries as Record<string, string>;
+  return labels[country] ?? country;
+}
 
-const SECTOR_LABELS_FR: Record<string, string> = {
-  Technology: "Technologie",
-  Financials: "Finance",
-  Finance: "Finance",
-  Industrials: "Industrie",
-  Healthcare: "Santé",
-  "Consumer Cyclicals": "Consommation discrétionnaire",
-  "Consumer Defensives": "Consommation de base",
-  "Consumer Non-Cyclicals": "Consommation de base",
-  Energy: "Énergie",
-  Utilities: "Services publics",
-  "Utilities and Telecommunications": "Services publics & télécoms",
-  Telecommunications: "Télécommunications",
-  "Non-Energy Materials": "Matériaux",
-  "Real Estate": "Immobilier",
-  "Communication Services": "Services de communication",
-  Other: "Autres",
-};
+function sectorLabel(sector: string, t: Dictionary): string {
+  const labels = t.analyse.detail.sectors as Record<string, string>;
+  return labels[sector] ?? sector;
+}
 
 function flagFor(country: string): string {
   return COUNTRY_FLAGS[country] ?? "🏳️";
 }
 
-function countryFr(country: string): string {
-  return COUNTRY_LABELS_FR[country] ?? country;
-}
 
-function sectorFr(sector: string): string {
-  return SECTOR_LABELS_FR[sector] ?? sector;
-}
 
 /* -------------------------------------------------------------------------- */
 /*                                Onglet Général                              */
@@ -116,6 +80,8 @@ function sectorFr(sector: string): string {
 
 
 function GeneralTab({ etf }: { etf: EtfDetail }) {
+  const { t } = useI18n();
+  const d = t.analyse.detail.etf;
   return (
     <div className="space-y-5">
       <div className="rounded-lg border border-border-cw p-4">
@@ -124,7 +90,7 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Badge tone={etf.distributing ? "positive" : "neutral"}>
-            {etf.distributing ? "Distribuant" : "Capitalisant"}
+            {etf.distributing ? d.distributing : d.accumulating}
           </Badge>
           <Badge tone="neutral">{etf.replication || "—"}</Badge>
           {etf.peaEligible ? <Badge tone="positive">PEA</Badge> : null}
@@ -135,8 +101,8 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
             dataAsOf={etf.dataAsOf}
             source={
               etf.assetClass === "Private Equity"
-                ? "KID / émetteur (ELTIF)"
-                : "justETF / émetteur"
+                ? d.sourcePe
+                : d.sourceEtf
             }
           />
         </div>
@@ -144,131 +110,123 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border-cw p-4">
-          <HintLabel
-            hint="Total Expense Ratio : frais totaux annuels du fonds (gestion, administration, juridique). Ils sont prélevés directement sur le fonds — la performance affichée est donc nette de frais."
-            uppercase
-          >
-            Frais annuels (TER)
+          <HintLabel hint={d.terHint} uppercase>
+            {d.terTitle}
           </HintLabel>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {etf.ter !== null ? formatPercent(etf.ter) : "—"}
           </p>
-          <p className="mt-0.5 text-xs text-text-muted">
-            prélevés sur le fonds, inclus dans la performance
-          </p>
+          <p className="mt-0.5 text-xs text-text-muted">{d.terSub}</p>
         </div>
         <div className="rounded-lg border border-border-cw p-4">
-          <HintLabel
-            hint="Dividendes et coupons versés en cash sur l'année 2025, en pourcentage du cours. Un ETF capitalisant réinvestit automatiquement ces montants dans le fonds (aucun versement en compte)."
-            uppercase
-          >
-            Rendement distribué 2025
+          <HintLabel hint={d.yieldHint} uppercase>
+            {d.yieldTitle}
           </HintLabel>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {etf.dividendYield2025 ? formatPercent(etf.dividendYield2025) : "—"}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
-            {etf.distributing ? "dividendes versés en cash" : "ETF capitalisant : 0"}
+            {etf.distributing ? d.yieldSubDist : d.yieldSubAcc}
           </p>
         </div>
       </div>
 
       <div className="rounded-lg border border-border-cw p-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-          Identité
+          {d.identity}
         </p>
         <InfoRow
-          label="Émetteur"
+          label={d.provider}
           value={etf.provider || etf.emitter}
-          hint="Société de gestion qui gère le fonds (BlackRock, Amundi, Vanguard…). Elle décide de la réplication et des frais, mais ne détient pas les actifs : ceux-ci sont segregated chez un dépositaire."
+          hint={d.providerHint}
         />
         <InfoRow
-          label="Indice suivi"
+          label={d.indexTracked}
           value={etf.indexTracked}
-          hint="Référence de marché que le fonds cherche à reproduire (ex. MSCI World = ~1 400 grandes entreprises de 23 pays développés). La performance du fonds est comparée à cet indice."
+          hint={d.indexHint}
         />
         <InfoRow
-          label="Classe d'actifs"
+          label={d.assetClass}
           value={etf.assetClass}
-          hint="Type d'actifs détenus par le fonds : actions (Equity), obligations (Bond), private equity (ELTIF non cotés)… Détermine le rendement attendu et le risque."
+          hint={d.assetClassHint}
         />
         <InfoRow
-          label="Région"
+          label={d.region}
           value={etf.region}
-          hint="Zone géographique couverte par l'indice : World (monde développé), Europe, Emerging Markets, France… Plus la zone est large, plus la diversification est forte."
+          hint={d.regionHint}
         />
         <InfoRow
-          label="Focus sectoriel"
+          label={d.sectorFocus}
           value={etf.sectorFocus}
-          hint="Secteurs économiques couverts : « All sectors » = toutes industries confondues (technologie, santé, finance…). Un focus unique (ex. Tech only) concentre le risque."
+          hint={d.sectorFocusHint}
         />
       </div>
 
       <div className="rounded-lg border border-border-cw p-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-          Identifiants
+          {d.identifiers}
         </p>
         <InfoRow
           label="ISIN"
           value={etf.isin}
-          hint="Identifiant international de valeurs : 12 caractères (2 lettres de pays + 9 caractères + clé). Unique par fonds, utilisé partout dans l'app pour rattacher positions et fiches."
+          hint={d.isinHint}
         />
         <InfoRow
           label="Ticker"
           value={etf.ticker}
-          hint="Symbole court de cotation sur la place principale (ex. WPEA sur Euronext Paris). Plus facile à retenir que l'ISIN."
+          hint={d.tickerHint}
         />
         {etf.tickerYahoo ? <InfoRow
-          label="Symbole Yahoo"
+          label={d.yahoo}
           value={etf.tickerYahoo}
-          hint="Symbole utilisé pour récupérer les cours en temps réel via Yahoo Finance (suffixé par la place : .PA = Paris, .DE = Xetra)."
+          hint={d.yahooHint}
         /> : null}
         {etf.wkn ? <InfoRow
-          label="WKN"
+          label={d.wkn}
           value={etf.wkn}
-          hint="Wertpapierkennnummer : identifiant allemand à 6 caractères, équivalent de l'ISIN sur les places germanophones."
+          hint={d.wknHint}
         /> : null}
         <InfoRow
-          label="Devise du fonds"
+          label={d.fundCurrency}
           value={etf.fundCurrency || etf.currency}
-          hint="Devise de comptabilisation du fonds. Attention : même si le fonds est en USD, la part EUR (hedged) supprime le risque de change ; la part USD (unhedged) y est exposée."
+          hint={d.fundCurrencyHint}
         />
         {etf.currencyRisk ? <InfoRow
-          label="Risque de devise"
+          label={d.currencyRisk}
           value={etf.currencyRisk}
-          hint="Unhedged : votre rendement suit aussi les variations EUR/USD (favorable si le dollar monte). Hedged : le change est neutralisé, au coût d'une légère décote de rendement."
+          hint={d.currencyRiskHint}
         /> : null}
       </div>
 
       <div className="rounded-lg border border-border-cw p-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-          Structure
+          {d.structure}
         </p>
         <InfoRow
-          label="Domicile"
+          label={d.domicile}
           value={etf.domicile}
-          hint="Pays d'enregistrement juridique du fonds. Irlande et Luxembourg sont les domiciles UCITS les plus courants : avantage fiscal sur les dividendes US (traité, ~15 % au lieu de 30 %)."
+          hint={d.domicileHint}
         />
         <InfoRow
-          label="Place de cotation"
+          label={d.exchange}
           value={etf.exchange}
-          hint="Bourse où la part est négociée : Euronext Paris, Xetra (Allemagne), Borsa Italiana… La liquidité est généralement la meilleure sur la place dominante."
+          hint={d.exchangeHint}
         />
         <InfoRow
-          label="Nombre de valeurs"
+          label={d.holdingsCount}
           value={etf.holdingsCount ? etf.holdingsCount.toLocaleString("fr-FR") : "—"}
-          hint="Nombre de lignes détenues par l'indice : ~1 400 pour MSCI World. Plus il est élevé, meilleure est la diversification (le risque d'une seule entreprise pèse peu)."
+          hint={d.holdingsCountHint}
         />
         {etf.holdingsAsOf ? <InfoRow
-          label="Répartitions du"
+          label={d.holdingsAsOf}
           value={etf.holdingsAsOf}
-          hint="Date des données de répartition (holdings, pays, secteurs) publiées par l'émetteur — généralement le rapport mensuel ou trimestriel le plus récent."
+          hint={d.holdingsAsOfHint}
         /> : null}
       </div>
       {etf.notes ? (
         <div className="rounded-lg border border-border-cw p-4">
           <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-            Bon à savoir
+            {d.notes}
           </p>
           <ul className="space-y-1.5 text-xs text-text-secondary">
             {etf.notes.split("; ").map((note) =>
@@ -288,12 +246,14 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
 const HOLDINGS_PAGE_SIZE = 10;
 
 function DetailsTab({ etf }: { etf: EtfDetail }) {
+  const { t } = useI18n();
+  const d = t.analyse.detail.etf;
   const holdings = etf.topHoldings;
   const [visibleCount, setVisibleCount] = useState(HOLDINGS_PAGE_SIZE);
   if (holdings.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-text-muted">
-        Liste des valeurs non disponible pour cet ETF.
+        {d.holdingsEmpty}
       </p>
     );
   }
@@ -305,10 +265,10 @@ function DetailsTab({ etf }: { etf: EtfDetail }) {
       <div className="rounded-lg border border-border-cw p-4">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-            Top {visible.length} valeurs
+            {d.topHoldings.replace("{count}", String(visible.length))}
           </p>
           <p className="text-xs text-text-muted tabular-nums">
-            poids cumulé {formatPercent(visibleWeight)}
+            {d.cumulatedWeight.replace("{weight}", formatPercent(visibleWeight))}
           </p>
         </div>
         <div className="mt-3 space-y-2.5">
@@ -346,14 +306,14 @@ function DetailsTab({ etf }: { etf: EtfDetail }) {
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-border-cw/60 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text-primary"
           >
             <Plus className="h-4 w-4" aria-hidden />
-            Afficher {Math.min(HOLDINGS_PAGE_SIZE, remaining)} valeur{remaining > 1 ? "s" : ""} de plus
+            {d.showMore
+              .replace("{count}", String(Math.min(HOLDINGS_PAGE_SIZE, remaining)))
+              .replace("{s}", remaining > 1 ? "s" : "")}
           </button>
         ) : null}
       </div>
       <p className="text-xs text-text-muted">
-        Poids issus du dernier rapport du fonds — les répartitions complètes
-        ({etf.holdingsCount ? etf.holdingsCount.toLocaleString("fr-FR") : "n"} valeurs) sont
-        publiées par l&apos;émetteur.
+        {d.holdingsDisclaimer.replace("{count}", etf.holdingsCount ? etf.holdingsCount.toLocaleString("fr-FR") : "n")}
       </p>
     </div>
   );
@@ -372,11 +332,13 @@ function BreakdownList({
   flag?: (label: string) => string;
   translate?: (label: string) => string;
 }) {
+  const { t } = useI18n();
+  const c = t.analyse.detail.common;
   const [expanded, setExpanded] = useState(false);
   if (entries.length === 0) {
     return (
       <p className="py-3 text-center text-sm text-text-muted">
-        Répartition non disponible.
+        {t.analyse.detail.etf.breakdownUnavailable}
       </p>
     );
   }
@@ -429,10 +391,10 @@ function BreakdownList({
           <span className="flex items-center gap-2">
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
             <span aria-hidden>🌍</span>
-            Autres
+            {c.other}
             {hiddenNamed.length > 0 ? (
               <span className="text-xs text-text-muted">
-                ({hiddenNamed.length} lignes)
+                {c.linesCount.replace("{count}", String(hiddenNamed.length))}
               </span>
             ) : null}
           </span>
@@ -446,7 +408,7 @@ function BreakdownList({
           className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-sm text-text-secondary transition-colors hover:bg-bg-subtle hover:text-text-primary"
         >
           <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-          Replier
+          {c.collapse}
         </button>
       ) : null}
       {(expanded || hiddenNamed.length === 0) && other ? (
@@ -465,6 +427,8 @@ function BreakdownList({
 }
 
 function DiversificationTab({ etf }: { etf: EtfDetail }) {
+  const { t } = useI18n();
+  const d = t.analyse.detail.etf;
   const hasData = etf.countries.length > 0 || etf.sectors.length > 0;
   return (
     <div className="space-y-5">
@@ -472,43 +436,37 @@ function DiversificationTab({ etf }: { etf: EtfDetail }) {
         <>
           <div className="rounded-lg border border-border-cw p-4">
             <div className="mb-3 flex items-baseline justify-between">
-              <HintLabel
-                hint="Répartition géographique du fonds : poids de chaque pays dans le portefeuille de l'ETF, tel que publié par l'émetteur."
-                uppercase
-              >
-                Pays représentés
+              <HintLabel hint={d.countriesHint} uppercase>
+                {d.countriesTitle}
               </HintLabel>
               {etf.holdingsAsOf ? (
-                <p className="text-xs text-text-muted">au {etf.holdingsAsOf}</p>
+                <p className="text-xs text-text-muted">{d.asOf.replace("{date}", etf.holdingsAsOf)}</p>
               ) : null}
             </div>
             <BreakdownList
               entries={etf.countries}
               flag={flagFor}
-              translate={countryFr}
+              translate={(label) => countryLabel(label, t)}
             />
           </div>
           <div className="rounded-lg border border-border-cw p-4">
             <HintLabel
               className="mb-3"
-              hint="Répartition sectorielle : poids de chaque secteur d'activité (technologie, santé, finance...) dans le portefeuille de l'ETF."
+              hint={d.sectorsHint}
               uppercase
             >
-              Secteurs
+              {d.sectorsTitle}
             </HintLabel>
-            <BreakdownList entries={etf.sectors} translate={sectorFr} />
+            <BreakdownList entries={etf.sectors} translate={(label) => sectorLabel(label, t)} />
           </div>
         </>
       ) : (
         <p className="py-8 text-center text-sm text-text-muted">
-          Répartition géographique et sectorielle non disponible pour cet ETF.
+          {t.analyse.detail.etf.breakdownEmpty}
         </p>
       )}
       <p className="text-xs text-text-muted">
-        Répartitions du fonds publiées par l&apos;émetteur — les 4 premières
-        lignes sont affichées, le reste se déplie. Ce sont des répartitions
-        « look-through » : elles montrent le contenu réel du panier (actions,
-        obligations) que l&apos;ETF détient, pas d&apos;autres fonds en cascade.
+        {t.analyse.detail.etf.breakdownDisclaimer}
       </p>
     </div>
   );
@@ -520,18 +478,16 @@ function DiversificationTab({ etf }: { etf: EtfDetail }) {
 
 type TabId = "general" | "details" | "diversification";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "general", label: "Général" },
-  { id: "details", label: "Détails" },
-  { id: "diversification", label: "Diversification" },
-];
+const TAB_IDS: TabId[] = ["general", "details", "diversification"];
 
 export function EtfDetailPanel({ etf }: { etf: EtfDetail }) {
+  const { t } = useI18n();
+  const tabLabels = t.analyse.detail.common.tabs;
   const [tab, setTab] = useState<TabId>("general");
   return (
     <div className="space-y-5">
       <div className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/50 p-1">
-        {TABS.map(({ id, label }) => (
+        {TAB_IDS.map((id) => (
           <button
             key={id}
             type="button"
@@ -543,7 +499,11 @@ export function EtfDetailPanel({ etf }: { etf: EtfDetail }) {
                 : "text-text-secondary hover:text-text-primary",
             )}
           >
-            {label}
+            {id === "general"
+              ? tabLabels.general
+              : id === "details"
+                ? tabLabels.details
+                : tabLabels.diversification}
           </button>
         ))}
       </div>

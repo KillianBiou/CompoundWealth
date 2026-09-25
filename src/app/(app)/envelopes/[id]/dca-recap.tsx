@@ -18,21 +18,18 @@ import { formatEurCents, formatEurCentsCompact } from "@/lib/money";
 
 import type { DcaSlice } from "./dca-section";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 type PeriodKey = "1m" | "3m" | "1y";
 
-const PERIODS: { key: PeriodKey; label: string }[] = [
-  { key: "1m", label: "1 mois" },
-  { key: "3m", label: "3 mois" },
-  { key: "1y", label: "1 an" },
-];
+const PERIOD_KEYS: PeriodKey[] = ["1m", "3m", "1y"];
 
 type ChartKind = "bar" | "donut" | "treemap";
 
-const CHART_KINDS: { key: ChartKind; label: string; icon: typeof BarChart3 }[] = [
-  { key: "bar", label: "Barres", icon: BarChart3 },
-  { key: "donut", label: "Anneau", icon: PieChartIcon },
-  { key: "treemap", label: "Treemap", icon: LayoutGrid },
+const CHART_KINDS: { key: ChartKind; icon: typeof BarChart3 }[] = [
+  { key: "bar", icon: BarChart3 },
+  { key: "donut", icon: PieChartIcon },
+  { key: "treemap", icon: LayoutGrid },
 ];
 
 const SLICE_COLORS = [
@@ -59,6 +56,8 @@ export function DcaRecap({
   summaries: Record<PeriodKey, DcaWindowSummary>;
   slices: DcaSlice[];
 }) {
+  const { t } = useI18n();
+  const PERIODS = PERIOD_KEYS.map((key) => ({ key, label: t.envelopes.dca.recap.periods[key] }));
   const [period, setPeriod] = useState<PeriodKey>("1m");
   const [chartKind, setChartKind] = useState<ChartKind>("bar");
 
@@ -77,7 +76,7 @@ export function DcaRecap({
         <div
           className="flex rounded-lg border border-border-cw bg-bg-subtle p-1"
           role="tablist"
-          aria-label="Période du récapitulatif"
+          aria-label={t.envelopes.dca.recap.periodGroup}
         >
           {PERIODS.map(({ key, label }) => (
             <button
@@ -101,15 +100,15 @@ export function DcaRecap({
         <div className="rounded-lg border border-positive/25 bg-positive/5 p-4">
           <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-secondary">
             <Coins className="h-3.5 w-3.5 text-positive" aria-hidden />
-            Engagé sur {PERIODS.find((p) => p.key === period)?.label}
+            {t.envelopes.dca.recap.committed.replace("{period}", PERIODS.find((p) => p.key === period)?.label ?? "")}
           </p>
           <p className="mt-1 font-heading text-3xl font-semibold text-positive tabular-nums">
             {formatEurCents(summary.totalEstimatedCents)}
           </p>
           <p className="mt-0.5 text-sm text-text-secondary tabular-nums">
-            {formatEurCents(summary.totalMaxCents)} max
+            {t.envelopes.dca.recap.max.replace("{amount}", formatEurCents(summary.totalMaxCents))}
             {summary.totalEstimatedCents !== summary.totalMaxCents ? (
-              <span className="text-warning"> · {formatEurCents(summary.totalMaxCents - summary.totalEstimatedCents)} non investis</span>
+              <span className="text-warning"> {t.envelopes.dca.recap.nonInvested.replace("{amount}", formatEurCents(summary.totalMaxCents - summary.totalEstimatedCents))}</span>
             ) : null}
           </p>
         </div>
@@ -118,18 +117,23 @@ export function DcaRecap({
           <CalendarClock className="h-4 w-4 text-text-muted" aria-hidden />
           <span className="tabular-nums">
             <span className="font-semibold text-text-primary">{summary.paymentsCount}</span>{" "}
-            versement{summary.paymentsCount > 1 ? "s" : ""} programmé
-            {summary.paymentsCount > 1 ? "s" : ""}
+            {t.envelopes.dca.recap.paymentsCount
+              .replace("{count}", String(summary.paymentsCount))
+              .replace("{s}", summary.paymentsCount > 1 ? "s" : "")
+              .replace("{s2}", summary.paymentsCount > 1 ? "s" : "")}
           </span>
         </div>
         {envelopeType === "PEA" ? (
           <p className="text-xs text-text-muted">
-            PEA : achat de parts entières uniquement — l&apos;estimation rogne le budget au nombre de
-            parts achetables.
+            {t.envelopes.dca.recap.peaNote}
+          </p>
+        ) : envelopeType === "PRIV" ? (
+          <p className="text-xs text-text-muted">
+            {t.envelopes.dca.recap.privNote}
           </p>
         ) : (
           <p className="text-xs text-text-muted">
-            CTO : parts fractionnaires — le budget complet est investi.
+            {t.envelopes.dca.recap.ctoNote}
           </p>
         )}
       </div>
@@ -137,14 +141,14 @@ export function DcaRecap({
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-            Répartition par position
+            {t.envelopes.dca.recap.breakdown}
           </p>
           <div
             className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle p-1"
             role="group"
-            aria-label="Type de visualisation"
+            aria-label={t.envelopes.dca.recap.chartKindGroup}
           >
-            {CHART_KINDS.map(({ key, label, icon: Icon }) => (
+            {CHART_KINDS.map(({ key, icon: Icon }) => (
               <button
                 key={key}
                 type="button"
@@ -158,7 +162,7 @@ export function DcaRecap({
                 )}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden />
-                {label}
+                {t.envelopes.dca.recap.chartKinds[key]}
               </button>
             ))}
           </div>

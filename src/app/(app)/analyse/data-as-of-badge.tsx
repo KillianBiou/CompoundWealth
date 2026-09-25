@@ -1,9 +1,10 @@
 import { Badge } from "@/components/ui";
+import { useI18n } from "@/i18n/provider";
 
-function formatAsOf(dateIso: string): string {
+function formatAsOf(dateIso: string, locale: string): string {
   const date = new Date(dateIso);
   if (Number.isNaN(date.getTime())) return dateIso;
-  return date.toLocaleDateString("fr-FR", {
+  return date.toLocaleDateString(locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -23,10 +24,12 @@ export function DataAsOfBadge({
   /** source des données de référence (ex. « Yahoo Finance », « KID / émetteur ») */
   source?: string;
 }) {
+  const { t, locale } = useI18n();
   if (!dataAsOf) return null;
+  const intlLocale = locale === "en" ? "en-GB" : "fr-FR";
   return (
     <Badge tone="neutral" className="font-normal">
-      Données du {formatAsOf(dataAsOf)}
+      {t.analyse.detail.common.dataAsOf.replace("{date}", formatAsOf(dataAsOf, intlLocale))}
       {source ? ` · ${source}` : ""}
     </Badge>
   );

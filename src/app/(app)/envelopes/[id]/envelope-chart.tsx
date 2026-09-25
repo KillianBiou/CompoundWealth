@@ -21,17 +21,10 @@ import {
 import { formatMoneyCents, formatMoneyCentsCompact } from "@/lib/money";
 import type { NumberLocale } from "@/lib/money";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 
-const periods: { key: PeriodKey; label: string }[] = [
-  { key: "1w", label: "1 sem" },
-  { key: "1m", label: "1 mois" },
-  { key: "3m", label: "3 mois" },
-  { key: "6m", label: "6 mois" },
-  { key: "1y", label: "1 an" },
-  { key: "2y", label: "2 ans" },
-  { key: "all", label: "Tout" },
-];
+const periodKeys: PeriodKey[] = ["1w", "1m", "3m", "6m", "1y", "2y", "all"];
 
 interface ChartPoint {
   date: number;
@@ -73,11 +66,13 @@ function ChartTooltip({
   payload,
   currency,
   locale,
+  labels,
 }: {
   active?: boolean;
   payload?: { payload: ChartPoint }[];
   currency: string;
   locale: NumberLocale;
+  labels: { invested: string; gain: string; total: string };
 }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
@@ -97,7 +92,7 @@ function ChartTooltip({
       </p>
       {invested !== null ? (
         <p className="tabular-nums">
-          Investi&nbsp;:{" "}
+          {labels.invested}{" "}
           <span className="font-medium text-text-primary">
             {formatMoneyCents(invested * 100, currency, locale)}
           </span>
@@ -105,7 +100,7 @@ function ChartTooltip({
       ) : null}
       {invested !== null && value !== null ? (
         <p className="tabular-nums">
-          Plus/moins-value&nbsp;: {" "}
+          {labels.gain}{" "}
           <span
             className={cn(
               "font-medium",
@@ -119,7 +114,7 @@ function ChartTooltip({
       ) : null}
       {value !== null ? (
         <p className="mt-1 border-t border-border-cw pt-1 tabular-nums text-text-primary">
-          Valeur totale&nbsp;:{" "}
+          {labels.total}{" "}
           <strong>{formatMoneyCents(value * 100, currency, locale)}</strong>
         </p>
       ) : null}
@@ -140,7 +135,9 @@ export function EnvelopeChart({
   currency?: string;
   numberLocale?: NumberLocale;
 }) {
+  const { t } = useI18n();
   const [period, setPeriod] = useState<PeriodKey>("all");
+  const periods = periodKeys.map((key) => ({ key, label: t.envelopes.chart.periods[key] }));
 
   const data = useMemo(() => {
     const investedPoints = investedSeries(investments);
@@ -155,14 +152,14 @@ export function EnvelopeChart({
   if (valuations.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-text-secondary">
-        Ajoutez une première valorisation pour voir la courbe.
+        {t.envelopes.chart.empty}
       </p>
     );
   }
 
   return (
     <div>
-      <div className="mb-3 flex gap-1 overflow-x-auto" role="group" aria-label="Période d'affichage">
+      <div className="mb-3 flex gap-1 overflow-x-auto" role="group" aria-label={t.envelopes.chart.periodGroup}>
         {periods.map((p) => (
           <button
             key={p.key}
@@ -182,7 +179,7 @@ export function EnvelopeChart({
       </div>
       <div
         className="h-64"
-        aria-label="Évolution de la valeur de l'enveloppe"
+        aria-label={t.envelopes.chart.chartAria}
       >
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -219,14 +216,14 @@ export function EnvelopeChart({
             />
             <Tooltip
               content={
-                <ChartTooltip currency={currency} locale={numberLocale} />
+                <ChartTooltip currency={currency} locale={numberLocale} labels={t.envelopes.chart.tooltip} />
               }
             />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-secondary)" }} />
             <Area
               type="monotone"
               dataKey="value"
-              name="Valeur"
+              name={t.envelopes.chart.series.value}
               stroke="var(--accent-500)"
               strokeWidth={2}
               fill="url(#valueGradient)"
@@ -237,7 +234,7 @@ export function EnvelopeChart({
             <Line
               type="monotone"
               dataKey="invested"
-              name="Investi"
+              name={t.envelopes.chart.series.invested}
               stroke="var(--info)"
               strokeWidth={2}
               dot={false}

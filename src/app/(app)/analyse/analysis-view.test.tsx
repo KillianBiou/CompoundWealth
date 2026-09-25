@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
+import { renderWithI18n } from "../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { AnalysisPageView } from "./analysis-view";
 import type {
@@ -136,7 +137,7 @@ const simulatorDefaults: SimulatorDefaults = {
 };
 
 function renderView() {
-  return render(
+  return renderWithI18n(
     <AnalysisPageView
       fees={fees}
       income={income}

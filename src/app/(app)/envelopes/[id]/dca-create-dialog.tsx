@@ -9,6 +9,7 @@ import { DCA_FREQUENCY_LABELS, nextDateForDay, type DcaFrequency } from "@/lib/d
 import { Badge, Button, Input, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { useActionToast } from "@/components/use-action-toast";
+import { useI18n } from "@/i18n/provider";
 
 interface LineDraft {
   isin: string;
@@ -24,6 +25,7 @@ export function DcaCreateDialog({
   envelopeId: string;
   suggestions: { isin: string; ticker: string; name: string }[];
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"plan" | "single">("plan");
   const [frequency, setFrequency] = useState<DcaFrequency>("MONTHLY");
@@ -90,13 +92,13 @@ export function DcaCreateDialog({
         className="flex w-full items-center justify-center gap-2 border-t border-border-cw px-6 py-3 text-sm text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-secondary"
       >
         <Plus className="h-4 w-4" aria-hidden />
-        Planifier un investissement régulier
+        {t.envelopes.dca.create}
       </button>
     );
   }
 
   return (
-    <Modal title="Planifier un investissement régulier" onClose={() => setOpen(false)}>
+    <Modal title={t.envelopes.dca.createTitle} onClose={() => setOpen(false)}>
       <form action={action} className="space-y-4" noValidate>
         <input type="hidden" name="envelopeId" value={envelopeId} />
         <input type="hidden" name="frequency" value={frequency} />
@@ -119,7 +121,7 @@ export function DcaCreateDialog({
               setPendingAdd(false);
             }}
           >
-            Plan périodique
+            {t.envelopes.dca.planTab}
           </button>
           <button
             type="button"
@@ -137,7 +139,7 @@ export function DcaCreateDialog({
               setPendingAdd(false);
             }}
           >
-            Titre unique
+            {t.envelopes.dca.singleTab}
           </button>
         </div>
 
@@ -149,7 +151,7 @@ export function DcaCreateDialog({
                   htmlFor="dca-frequency"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Périodicité
+                  {t.envelopes.dca.frequency}
                 </label>
                 <Select
                   id="dca-frequency"
@@ -170,7 +172,7 @@ export function DcaCreateDialog({
                   htmlFor="dca-start"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Jour de départ
+                  {t.envelopes.dca.startDay}
                 </label>
                 <Input
                   id="dca-start"
@@ -178,21 +180,21 @@ export function DcaCreateDialog({
                   min="1"
                   max="31"
                   inputMode="numeric"
-                  placeholder="Ex. 5"
+                  placeholder={t.envelopes.dca.startDayPlaceholder}
                   value={startDay}
                   onChange={(e) => setStartDay(e.target.value)}
                   required
                 />
                 {startDate ? (
                   <p className="mt-1 text-xs text-text-muted">
-                    Premier versement le {new Date(startDate).toLocaleDateString("fr-FR")}
+                    {t.envelopes.dca.firstPayment.replace("{date}", new Date(startDate).toLocaleDateString("fr-FR"))}
                   </p>
                 ) : null}
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-text-muted">Titres du plan</p>
+              <p className="text-xs uppercase tracking-wide text-text-muted">{t.envelopes.dca.planLines}</p>
               {lines.map((line) => (
                 <div
                   key={line.isin}
@@ -208,7 +210,7 @@ export function DcaCreateDialog({
                     value={JSON.stringify({ isin: line.isin, maxAmountEur: line.maxAmountEur })}
                   />
                   <Input
-                    aria-label={`Montant max pour ${line.ticker}`}
+                    aria-label={t.envelopes.dca.maxAmountFor.replace("{ticker}", line.ticker)}
                     type="number"
                     step="0.01"
                     min="0"
@@ -223,7 +225,7 @@ export function DcaCreateDialog({
                     type="button"
                     className="text-text-muted hover:text-negative"
                     onClick={() => removeLine(line.isin)}
-                    aria-label={`Retirer ${line.ticker}`}
+                    aria-label={t.envelopes.dca.remove.replace("{ticker}", line.ticker)}
                   >
                     <X className="h-4 w-4" aria-hidden />
                   </button>
@@ -235,7 +237,7 @@ export function DcaCreateDialog({
                     <Input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Nom, ticker ou ISIN…"
+                      placeholder={t.envelopes.dca.searchPlaceholder}
                       autoComplete="off"
                       autoFocus
                     />
@@ -245,7 +247,7 @@ export function DcaCreateDialog({
                     {results.length > 0 ? (
                       <ul
                         role="listbox"
-                        aria-label="ETF correspondants"
+                        aria-label={t.envelopes.dca.resultsLabel}
                         className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border-cw bg-bg-elevated shadow-lg"
                       >
                         {results.map((etf) => (
@@ -277,7 +279,7 @@ export function DcaCreateDialog({
                     className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-cw px-3 py-2 text-sm text-text-muted transition-colors hover:border-accent-500/50 hover:text-text-secondary"
                   >
                     <Plus className="h-4 w-4" aria-hidden />
-                    Ajouter un titre
+                    {t.envelopes.dca.addSecurity}
                   </button>
                 )}
               </div>
@@ -286,7 +288,7 @@ export function DcaCreateDialog({
             {visibleSuggestions.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-wide text-text-muted">
-                  Suggestions — ETF de votre enveloppe
+                  {t.envelopes.dca.suggestions}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {visibleSuggestions.map((s) => (
@@ -310,6 +312,7 @@ export function DcaCreateDialog({
           </>
         ) : (
           <SingleModeFields
+            t={t}
             query={query}
             setQuery={setQuery}
             pendingAdd={pendingAdd}
@@ -365,14 +368,14 @@ export function DcaCreateDialog({
             disabled={pending || lines.length === 0 || lines.some((l) => !l.maxAmountEur)}
             className="w-full sm:w-auto"
           >
-            {pending ? "Création…" : "Confirmer"}
+            {pending ? t.envelopes.dca.creating : t.envelopes.dca.confirm}
           </Button>
           <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-            Annuler
+            {t.common.cancel}
           </Button>
           {lines.length > 0 ? (
             <Badge tone="accent">
-              {lines.length} titre{lines.length > 1 ? "s" : ""}
+              {t.envelopes.dca.titlesCount.replace("{count}", String(lines.length)).replace("{s}", lines.length > 1 ? "s" : "")}
             </Badge>
           ) : null}
         </div>
@@ -382,6 +385,7 @@ export function DcaCreateDialog({
 }
 
 function SingleModeFields({
+  t,
   query,
   setQuery,
   pendingAdd,
@@ -398,6 +402,7 @@ function SingleModeFields({
   suggestions,
   onSuggestion,
 }: {
+  t: ReturnType<typeof useI18n>["t"];
   query: string;
   setQuery: (v: string) => void;
   pendingAdd: boolean;
@@ -422,7 +427,7 @@ function SingleModeFields({
           htmlFor="dca-single-search"
           className="block text-xs uppercase tracking-wide text-text-muted"
         >
-          Titre
+          {t.envelopes.dca.single.title}
         </label>
         {selected ? (
           <div className="flex items-center justify-between rounded-lg border border-border-cw bg-bg-subtle px-3 py-2">
@@ -435,7 +440,7 @@ function SingleModeFields({
               className="text-xs text-text-muted hover:text-negative"
               onClick={() => setPendingAdd(true)}
             >
-              Changer
+              {t.envelopes.dca.single.change}
             </button>
           </div>
         ) : (
@@ -447,7 +452,7 @@ function SingleModeFields({
                 setQuery(e.target.value);
                 setPendingAdd(true);
               }}
-              placeholder="Nom, ticker ou ISIN…"
+              placeholder={t.envelopes.dca.searchPlaceholder}
               autoComplete="off"
             />
             <span className="pointer-events-none absolute right-3 top-2 text-text-muted">
@@ -456,7 +461,7 @@ function SingleModeFields({
             {pendingAdd && results.length > 0 ? (
               <ul
                 role="listbox"
-                aria-label="ETF correspondants"
+                aria-label={t.envelopes.dca.resultsLabel}
                 className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border-cw bg-bg-elevated shadow-lg"
               >
                 {results.map((etf) => (
@@ -487,14 +492,14 @@ function SingleModeFields({
         )}
         {selected ? (
           <div className="flex items-center gap-3 rounded-lg border border-border-cw bg-bg-subtle px-3 py-2">
-            <p className="min-w-0 flex-1 text-sm text-text-secondary">Montant max</p>
+            <p className="min-w-0 flex-1 text-sm text-text-secondary">{t.envelopes.dca.single.maxAmount}</p>
             <input
               type="hidden"
               name="lines"
               value={JSON.stringify({ isin: selected.isin, maxAmountEur: selected.maxAmountEur })}
             />
             <Input
-              aria-label="Montant max"
+              aria-label={t.envelopes.dca.single.maxAmount}
               type="number"
               step="0.01"
               min="0"
@@ -514,20 +519,18 @@ function SingleModeFields({
             htmlFor="dca-single-frequency"
             className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
           >
-            Périodicité
+            {t.envelopes.dca.frequency}
           </label>
           <Select
             id="dca-single-frequency"
             value={frequency}
             onChange={(e) => setFrequency(e.target.value as DcaFrequency)}
           >
-            {(Object.entries(DCA_FREQUENCY_LABELS) as [DcaFrequency, string][]).map(
-              ([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ),
-            )}
+            {(Object.keys(DCA_FREQUENCY_LABELS) as DcaFrequency[]).map((value) => (
+              <option key={value} value={value}>
+                {t.envelopes.dcaFrequency[value]}
+              </option>
+            ))}
           </Select>
         </div>
         <div className="flex-1">
@@ -535,7 +538,7 @@ function SingleModeFields({
             htmlFor="dca-single-start"
             className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
           >
-            Jour de départ
+            {t.envelopes.dca.startDay}
           </label>
           <Input
             id="dca-single-start"
@@ -543,14 +546,14 @@ function SingleModeFields({
             min="1"
             max="31"
             inputMode="numeric"
-            placeholder="Ex. 5"
+            placeholder={t.envelopes.dca.startDayPlaceholder}
             value={startDay}
             onChange={(e) => setStartDay(e.target.value)}
             required
           />
           {firstDateLabel ? (
             <p className="mt-1 text-xs text-text-muted">
-              Premier versement le {firstDateLabel}
+              {t.envelopes.dca.firstPayment.replace("{date}", firstDateLabel)}
             </p>
           ) : null}
         </div>
@@ -558,7 +561,7 @@ function SingleModeFields({
       {suggestions.length > 0 ? (
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-wide text-text-muted">
-            Suggestions — ETF de votre enveloppe
+            {t.envelopes.dca.suggestions}
           </p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
