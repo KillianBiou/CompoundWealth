@@ -68,7 +68,6 @@ const fees: FeeAnalysisResult = {
 const income: IncomeAnalysisResult = {
   cashTwelveMonthsCents: 237_00,
   projectedTwelveMonthsCents: 500_00,
-  capitalizedTwelveMonthsCents: 260_00,
   lines: [
     {
       positionId: "pos-1",
@@ -76,10 +75,22 @@ const income: IncomeAnalysisResult = {
       isin: "US67066G1040",
       symbol: "US67066G1040",
       envelopeName: "CTO Trade Republic",
-      kind: "cash",
       twelveMonthsCents: 237_00,
       projectedCents: 237_00,
       yieldOnValue: 0.0044,
+      paymentMonths: [2, 5, 8, 11],
+      paymentsPerYear: 4,
+      nextPayment: { year: 2026, month: 8, amountCents: 59_00 },
+    },
+  ],
+  excludedLines: [
+    {
+      positionId: "pos-3",
+      name: "MSCI World Swap PEA",
+      isin: "IE0002XZSHO1",
+      symbol: "IE0002XZSHO1",
+      envelopeName: "PEA Trade Republic",
+      reason: "capitalizing",
     },
   ],
   yieldOnValue: 0.0031,
@@ -102,6 +113,7 @@ const sectors: DiversificationResult = {
     },
   ],
   score: 6,
+  scoreBreakdown: [],
   alerts: [],
   totalCents: 100_000_00,
 };
@@ -109,7 +121,7 @@ const sectors: DiversificationResult = {
 const regions: DiversificationResult = {
   lines: [
     {
-      sector: "US",
+      sector: "AmeriqueNord",
       amountCents: 58_000_00,
       share: 0.58,
       contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
@@ -122,6 +134,64 @@ const regions: DiversificationResult = {
     },
   ],
   score: 5,
+  scoreBreakdown: [
+    { key: "geoTop", points: 2, max: 4 },
+    { key: "geoCoverage", points: 2, max: 3 },
+    { key: "geoBalance", points: 1, max: 3 },
+  ],
+  alerts: [
+    {
+      label: "AmeriqueNord",
+      share: 0.58,
+      detail: "MSCI World Swap PEA + NVIDIA…",
+    },
+  ],
+  totalCents: 100_000_00,
+};
+const countries: DiversificationResult = {
+  lines: [
+    {
+      sector: "United States",
+      amountCents: 58_000_00,
+      share: 0.58,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
+    },
+    {
+      sector: "France",
+      amountCents: 27_000_00,
+      share: 0.27,
+      contributors: [{ name: "MSCI France", amountCents: 27_000_00 }],
+    },
+    {
+      sector: "Autres pays",
+      amountCents: 5_000_00,
+      share: 0.05,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 5_000_00 }],
+    },
+  ],
+  score: 5,
+  scoreBreakdown: [],
+  alerts: [],
+  totalCents: 100_000_00,
+};
+
+const economies: DiversificationResult = {
+  lines: [
+    {
+      sector: "Developpe",
+      amountCents: 85_000_00,
+      share: 0.85,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
+    },
+    {
+      sector: "Emergent",
+      amountCents: 15_000_00,
+      share: 0.15,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 15_000_00 }],
+    },
+  ],
+  score: 4,
+  scoreBreakdown: [],
   alerts: [],
   totalCents: 100_000_00,
 };
@@ -143,6 +213,8 @@ function renderView() {
       income={income}
       sectors={sectors}
       regions={regions}
+      countries={countries}
+      economies={economies}
       simulatorDefaults={simulatorDefaults}
       etfDetails={{
         [fees.lines[0].isin ?? "IE0002XZSHO1"]: {
@@ -284,6 +356,41 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText("Sectoriel")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Sectoriel"));
     expect(screen.getAllByText("Technologie").length).toBeGreaterThan(0);
+  });
+  it("le sélecteur géographique bascule entre zones et pays détaillés", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    expect(screen.getByText("Zones")).toBeInTheDocument();
+    expect(screen.getByText(/Pays \(2\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Pays \(2\)/));
+    expect(screen.getAllByText("United States").length).toBeGreaterThan(0);
+    expect(screen.getByText("Autres pays")).toBeInTheDocument();
+  });
+  it("la bulle du score détaille les critères un par un", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    const scoreLabel = screen.getByText("Score");
+    fireEvent.mouseEnter(scoreLabel.querySelector("svg")!);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Zone dominante ≤ 25 %");
+    expect(tooltip).toHaveTextContent("Zones couvertes");
+    expect(tooltip).toHaveTextContent("Total");
+  });
+
+  it("l'alerte de concentration affiche le libellé traduit de la zone", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    const alertLine = screen.getByText(/via MSCI World Swap PEA \+ NVIDIA…/);
+    expect(alertLine.textContent).toContain("Amérique du Nord");
+    expect(alertLine.textContent).not.toContain("AmeriqueNord");
+  });
+  it("la vue économie classe l'exposition développé / émergent / frontière", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    fireEvent.click(screen.getByText("Économie"));
+    expect(screen.getAllByText(/Marchés développés/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Marchés émergents/)).toBeInTheDocument();
+    expect(screen.queryByText(/Marchés frontières/)).not.toBeInTheDocument();
   });
 
   it("ouvre le panneau ETF au clic sur une ligne du scanner de frais", () => {

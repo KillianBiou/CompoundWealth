@@ -4,6 +4,18 @@
  * indices de référence (MSCI, S&P, STOXX, Bloomberg) ; destinées à être
  * remplacées par un enrichissement fichier / API / scraper.
  */
+import { getEtfDetailByIsin } from "./etf-detail";
+
+export {
+  COUNTRY_SHARE_THRESHOLD,
+  ECONOMIES,
+  economyOfCountry,
+  OTHER_COUNTRIES_LABEL,
+  ZONES,
+  zoneOfCountry,
+  type EconomyKey,
+  type ZoneKey,
+} from "./geo-zones";
 
 export type RegionKey =
   | "US"
@@ -251,4 +263,26 @@ export function getStockExposure(isin: string | null): EtfExposure | null {
 
 export function isUSStock(isin: string): boolean {
   return /^US[A-Z0-9]{9}[0-9]$/.test(isin.trim().toUpperCase());
+}
+
+export interface CountryWeight {
+  country: string;
+  weight: number;
+}
+
+/**
+ * Répartition par pays d'une position, look-through : colonne `countries`
+ * du fichier ETF distant (data/etfDetail.csv) ; les actions US individuelles
+ * sont 100 % États-Unis. Retourne [] si la répartition du fonds est inconnue.
+ */
+export function getCountriesByIsin(isin: string | null): CountryWeight[] {
+  if (!isin) return [];
+  const detail = getEtfDetailByIsin(isin);
+  if (detail && detail.countries.length > 0) {
+    return detail.countries.map((c) => ({ country: c.name, weight: c.weight }));
+  }
+  if (isUSStock(isin)) {
+    return [{ country: "United States", weight: 1 }];
+  }
+  return [];
 }

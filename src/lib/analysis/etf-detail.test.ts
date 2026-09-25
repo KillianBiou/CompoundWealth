@@ -10,7 +10,7 @@ import type { AnalysisPosition } from "./scanners";
 
 const CSV = `isin,ticker,ticker_yahoo,name,emitter,index_tracked,asset_class,region,sector_focus,ter,replication,distributing,dividend_yield_2023,dividend_yield_2024,dividend_yield_2025,currency,exchange,domicile,ucits,pea_eligible,established,fund_size_musd,holdings_count,notes
 IE0002XZSHO1,WPEA,WPEA.PA,"iShares MSCI World Swap PEA UCITS ETF EUR (Acc)",BlackRock,MSCI World Swap PEA,Equity,World,All sectors,0.25,Swap,False,0,0,0,EUR,Euronext Paris,Ireland,True,True,2018,6300,1350,"USER HOLDING; swap-based PEA World; capitalizing"
-IE00BP3QZJ36,IFRE,IS3U.DE,iShares MSCI France UCITS ETF,BlackRock,MSCI France,Equity,France,All sectors,0.25,Physical,True,3.1,3.2,3.0,EUR,Xetra,Ireland,True,True,2012,1200,75,"USER HOLDING (alias IFRE on Euronext; Yahoo IS3U); distributing"`;
+IE00BP3QZJ36,IFRE,IS3U.DE,iShares MSCI France UCITS ETF,BlackRock,MSCI France,Equity,France,All sectors,0.25,Physical,False,3.1,3.2,3.0,EUR,Xetra,Ireland,True,True,2012,1200,75,"USER HOLDING (alias IFRE on Euronext; Yahoo IS3U); accumulating"`;
 
 describe("parseEtfDetailCsv", () => {
   it("parse les 134 ETF du fichier réel du dépôt", () => {
@@ -32,7 +32,7 @@ describe("parseEtfDetailCsv", () => {
     expect(parsed).toHaveLength(2);
     expect(parsed[0].ter).toBeCloseTo(0.0025, 6);
     expect(parsed[1].dividendYield2025).toBeCloseTo(0.03, 6);
-    expect(parsed[1].distributing).toBe(true);
+    expect(parsed[1].distributing).toBe(false);
   });
 
   it("ignore les lignes sans ISIN valide", () => {
