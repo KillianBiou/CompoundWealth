@@ -16,6 +16,8 @@ import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
 import { DataAsOfBadge } from "./data-as-of-badge";
+import { HintLabel } from "./hint-label";
+import { InfoRow } from "./info-row";
 
 const SECTOR_LABELS_FR: Record<string, string> = {
   Technology: "Technologie",
@@ -76,14 +78,7 @@ function formatVolume(volume: number): string {
   return formatNumberFr(volume);
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-border-cw/40 py-1.5 last:border-0">
-      <span className="shrink-0 text-xs text-text-muted">{label}</span>
-      <span className="text-right text-sm text-text-primary">{value}</span>
-    </div>
-  );
-}
+
 
 /* -------------------------------------------------------------------------- */
 /*                            Cours de l'action                               */
@@ -108,9 +103,12 @@ function PriceChart({
   return (
     <div className="rounded-lg border border-border-cw p-4">
       <div className="flex items-baseline justify-between">
-        <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+        <HintLabel
+          hint="Clôture quotidienne du cours (source Yahoo Finance), échantillonnée sur environ 80 points. Le pourcentage compare le premier et le dernier point de la période."
+          uppercase
+        >
           Cours 6 derniers mois
-        </p>
+        </HintLabel>
         <p
           className={cn(
             "text-xs font-semibold tabular-nums",
@@ -255,9 +253,12 @@ export function ActionDetailPanel({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border border-border-cw p-4">
-              <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+              <HintLabel
+                uppercase
+                hint="Valeur de marché totale de l'entreprise : cours × nombre d'actions en circulation. Au-delà de 200 Md$ on parle de mega-cap (Apple, Microsoft...)."
+              >
                 Capitalisation
-              </p>
+              </HintLabel>
               <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
                 {action.marketCap !== null
                   ? formatMarketCap(action.marketCap, action.currency)
@@ -266,9 +267,12 @@ export function ActionDetailPanel({
               <p className="mt-0.5 text-xs text-text-muted">valeur de marché totale</p>
             </div>
             <div className="rounded-lg border border-border-cw p-4">
-              <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+              <HintLabel
+                uppercase
+                hint="Ratio P/E : cours divisé par le bénéfice par action sur 12 mois glissants. Autour de 15-20× en moyenne historique pour le marché américain. Un ratio élevé traduit une forte croissance attendue (ou une action chère)."
+              >
                 Cours / bénéfice
-              </p>
+              </HintLabel>
               <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
                 {action.trailingPe !== null
                   ? `${action.trailingPe.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`
@@ -289,6 +293,7 @@ export function ActionDetailPanel({
             <InfoRow
               label="Volume du jour"
               value={action.volume !== null ? formatVolume(action.volume) : "—"}
+              hint="Nombre d'actions échangées aujourd'hui. Un volume élevé signifie une liquidité forte : vous achetez/vendez sans déplacer le prix."
             />
             <InfoRow
               label="Volume moyen 3 mois"
@@ -297,6 +302,7 @@ export function ActionDetailPanel({
                   ? formatVolume(action.averageVolume3Month)
                   : "—"
               }
+              hint="Moyenne quotidienne des échanges sur 3 mois : plus fiable que le volume du jour pour juger la liquidité structurelle du titre."
             />
             <InfoRow
               label="Plus haut 52 semaines"
@@ -305,6 +311,7 @@ export function ActionDetailPanel({
                   ? `${formatNumberFr(action.fiftyTwoWeekHigh)} ${symbol}`
                   : "—"
               }
+              hint="Cours le plus élevé sur l'année écoulée. Servir de résistance psychologique : s'en approcher peut déclencher des prises de bénéfices."
             />
             <InfoRow
               label="Plus bas 52 semaines"
@@ -313,6 +320,7 @@ export function ActionDetailPanel({
                   ? `${formatNumberFr(action.fiftyTwoWeekLow)} ${symbol}`
                   : "—"
               }
+              hint="Cours le plus bas sur l'année écoulée. Proche du plus bas = potentiellement décotée, mais souvent pour une raison (détérioration des bénéfices)."
             />
             <InfoRow
               label="Moyenne 50 jours"
@@ -321,6 +329,7 @@ export function ActionDetailPanel({
                   ? `${formatNumberFr(action.fiftyDayAverage)} ${symbol}`
                   : "—"
               }
+              hint="Moyenne mobile des 50 dernières séances (~2,5 mois) : indicateur de tendance court terme. Cours au-dessus = dynamique positive récente."
             />
             <InfoRow
               label="Moyenne 200 jours"
@@ -329,6 +338,7 @@ export function ActionDetailPanel({
                   ? `${formatNumberFr(action.twoHundredDayAverage)} ${symbol}`
                   : "—"
               }
+              hint="Moyenne mobile des 200 dernières séances (~10 mois) : référence long terme des investisseurs institutionnels. Cours au-dessus = tendance de fond haussière."
             />
           </div>
 
@@ -339,6 +349,7 @@ export function ActionDetailPanel({
             <InfoRow
               label="Rendement du dividende"
               value={action.dividendYield !== null ? formatPercent(action.dividendYield) : "—"}
+              hint="Dividende annuel ÷ cours actuel. C'est le revenu cash que l'action distribue chaque année, en pourcentage de votre investissement. 2 à 4 % est courant pour une entreprise mature."
             />
             <InfoRow
               label="Dividende annuel"
@@ -347,10 +358,12 @@ export function ActionDetailPanel({
                   ? `${formatNumberFr(action.dividendRate)} ${symbol}`
                   : "—"
               }
+              hint="Montant total distribué par action sur 12 mois glissants. Une entreprise qui l'augmente régulièrement signale des bénéfices récurrents."
             />
             <InfoRow
               label="Taux de distribution"
               value={action.payoutRatio !== null ? formatPercent(action.payoutRatio) : "—"}
+              hint="Part du bénéfice net distribuée en dividendes. < 60 % est soutenable (l'entreprise garde de quoi investir) ; > 100 % est un signal d'alerte (elle paie plus qu'elle ne gagne)."
             />
             <InfoRow
               label="Cours / actif net"
@@ -359,6 +372,7 @@ export function ActionDetailPanel({
                   ? `${action.priceToBook.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`
                   : "—"
               }
+              hint="Capitalisation boursière ÷ valeur comptable des actifs. Utile pour les banques/industries : < 1 signifie que le marché valorise l'entreprise moins que ses actifs nets."
             />
             <InfoRow
               label="Beta (volatilité)"
@@ -367,6 +381,7 @@ export function ActionDetailPanel({
                   ? action.beta.toLocaleString("fr-FR", { maximumFractionDigits: 2 })
                   : "—"
               }
+              hint="Sensibilité du titre au marché : 1 = amplifie le marché, 1 = varie comme lui, < 1 = plus stable que le marché, > 2 = très nerveux. Un beta de 2 signifie ±2 % quand le marché bouge de ±1 %."
             />
           </div>
         </div>
@@ -398,8 +413,16 @@ export function ActionDetailPanel({
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
               Identité
             </p>
-            <InfoRow label="Secteur" value={sectorFr(action.sector) || "—"} />
-            <InfoRow label="Industrie" value={action.industry || "—"} />
+            <InfoRow
+              label="Secteur"
+              value={sectorFr(action.sector) || "—"}
+              hint="Grande famille économique (Technologie, Santé, Énergie…). Diversifier entre secteurs réduit le risque conjoncturel : chaque secteur réagit différemment au cycle économique."
+            />
+            <InfoRow
+              label="Industrie"
+              value={action.industry || "—"}
+              hint="Sous-segment précis du secteur (ex. Semiconductors dans Technologie). Deux entreprises d'un même secteur peuvent avoir des dynamiques très différentes selon leur industrie."
+            />
             <InfoRow
               label="Employés"
               value={
@@ -407,8 +430,13 @@ export function ActionDetailPanel({
                   ? action.fullTimeEmployees.toLocaleString("fr-FR")
                   : "—"
               }
+              hint="Effectif à temps plein. Donne l'échelle de l'entreprise : le chiffre d'affaires par employé (CA ÷ effectif) est un bon indicateur de productivité."
             />
-            <InfoRow label="Devise de cotation" value={action.currency || "—"} />
+            <InfoRow
+              label="Devise de cotation"
+              value={action.currency || "—"}
+              hint="Devise dans laquelle le titre est coté. Si elle diffère de l'EUR (USD, CHF…), votre rendement réel inclut la variation de change entre l'achat et la revente."
+            />
             {action.website ? (
               <div className="flex items-baseline justify-between gap-4 border-b border-border-cw/40 py-1.5 last:border-0">
                 <span className="shrink-0 text-xs text-text-muted">Site web</span>
@@ -428,10 +456,28 @@ export function ActionDetailPanel({
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
               Identifiants
             </p>
-            <InfoRow label="Ticker" value={action.ticker} />
-            <InfoRow label="Symbole Yahoo" value={action.tickerYahoo} />
-            {action.isin ? <InfoRow label="ISIN" value={action.isin} /> : null}
-            <InfoRow label="Place de cotation" value={action.exchange || "—"} />
+            <InfoRow
+              label="Ticker"
+              value={action.ticker}
+              hint="Symbole court de cotation (ex. NVDA). Attention aux collisions : deux entreprises peuvent partager un ticker sur des places différentes."
+            />
+            <InfoRow
+              label="Symbole Yahoo"
+              value={action.tickerYahoo}
+              hint="Symbole utilisé pour récupérer les cours en temps réel via Yahoo Finance (suffixé par la place : .PA = Paris, .SW = Suisse, .KS = Corée…)."
+            />
+            {action.isin ? (
+              <InfoRow
+                label="ISIN"
+                value={action.isin}
+                hint="Identifiant international unique à 12 caractères (2 lettres de pays + 9 caractères + clé). Le seul identifiant fiable à travers toutes les bourses."
+              />
+            ) : null}
+            <InfoRow
+              label="Place de cotation"
+              value={action.exchange || "—"}
+              hint="Bourse où le titre est négocié (NASDAQ, NYSE, Euronext…). Les horaires de cotation et la fiscalité des dividendes dépendent de la place."
+            />
           </div>
 
           {action.businessSummary ? (

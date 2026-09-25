@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
+import { HintLabel } from "./hint-label";
+import { InfoRow } from "./info-row";
 import { DataAsOfBadge } from "./data-as-of-badge";
 
 /**
@@ -111,14 +113,7 @@ function sectorFr(sector: string): string {
 /*                                Onglet Général                              */
 /* -------------------------------------------------------------------------- */
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-border-cw/40 py-1.5 last:border-0">
-      <span className="shrink-0 text-xs text-text-muted">{label}</span>
-      <span className="text-right text-sm text-text-primary">{value}</span>
-    </div>
-  );
-}
+
 
 function GeneralTab({ etf }: { etf: EtfDetail }) {
   return (
@@ -149,9 +144,12 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border-cw p-4">
-          <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+          <HintLabel
+            hint="Total Expense Ratio : frais totaux annuels du fonds (gestion, administration, juridique). Ils sont prélevés directement sur le fonds — la performance affichée est donc nette de frais."
+            uppercase
+          >
             Frais annuels (TER)
-          </p>
+          </HintLabel>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {etf.ter !== null ? formatPercent(etf.ter) : "—"}
           </p>
@@ -160,9 +158,12 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
           </p>
         </div>
         <div className="rounded-lg border border-border-cw p-4">
-          <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+          <HintLabel
+            hint="Dividendes et coupons versés en cash sur l'année 2025, en pourcentage du cours. Un ETF capitalisant réinvestit automatiquement ces montants dans le fonds (aucun versement en compte)."
+            uppercase
+          >
             Rendement distribué 2025
-          </p>
+          </HintLabel>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {etf.dividendYield2025 ? formatPercent(etf.dividendYield2025) : "—"}
           </p>
@@ -176,36 +177,93 @@ function GeneralTab({ etf }: { etf: EtfDetail }) {
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
           Identité
         </p>
-        <InfoRow label="Émetteur" value={etf.provider || etf.emitter} />
-        <InfoRow label="Indice suivi" value={etf.indexTracked} />
-        <InfoRow label="Classe d'actifs" value={etf.assetClass} />
-        <InfoRow label="Région" value={etf.region} />
-        <InfoRow label="Focus sectoriel" value={etf.sectorFocus} />
+        <InfoRow
+          label="Émetteur"
+          value={etf.provider || etf.emitter}
+          hint="Société de gestion qui gère le fonds (BlackRock, Amundi, Vanguard…). Elle décide de la réplication et des frais, mais ne détient pas les actifs : ceux-ci sont segregated chez un dépositaire."
+        />
+        <InfoRow
+          label="Indice suivi"
+          value={etf.indexTracked}
+          hint="Référence de marché que le fonds cherche à reproduire (ex. MSCI World = ~1 400 grandes entreprises de 23 pays développés). La performance du fonds est comparée à cet indice."
+        />
+        <InfoRow
+          label="Classe d'actifs"
+          value={etf.assetClass}
+          hint="Type d'actifs détenus par le fonds : actions (Equity), obligations (Bond), private equity (ELTIF non cotés)… Détermine le rendement attendu et le risque."
+        />
+        <InfoRow
+          label="Région"
+          value={etf.region}
+          hint="Zone géographique couverte par l'indice : World (monde développé), Europe, Emerging Markets, France… Plus la zone est large, plus la diversification est forte."
+        />
+        <InfoRow
+          label="Focus sectoriel"
+          value={etf.sectorFocus}
+          hint="Secteurs économiques couverts : « All sectors » = toutes industries confondues (technologie, santé, finance…). Un focus unique (ex. Tech only) concentre le risque."
+        />
       </div>
 
       <div className="rounded-lg border border-border-cw p-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
           Identifiants
         </p>
-        <InfoRow label="ISIN" value={etf.isin} />
-        <InfoRow label="Ticker" value={etf.ticker} />
-        {etf.tickerYahoo ? <InfoRow label="Symbole Yahoo" value={etf.tickerYahoo} /> : null}
-        {etf.wkn ? <InfoRow label="WKN" value={etf.wkn} /> : null}
-        <InfoRow label="Devise du fonds" value={etf.fundCurrency || etf.currency} />
-        {etf.currencyRisk ? <InfoRow label="Risque de devise" value={etf.currencyRisk} /> : null}
+        <InfoRow
+          label="ISIN"
+          value={etf.isin}
+          hint="Identifiant international de valeurs : 12 caractères (2 lettres de pays + 9 caractères + clé). Unique par fonds, utilisé partout dans l'app pour rattacher positions et fiches."
+        />
+        <InfoRow
+          label="Ticker"
+          value={etf.ticker}
+          hint="Symbole court de cotation sur la place principale (ex. WPEA sur Euronext Paris). Plus facile à retenir que l'ISIN."
+        />
+        {etf.tickerYahoo ? <InfoRow
+          label="Symbole Yahoo"
+          value={etf.tickerYahoo}
+          hint="Symbole utilisé pour récupérer les cours en temps réel via Yahoo Finance (suffixé par la place : .PA = Paris, .DE = Xetra)."
+        /> : null}
+        {etf.wkn ? <InfoRow
+          label="WKN"
+          value={etf.wkn}
+          hint="Wertpapierkennnummer : identifiant allemand à 6 caractères, équivalent de l'ISIN sur les places germanophones."
+        /> : null}
+        <InfoRow
+          label="Devise du fonds"
+          value={etf.fundCurrency || etf.currency}
+          hint="Devise de comptabilisation du fonds. Attention : même si le fonds est en USD, la part EUR (hedged) supprime le risque de change ; la part USD (unhedged) y est exposée."
+        />
+        {etf.currencyRisk ? <InfoRow
+          label="Risque de devise"
+          value={etf.currencyRisk}
+          hint="Unhedged : votre rendement suit aussi les variations EUR/USD (favorable si le dollar monte). Hedged : le change est neutralisé, au coût d'une légère décote de rendement."
+        /> : null}
       </div>
 
       <div className="rounded-lg border border-border-cw p-4">
         <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
           Structure
         </p>
-        <InfoRow label="Domicile" value={etf.domicile} />
-        <InfoRow label="Place de cotation" value={etf.exchange} />
+        <InfoRow
+          label="Domicile"
+          value={etf.domicile}
+          hint="Pays d'enregistrement juridique du fonds. Irlande et Luxembourg sont les domiciles UCITS les plus courants : avantage fiscal sur les dividendes US (traité, ~15 % au lieu de 30 %)."
+        />
+        <InfoRow
+          label="Place de cotation"
+          value={etf.exchange}
+          hint="Bourse où la part est négociée : Euronext Paris, Xetra (Allemagne), Borsa Italiana… La liquidité est généralement la meilleure sur la place dominante."
+        />
         <InfoRow
           label="Nombre de valeurs"
           value={etf.holdingsCount ? etf.holdingsCount.toLocaleString("fr-FR") : "—"}
+          hint="Nombre de lignes détenues par l'indice : ~1 400 pour MSCI World. Plus il est élevé, meilleure est la diversification (le risque d'une seule entreprise pèse peu)."
         />
-        {etf.holdingsAsOf ? <InfoRow label="Répartitions du" value={etf.holdingsAsOf} /> : null}
+        {etf.holdingsAsOf ? <InfoRow
+          label="Répartitions du"
+          value={etf.holdingsAsOf}
+          hint="Date des données de répartition (holdings, pays, secteurs) publiées par l'émetteur — généralement le rapport mensuel ou trimestriel le plus récent."
+        /> : null}
       </div>
       {etf.notes ? (
         <div className="rounded-lg border border-border-cw p-4">
@@ -414,9 +472,12 @@ function DiversificationTab({ etf }: { etf: EtfDetail }) {
         <>
           <div className="rounded-lg border border-border-cw p-4">
             <div className="mb-3 flex items-baseline justify-between">
-              <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
+              <HintLabel
+                hint="Répartition géographique du fonds : poids de chaque pays dans le portefeuille de l'ETF, tel que publié par l'émetteur."
+                uppercase
+              >
                 Pays représentés
-              </p>
+              </HintLabel>
               {etf.holdingsAsOf ? (
                 <p className="text-xs text-text-muted">au {etf.holdingsAsOf}</p>
               ) : null}
@@ -428,9 +489,13 @@ function DiversificationTab({ etf }: { etf: EtfDetail }) {
             />
           </div>
           <div className="rounded-lg border border-border-cw p-4">
-            <p className="mb-3 text-xs font-medium tracking-wide text-text-secondary uppercase">
+            <HintLabel
+              className="mb-3"
+              hint="Répartition sectorielle : poids de chaque secteur d'activité (technologie, santé, finance...) dans le portefeuille de l'ETF."
+              uppercase
+            >
               Secteurs
-            </p>
+            </HintLabel>
             <BreakdownList entries={etf.sectors} translate={sectorFr} />
           </div>
         </>
@@ -441,7 +506,9 @@ function DiversificationTab({ etf }: { etf: EtfDetail }) {
       )}
       <p className="text-xs text-text-muted">
         Répartitions du fonds publiées par l&apos;émetteur — les 4 premières
-        lignes sont affichées, le reste se déplie.
+        lignes sont affichées, le reste se déplie. Ce sont des répartitions
+        « look-through » : elles montrent le contenu réel du panier (actions,
+        obligations) que l&apos;ETF détient, pas d&apos;autres fonds en cascade.
       </p>
     </div>
   );
