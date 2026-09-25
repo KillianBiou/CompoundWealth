@@ -3,6 +3,7 @@ import { getEnvelopeSummaries } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { aggregateSeries, periodPerformance } from "@/lib/portfolio/series";
 import { ButtonLink, Card, Kpi } from "@/components/ui";
+import { getDictionary, getLocaleFromCookies } from "@/i18n/server";
 import { DashboardWealthSection } from "./dashboard-wealth-section";
 import type { ChartSeriesToggle } from "./wealth-chart";
 import { RefreshAllButton } from "./refresh-all-button";
@@ -17,6 +18,7 @@ function periodChange(
 
 export default async function DashboardPage() {
   const envelopes = await getEnvelopeSummaries();
+  const t = getDictionary(await getLocaleFromCookies());
   const totalInvested = envelopes.reduce((s, e) => s + e.investedCents, 0);
   const totalValue = envelopes.reduce((s, e) => s + e.valueCents, 0);
   const hasUnknown = envelopes.some((e) => e.hasUnknownInvested);
@@ -37,14 +39,13 @@ export default async function DashboardPage() {
   if (envelopes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <h1 className="font-heading text-2xl font-semibold">Bienvenue 👋</h1>
+        <h1 className="font-heading text-2xl font-semibold">{t.dashboard.welcome}</h1>
         <p className="max-w-md text-text-secondary">
-          Créez votre première enveloppe (PEA ou CTO) pour commencer à suivre la croissance de
-          votre patrimoine.
+          {t.dashboard.welcomeText}
         </p>
         <ButtonLink href="/envelopes/new" className="mt-2">
           <Plus className="h-4 w-4" aria-hidden />
-          Nouvelle enveloppe
+          {t.dashboard.newEnvelope}
         </ButtonLink>
       </div>
     );
@@ -54,38 +55,40 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold">Tableau de bord</h1>
+          <h1 className="font-heading text-2xl font-semibold">{t.dashboard.title}</h1>
           <p className="mt-0.5 text-sm text-text-secondary">
-            Votre patrimoine, consolidé sur {envelopes.length} enveloppe{envelopes.length > 1 ? "s" : ""}.
+            {t.dashboard.subtitle
+              .replace("{count}", String(envelopes.length))
+              .replace("{s}", envelopes.length > 1 ? "s" : "")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <RefreshAllButton />
           <ButtonLink href="/envelopes/new" variant="secondary">
             <Plus className="h-4 w-4" aria-hidden />
-            Nouvelle enveloppe
+            {t.dashboard.newEnvelope}
           </ButtonLink>
         </div>
       </div>
 
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <Kpi
-          label="Total investi"
+          label={t.dashboard.totalInvested}
           value={hasUnknown ? `${formatEurCents(totalInvested)} + ?` : formatEurCents(totalInvested)}
         />
-        <Kpi label="Valeur actuelle" value={formatEurCents(totalValue)} />
+        <Kpi label={t.dashboard.currentValue} value={formatEurCents(totalValue)} />
         {totalGain !== null && gainRatio !== null ? (
           <Kpi
-            label="Gain / perte"
+            label={t.dashboard.gainLoss}
             value={formatEurCents(Math.abs(totalGain))}
             sub={`${totalGain >= 0 ? "+" : "−"}${formatEurCents(Math.abs(totalGain))} (${formatPercent(gainRatio)})`}
             subTone={totalGain >= 0 ? "positive" : "negative"}
           />
         ) : (
           <Kpi
-            label="Gain / perte"
+            label={t.dashboard.gainLoss}
             value="—"
-            sub="Certaines positions sont en état des lieux (sans montant investi)"
+            sub={t.dashboard.gainUnknown}
           />
         )}
       </Card>

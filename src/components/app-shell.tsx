@@ -1,15 +1,25 @@
+"use client";
+
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Landmark, Settings, LogOut, LineChart } from "lucide-react";
+import {
+  LayoutDashboard,
+  Landmark,
+  Settings,
+  LogOut,
+  LineChart,
+} from "lucide-react";
 import { logoutAction } from "@/server/actions";
+import { useI18n } from "@/i18n/provider";
+import { LanguageSwitcher } from "./language-switcher";
 import { Button } from "./ui";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/envelopes", label: "Enveloppes", icon: Landmark },
-  { href: "/analyse", label: "Analyse", icon: LineChart },
-  { href: "/settings", label: "Réglages", icon: Settings },
-];
+const NAV_KEYS = [
+  { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
+  { href: "/envelopes", key: "envelopes", icon: Landmark },
+  { href: "/analyse", key: "analyse", icon: LineChart },
+  { href: "/settings", key: "settings", icon: Settings },
+] as const;
 
 export function Logo() {
   return (
@@ -25,6 +35,12 @@ export function Logo() {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const navItems = NAV_KEYS.map(({ href, key, icon }) => ({
+    href,
+    label: t.nav[key],
+    icon,
+  }));
   return (
     <div className="flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border-cw bg-bg-elevated md:flex">
@@ -43,23 +59,29 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="p-3">
+        <div className="space-y-2 p-3">
           <form action={logoutAction}>
             <Button variant="ghost" type="submit" className="w-full justify-start">
               <LogOut className="h-4 w-4" aria-hidden />
-              Déconnexion
+              {t.nav.logout}
             </Button>
           </form>
+          <div className="flex justify-end px-1">
+            <LanguageSwitcher />
+          </div>
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border-cw px-4 py-3 md:hidden">
           <Logo />
-          <form action={logoutAction}>
-            <Button variant="ghost" type="submit" aria-label="Déconnexion">
-              <LogOut className="h-4 w-4" aria-hidden />
-            </Button>
-          </form>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher compact />
+            <form action={logoutAction}>
+              <Button variant="ghost" type="submit" aria-label={t.nav.logout}>
+                <LogOut className="h-4 w-4" aria-hidden />
+              </Button>
+            </form>
+          </div>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 md:px-8">{children}</main>
         <nav className="sticky bottom-0 z-10 flex border-t border-border-cw bg-bg-elevated md:hidden">

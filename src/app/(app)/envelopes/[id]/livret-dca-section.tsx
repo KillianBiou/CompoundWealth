@@ -14,6 +14,7 @@ import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Card, Field, Input, Modal, Select } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
 import { useToast } from "@/components/toast";
+import { useI18n } from "@/i18n/provider";
 
 export interface LivretDcaRow {
   lineId: string;
@@ -24,8 +25,8 @@ export interface LivretDcaRow {
   active: boolean;
 }
 
-function nextDateLabel(row: LivretDcaRow): { label: string; relative: string } {
-  if (!row.active) return { label: "—", relative: "en pause" };
+function nextDateLabel(row: LivretDcaRow, t: ReturnType<typeof useI18n>["t"]): { label: string; relative: string } {
+  if (!row.active) return { label: "—", relative: t.envelopes.livretDca.pauseRelative };
   const next = nextOccurrence({ frequency: row.frequency, startDate: row.startDate });
   const daysUntil = Math.round(
     (new Date(next.getFullYear(), next.getMonth(), next.getDate()).getTime() -
@@ -35,7 +36,11 @@ function nextDateLabel(row: LivretDcaRow): { label: string; relative: string } {
   return {
     label: next.toLocaleDateString("fr-FR"),
     relative:
-      daysUntil <= 0 ? "aujourd'hui" : daysUntil === 1 ? "demain" : `dans ${daysUntil} jours`,
+      daysUntil <= 0
+        ? t.envelopes.relativeDate.today
+        : daysUntil === 1
+          ? t.envelopes.relativeDate.tomorrow
+          : t.envelopes.relativeDate.inDays.replace("{count}", String(daysUntil)),
   };
 }
 
@@ -46,6 +51,7 @@ export function LivretDcaSection({
   envelopeId: string;
   plans: LivretDcaRow[];
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [startDay, setStartDay] = useState("");
   const [pending, startTransition] = useTransition();
@@ -69,10 +75,9 @@ export function LivretDcaSection({
     <Card className="p-0">
       <div className="flex items-center justify-between border-b border-border-cw p-6 pb-4">
         <div>
-          <h2 className="font-heading text-lg font-semibold">Versements réguliers</h2>
+          <h2 className="font-heading text-lg font-semibold">{t.envelopes.livretDca.title}</h2>
           <p className="mt-0.5 text-xs text-text-muted">
-            Planifiez vos virements automatiques vers ce livret — planification uniquement,
-            aucun mouvement automatique.
+            {t.envelopes.livretDca.subtitle}
           </p>
         </div>
         <Badge tone="neutral">{plans.filter((p) => p.active).length}</Badge>
@@ -80,22 +85,22 @@ export function LivretDcaSection({
 
       {plans.length === 0 ? (
         <p className="px-6 pb-2 pt-4 text-sm text-text-secondary">
-          Aucun versement régulier planifié pour le moment.
+          {t.envelopes.livretDca.empty}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border-cw/70 text-left text-xs uppercase tracking-wide text-text-muted">
-                <th scope="col" className="px-6 py-3 font-medium">Montant</th>
-                <th scope="col" className="px-6 py-3 font-medium">Périodicité</th>
-                <th scope="col" className="px-6 py-3 font-medium">Prochaine échéance</th>
-                <th scope="col" className="px-6 py-3 text-right font-medium">Actions</th>
+                <th scope="col" className="px-6 py-3 font-medium">{t.envelopes.livretDca.cols.amount}</th>
+                <th scope="col" className="px-6 py-3 font-medium">{t.envelopes.livretDca.cols.frequency}</th>
+                <th scope="col" className="px-6 py-3 font-medium">{t.envelopes.livretDca.cols.nextDate}</th>
+                <th scope="col" className="px-6 py-3 text-right font-medium">{t.common.edit}</th>
               </tr>
             </thead>
             <tbody>
               {plans.map((row) => {
-                const next = nextDateLabel(row);
+                const next = nextDateLabel(row, t);
                 return (
                   <tr key={row.lineId} className="border-b border-border-cw/40 last:border-0">
                     <td className="px-6 py-3.5">
@@ -110,7 +115,7 @@ export function LivretDcaSection({
                       </span>
                     </td>
                     <td className="px-6 py-3.5 text-text-secondary">
-                      {DCA_FREQUENCY_LABELS[row.frequency]}
+                      {t.envelopes.dcaFrequency[row.frequency]}
                     </td>
                     <td className="px-6 py-3.5">
                       {row.active ? (
@@ -119,7 +124,7 @@ export function LivretDcaSection({
                           <span className="ml-2 text-xs text-text-muted">{next.relative}</span>
                         </>
                       ) : (
-                        <span className="text-text-muted italic">En pause</span>
+                        <span className="text-text-muted italic">{t.envelopes.livretDca.paused}</span>
                       )}
                     </td>
                     <td className="px-6 py-3.5">
@@ -135,14 +140,14 @@ export function LivretDcaSection({
                               await toggleDcaLineAction(formData);
                               toast.success(
                                 row.active
-                                  ? "Versement mis en pause — plus de virement planifié"
-                                  : `Versement repris — prochaine échéance ${next.label}`,
+                                  ? t.envelopes.livretDca.pauseToast
+                                  : t.envelopes.livretDca.resumeToast.replace("{date}", next.label),
                               );
                             })
                           }
                           className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs font-medium text-text-secondary transition-colors hover:border-accent-500/60 hover:text-text-primary disabled:opacity-50"
                         >
-                          {row.active ? "Mettre en pause" : "Reprendre"}
+                          {row.active ? t.envelopes.livretDca.pause : t.envelopes.livretDca.resume}
                         </button>
                         <button
                           type="button"
@@ -153,12 +158,12 @@ export function LivretDcaSection({
                               formData.set("lineId", row.lineId);
                               formData.set("envelopeId", envelopeId);
                               await deleteDcaLineAction(formData);
-                              toast.success("Versement régulier supprimé");
+                              toast.success(t.envelopes.livretDca.deleteToast);
                             })
                           }
                           className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs font-medium text-text-secondary transition-colors hover:border-negative/60 hover:text-negative disabled:opacity-50"
                         >
-                          Supprimer
+                          {t.envelopes.livretDca.delete}
                         </button>
                       </div>
                     </td>
@@ -179,11 +184,11 @@ export function LivretDcaSection({
         className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-border-cw px-6 py-3 text-sm text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-secondary"
       >
         <Plus className="h-4 w-4" aria-hidden />
-        Planifier un versement régulier
+        {t.envelopes.livretDca.create}
       </button>
 
       {open ? (
-        <Modal title="Planifier un versement régulier" onClose={() => setOpen(false)}>
+        <Modal title={t.envelopes.livretDca.createTitle} onClose={() => setOpen(false)}>
           <form action={action} className="space-y-4" noValidate>
             <input type="hidden" name="envelopeId" value={envelopeId} />
             <div className="flex flex-col gap-4 sm:flex-row">
@@ -192,16 +197,14 @@ export function LivretDcaSection({
                   htmlFor="livret-dca-frequency"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Périodicité
+                  {t.envelopes.livretDca.cols.frequency}
                 </label>
                 <Select id="livret-dca-frequency" name="frequency" defaultValue="MONTHLY">
-                  {(Object.entries(DCA_FREQUENCY_LABELS) as [DcaFrequency, string][]).map(
-                    ([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ),
-                  )}
+                  {(Object.keys(DCA_FREQUENCY_LABELS) as DcaFrequency[]).map((value) => (
+                    <option key={value} value={value}>
+                      {t.envelopes.dcaFrequency[value]}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="flex-1">
@@ -209,7 +212,7 @@ export function LivretDcaSection({
                   htmlFor="livret-dca-start"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Jour de départ
+                  {t.envelopes.livretDca.startDay}
                 </label>
                 <Input
                   id="livret-dca-start"
@@ -218,23 +221,23 @@ export function LivretDcaSection({
                   min="1"
                   max="31"
                   inputMode="numeric"
-                  placeholder="Ex. 5"
+                  placeholder={t.envelopes.livretDca.startDayPlaceholder}
                   value={startDay}
                   onChange={(e) => setStartDay(e.target.value)}
                   required
                 />
                 {startDate ? (
                   <p className="mt-1 text-xs text-text-muted">
-                    Premier versement le {new Date(startDate).toLocaleDateString("fr-FR")}
+                    {t.envelopes.livretDca.firstPayment.replace("{date}", new Date(startDate).toLocaleDateString("fr-FR"))}
                   </p>
                 ) : null}
               </div>
             </div>
             <Field
-              label="Montant par versement (€)"
+              label={t.envelopes.livretDca.amountLabel}
               htmlFor="livret-dca-amount"
               error={state?.errors?.maxAmountEur}
-              hint="Exemple : 200 € chaque mois — les versements sont bloqués au plafond de 22 950 €"
+              hint={t.envelopes.livretDca.amountHint}
             >
               <Input
                 id="livret-dca-amount"
@@ -253,7 +256,7 @@ export function LivretDcaSection({
               </p>
             ) : null}
             <Button type="submit" disabled={formPending} className="w-full sm:w-auto">
-              {formPending ? "Planification…" : "Confirmer le versement régulier"}
+              {formPending ? t.envelopes.livretDca.scheduling : t.envelopes.livretDca.confirm}
             </Button>
           </form>
         </Modal>

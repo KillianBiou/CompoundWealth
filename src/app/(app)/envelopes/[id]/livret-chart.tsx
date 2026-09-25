@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { LIVRET_A_DEPOSIT_CAP_CENTS } from "@/lib/livret";
 import { formatEurCents, formatMoneyCentsCompact } from "@/lib/money";
+import { useI18n } from "@/i18n/provider";
 
 export interface LivretPointRow {
   date: Date;
@@ -36,6 +37,7 @@ function ChartTooltip({
   active?: boolean;
   payload?: { payload: ChartPoint }[];
 }) {
+  const { t } = useI18n();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   return (
@@ -48,15 +50,14 @@ function ChartTooltip({
         })}
       </p>
       <p className="tabular-nums text-text-secondary">
-        Solde du livret :{" "}
+        {t.envelopes.livretDca.chart.tooltipBalance}{" "}
         <span className="font-semibold text-text-primary">
           {formatEurCents(point.balance * 100)}
         </span>
       </p>
       {point.overCap > 0 ? (
         <p className="mt-1 rounded bg-negative/10 px-1.5 py-1 tabular-nums text-negative">
-          {formatEurCents(point.overCap * 100)} au-dessus du plafond de versement — suivis
-          hors livret, rémunération très faible
+          {t.envelopes.livretDca.chart.tooltipOverCap.replace("{amount}", formatEurCents(point.overCap * 100))}
         </p>
       ) : null}
     </div>
@@ -72,6 +73,7 @@ export function LivretChart({
   showCap: boolean;
   onToggleCap: () => void;
 }) {
+  const { t } = useI18n();
   const data = useMemo(
     () =>
       series.map((p) => ({
@@ -86,7 +88,7 @@ export function LivretChart({
   if (series.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-text-secondary">
-        Ajoutez un premier versement pour voir l&apos;évolution de votre livret.
+        {t.envelopes.livretDca.chart.empty}
       </p>
     );
   }
@@ -103,15 +105,15 @@ export function LivretChart({
             onChange={onToggleCap}
             className="h-4 w-4 cursor-pointer accent-[var(--info)]"
           />
-          Montrer la limite de 22 950 €
+          {t.envelopes.livretDca.chart.showCap}
         </label>
         {hasOverCap ? (
           <span className="rounded-full bg-negative/10 px-2.5 py-0.5 text-xs font-medium text-negative">
-            ⚠ Solde au-dessus du plafond — seuls les intérêts peuvent y figurer
+            {t.envelopes.livretDca.chart.overCapBadge}
           </span>
         ) : null}
       </div>
-      <div className="h-64" aria-label="Évolution du solde du livret">
+      <div className="h-64" aria-label={t.envelopes.livretDca.chart.aria}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
@@ -162,7 +164,7 @@ export function LivretChart({
               type="stepAfter"
               dataKey="balance"
               stackId="livret"
-              name="Solde"
+              name={t.envelopes.livretDca.chart.balanceSeries}
               stroke="var(--info)"
               strokeWidth={2}
               fill="url(#livretGradient)"
@@ -175,7 +177,7 @@ export function LivretChart({
                 type="stepAfter"
                 dataKey="overCapOnly"
                 stackId="livret"
-                name="Hors livret (refusé)"
+                name={t.envelopes.livretDca.chart.overCapSeries}
                 stroke="var(--negative)"
                 strokeWidth={1.5}
                 fill="url(#overCapHatch)"
@@ -190,7 +192,7 @@ export function LivretChart({
                 stroke="var(--negative)"
                 strokeDasharray="6 4"
                 label={{
-                  value: "Plafond 22 950 €",
+                  value: t.envelopes.livretDca.chart.capLabel,
                   position: "insideTopRight",
                   fill: "var(--negative)",
                   fontSize: 11,

@@ -15,23 +15,11 @@ import { Badge } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { formatPercent } from "@/lib/money";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
+import { useI18n } from "@/i18n/provider";
+import type { Dictionary, Locale } from "@/i18n/server";
 import { DataAsOfBadge } from "./data-as-of-badge";
 import { HintLabel } from "./hint-label";
 import { InfoRow } from "./info-row";
-
-const SECTOR_LABELS_FR: Record<string, string> = {
-  Technology: "Technologie",
-  "Communication Services": "Services de communication",
-  "Consumer Cyclical": "Consommation discrétionnaire",
-  "Consumer Defensive": "Consommation de base",
-  Financials: "Finance",
-  Healthcare: "Santé",
-  Industrials: "Industrie",
-  Energy: "Énergie",
-  Utilities: "Services publics",
-  "Real Estate": "Immobilier",
-  "Basic Materials": "Matériaux de base",
-};
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$",
@@ -52,33 +40,36 @@ function currencySymbol(currency: string): string {
   return CURRENCY_SYMBOLS[currency] ?? currency;
 }
 
-function sectorFr(sector: string): string {
-  return SECTOR_LABELS_FR[sector] ?? sector;
+function intlLocale(locale: Locale): string {
+  return locale === "en" ? "en-US" : "fr-FR";
 }
 
-function formatNumberFr(value: number): string {
-  return value.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+function sectorLabel(sector: string, t: Dictionary): string {
+  const labels = t.analyse.detail.sectors as Record<string, string>;
+  return labels[sector] ?? sector;
+}
+
+function formatNumber(value: number, locale: string): string {
+  return value.toLocaleString(locale, { maximumFractionDigits: 2 });
 }
 
 /** market cap lisible : 5 422 Md$ / 289 MdCHF */
-function formatMarketCap(marketCap: number, currency: string): string {
+function formatMarketCap(marketCap: number, currency: string, locale: string): string {
   const symbol = currencySymbol(currency);
   if (marketCap >= 1_000_000_000_000) {
-    return `${(marketCap / 1_000_000_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} Tn${symbol}`;
+    return `${(marketCap / 1_000_000_000_000).toLocaleString(locale, { maximumFractionDigits: 2 })} Tn${symbol}`;
   }
   if (marketCap >= 1_000_000_000) {
-    return `${(marketCap / 1_000_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} Md${symbol}`;
+    return `${(marketCap / 1_000_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })} Md${symbol}`;
   }
-  return `${(marketCap / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M${symbol}`;
+  return `${(marketCap / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })} M${symbol}`;
 }
 
-function formatVolume(volume: number): string {
-  if (volume >= 1_000_000) return `${(volume / 1_000_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M`;
-  if (volume >= 1_000) return `${(volume / 1_000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k`;
-  return formatNumberFr(volume);
+function formatVolume(volume: number, locale: string): string {
+  if (volume >= 1_000_000) return `${(volume / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })} M`;
+  if (volume >= 1_000) return `${(volume / 1_000).toLocaleString(locale, { maximumFractionDigits: 1 })} k`;
+  return formatNumber(volume, locale);
 }
-
-
 
 /* -------------------------------------------------------------------------- */
 /*                            Cours de l'action                               */
@@ -96,6 +87,9 @@ function PriceChart({
   points: PriceHistoryPoint[];
   currency: string;
 }) {
+  const { t, locale } = useI18n();
+  const d = t.analyse.detail.action;
+  const intl = intlLocale(locale);
   const data = points.map((p) => ({ date: p.date, price: p.price }));
   const first = data[0]?.price ?? 0;
   const last = data[data.length - 1]?.price ?? 0;
@@ -103,11 +97,8 @@ function PriceChart({
   return (
     <div className="rounded-lg border border-border-cw p-4">
       <div className="flex items-baseline justify-between">
-        <HintLabel
-          hint="Clôture quotidienne du cours (source Yahoo Finance), échantillonnée sur environ 80 points. Le pourcentage compare le premier et le dernier point de la période."
-          uppercase
-        >
-          Cours 6 derniers mois
+        <HintLabel hint={d.priceHint} uppercase>
+          {d.priceTitle}
         </HintLabel>
         <p
           className={cn(
@@ -119,7 +110,7 @@ function PriceChart({
           {first > 0 ? formatPercent((last - first) / first) : "—"}
         </p>
       </div>
-      <div className="mt-2 h-40" aria-label="Évolution du cours sur 6 mois">
+      <div className="mt-2 h-40" aria-label={d.priceChartAria}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
             <defs>
@@ -133,7 +124,7 @@ function PriceChart({
               dataKey="date"
               type="category"
               tickFormatter={(v: string) =>
-                new Date(v).toLocaleDateString("fr-FR", { month: "short" })
+                new Date(v).toLocaleDateString(intl, { month: "short" })
               }
               stroke="var(--text-muted)"
               fontSize={11}
@@ -142,7 +133,7 @@ function PriceChart({
             />
             <YAxis
               domain={["auto", "auto"]}
-              tickFormatter={(v: number) => `${formatNumberFr(v)}`}
+              tickFormatter={(v: number) => `${formatNumber(v, intl)}`}
               stroke="var(--text-muted)"
               fontSize={11}
               tickLine={false}
@@ -157,21 +148,21 @@ function PriceChart({
                 fontSize: 12,
               }}
               labelFormatter={(label) =>
-                new Date(String(label)).toLocaleDateString("fr-FR", {
+                new Date(String(label)).toLocaleDateString(intl, {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
                 })
               }
               formatter={(value) => [
-                `${formatNumberFr(Number(value))} ${currencySymbol(currency)}`,
-                "Cours",
+                `${formatNumber(Number(value), intl)} ${currencySymbol(currency)}`,
+                d.priceSeries,
               ]}
             />
             <Area
               type="monotone"
               dataKey="price"
-              name="Cours"
+              name={d.priceSeries}
               stroke="var(--accent-500)"
               strokeWidth={2}
               fill="url(#actionPriceGradient)"
@@ -197,6 +188,9 @@ export function ActionDetailPanel({
   /** historique 6 mois préchargé côté serveur (peut être vide) */
   priceHistory: PriceHistoryPoint[];
 }) {
+  const { t, locale } = useI18n();
+  const d = t.analyse.detail.action;
+  const intl = intlLocale(locale);
   const [tab, setTab] = useState<"general" | "entreprise">("general");
   const symbol = currencySymbol(action.currency);
   return (
@@ -204,8 +198,8 @@ export function ActionDetailPanel({
       <div className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/50 p-1">
         {(
           [
-            { id: "general", label: "Général" },
-            { id: "entreprise", label: "Entreprise" },
+            { id: "general", label: t.analyse.detail.common.tabs.general },
+            { id: "entreprise", label: t.analyse.detail.common.tabs.company },
           ] as const
         ).map(({ id, label }) => (
           <button
@@ -223,7 +217,6 @@ export function ActionDetailPanel({
           </button>
         ))}
       </div>
-
       {tab === "general" ? (
         <div className="space-y-5">
           <div className="rounded-lg border border-border-cw p-4">
@@ -233,12 +226,12 @@ export function ActionDetailPanel({
               </p>
               {action.price !== null ? (
                 <p className="font-heading text-lg font-semibold tabular-nums text-text-primary">
-                  {formatNumberFr(action.price)} {symbol}
+                  {formatNumber(action.price, intl)} {symbol}
                 </p>
               ) : null}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge tone="neutral">{sectorFr(action.sector) || "—"}</Badge>
+              <Badge tone="neutral">{sectorLabel(action.sector, t) || "—"}</Badge>
               {action.industry ? <Badge tone="neutral">{action.industry}</Badge> : null}
               <Badge tone="neutral">{action.exchange}</Badge>
             </div>
@@ -246,142 +239,135 @@ export function ActionDetailPanel({
               <DataAsOfBadge dataAsOf={action.dataAsOf} source="Yahoo Finance" />
             </div>
           </div>
-
           {priceHistory.length > 1 ? (
             <PriceChart points={priceHistory} currency={action.currency} />
           ) : null}
-
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border border-border-cw p-4">
-              <HintLabel
-                uppercase
-                hint="Valeur de marché totale de l'entreprise : cours × nombre d'actions en circulation. Au-delà de 200 Md$ on parle de mega-cap (Apple, Microsoft...)."
-              >
-                Capitalisation
+              <HintLabel uppercase hint={d.marketCapHint}>
+                {d.marketCap}
               </HintLabel>
               <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
                 {action.marketCap !== null
-                  ? formatMarketCap(action.marketCap, action.currency)
+                  ? formatMarketCap(action.marketCap, action.currency, intl)
                   : "—"}
               </p>
-              <p className="mt-0.5 text-xs text-text-muted">valeur de marché totale</p>
+              <p className="mt-0.5 text-xs text-text-muted">{d.marketCapSub}</p>
             </div>
             <div className="rounded-lg border border-border-cw p-4">
-              <HintLabel
-                uppercase
-                hint="Ratio P/E : cours divisé par le bénéfice par action sur 12 mois glissants. Autour de 15-20× en moyenne historique pour le marché américain. Un ratio élevé traduit une forte croissance attendue (ou une action chère)."
-              >
-                Cours / bénéfice
+              <HintLabel uppercase hint={d.peHint}>
+                {d.peTitle}
               </HintLabel>
               <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
                 {action.trailingPe !== null
-                  ? `${action.trailingPe.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`
+                  ? `${action.trailingPe.toLocaleString(intl, { maximumFractionDigits: 1 })}×`
                   : "—"}
               </p>
               <p className="mt-0.5 text-xs text-text-muted">
                 {action.forwardPe !== null
-                  ? `estimé : ${action.forwardPe.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`
-                  : "bénéfices 12 mois glissants"}
+                  ? d.peForward.replace(
+                      "{value}",
+                      action.forwardPe.toLocaleString(intl, { maximumFractionDigits: 1 }),
+                    )
+                  : d.peTrailingSub}
               </p>
             </div>
           </div>
-
           <div className="rounded-lg border border-border-cw p-4">
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Cours & volumes
+              {d.priceVolume}
             </p>
             <InfoRow
-              label="Volume du jour"
-              value={action.volume !== null ? formatVolume(action.volume) : "—"}
-              hint="Nombre d'actions échangées aujourd'hui. Un volume élevé signifie une liquidité forte : vous achetez/vendez sans déplacer le prix."
+              label={d.volumeDay}
+              value={action.volume !== null ? formatVolume(action.volume, intl) : "—"}
+              hint={d.volumeDayHint}
             />
             <InfoRow
-              label="Volume moyen 3 mois"
+              label={d.volume3m}
               value={
                 action.averageVolume3Month !== null
-                  ? formatVolume(action.averageVolume3Month)
+                  ? formatVolume(action.averageVolume3Month, intl)
                   : "—"
               }
-              hint="Moyenne quotidienne des échanges sur 3 mois : plus fiable que le volume du jour pour juger la liquidité structurelle du titre."
+              hint={d.volume3mHint}
             />
             <InfoRow
-              label="Plus haut 52 semaines"
+              label={d.high52}
               value={
                 action.fiftyTwoWeekHigh !== null
-                  ? `${formatNumberFr(action.fiftyTwoWeekHigh)} ${symbol}`
+                  ? `${formatNumber(action.fiftyTwoWeekHigh, intl)} ${symbol}`
                   : "—"
               }
-              hint="Cours le plus élevé sur l'année écoulée. Servir de résistance psychologique : s'en approcher peut déclencher des prises de bénéfices."
+              hint={d.high52Hint}
             />
             <InfoRow
-              label="Plus bas 52 semaines"
+              label={d.low52}
               value={
                 action.fiftyTwoWeekLow !== null
-                  ? `${formatNumberFr(action.fiftyTwoWeekLow)} ${symbol}`
+                  ? `${formatNumber(action.fiftyTwoWeekLow, intl)} ${symbol}`
                   : "—"
               }
-              hint="Cours le plus bas sur l'année écoulée. Proche du plus bas = potentiellement décotée, mais souvent pour une raison (détérioration des bénéfices)."
+              hint={d.low52Hint}
             />
             <InfoRow
-              label="Moyenne 50 jours"
+              label={d.ma50}
               value={
                 action.fiftyDayAverage !== null
-                  ? `${formatNumberFr(action.fiftyDayAverage)} ${symbol}`
+                  ? `${formatNumber(action.fiftyDayAverage, intl)} ${symbol}`
                   : "—"
               }
-              hint="Moyenne mobile des 50 dernières séances (~2,5 mois) : indicateur de tendance court terme. Cours au-dessus = dynamique positive récente."
+              hint={d.ma50Hint}
             />
             <InfoRow
-              label="Moyenne 200 jours"
+              label={d.ma200}
               value={
                 action.twoHundredDayAverage !== null
-                  ? `${formatNumberFr(action.twoHundredDayAverage)} ${symbol}`
+                  ? `${formatNumber(action.twoHundredDayAverage, intl)} ${symbol}`
                   : "—"
               }
-              hint="Moyenne mobile des 200 dernières séances (~10 mois) : référence long terme des investisseurs institutionnels. Cours au-dessus = tendance de fond haussière."
+              hint={d.ma200Hint}
             />
           </div>
-
           <div className="rounded-lg border border-border-cw p-4">
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Dividende & valorisation
+              {d.dividendValuation}
             </p>
             <InfoRow
-              label="Rendement du dividende"
+              label={d.dividendYield}
               value={action.dividendYield !== null ? formatPercent(action.dividendYield) : "—"}
-              hint="Dividende annuel ÷ cours actuel. C'est le revenu cash que l'action distribue chaque année, en pourcentage de votre investissement. 2 à 4 % est courant pour une entreprise mature."
+              hint={d.dividendYieldHint}
             />
             <InfoRow
-              label="Dividende annuel"
+              label={d.dividendRate}
               value={
                 action.dividendRate !== null
-                  ? `${formatNumberFr(action.dividendRate)} ${symbol}`
+                  ? `${formatNumber(action.dividendRate, intl)} ${symbol}`
                   : "—"
               }
-              hint="Montant total distribué par action sur 12 mois glissants. Une entreprise qui l'augmente régulièrement signale des bénéfices récurrents."
+              hint={d.dividendRateHint}
             />
             <InfoRow
-              label="Taux de distribution"
+              label={d.payout}
               value={action.payoutRatio !== null ? formatPercent(action.payoutRatio) : "—"}
-              hint="Part du bénéfice net distribuée en dividendes. < 60 % est soutenable (l'entreprise garde de quoi investir) ; > 100 % est un signal d'alerte (elle paie plus qu'elle ne gagne)."
+              hint={d.payoutHint}
             />
             <InfoRow
-              label="Cours / actif net"
+              label={d.priceToBook}
               value={
                 action.priceToBook !== null
-                  ? `${action.priceToBook.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}×`
+                  ? `${action.priceToBook.toLocaleString(intl, { maximumFractionDigits: 1 })}×`
                   : "—"
               }
-              hint="Capitalisation boursière ÷ valeur comptable des actifs. Utile pour les banques/industries : < 1 signifie que le marché valorise l'entreprise moins que ses actifs nets."
+              hint={d.priceToBookHint}
             />
             <InfoRow
-              label="Beta (volatilité)"
+              label={d.beta}
               value={
                 action.beta !== null
-                  ? action.beta.toLocaleString("fr-FR", { maximumFractionDigits: 2 })
+                  ? action.beta.toLocaleString(intl, { maximumFractionDigits: 2 })
                   : "—"
               }
-              hint="Sensibilité du titre au marché : 1 = amplifie le marché, 1 = varie comme lui, < 1 = plus stable que le marché, > 2 = très nerveux. Un beta de 2 signifie ±2 % quand le marché bouge de ±1 %."
+              hint={d.betaHint}
             />
           </div>
         </div>
@@ -404,42 +390,41 @@ export function ActionDetailPanel({
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <Badge tone="neutral">{sectorFr(action.sector) || "—"}</Badge>
+              <Badge tone="neutral">{sectorLabel(action.sector, t) || "—"}</Badge>
               {action.industry ? <Badge tone="neutral">{action.industry}</Badge> : null}
             </div>
           </div>
-
           <div className="rounded-lg border border-border-cw p-4">
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Identité
+              {d.identity}
             </p>
             <InfoRow
-              label="Secteur"
-              value={sectorFr(action.sector) || "—"}
-              hint="Grande famille économique (Technologie, Santé, Énergie…). Diversifier entre secteurs réduit le risque conjoncturel : chaque secteur réagit différemment au cycle économique."
+              label={d.sector}
+              value={sectorLabel(action.sector, t) || "—"}
+              hint={d.sectorHint}
             />
             <InfoRow
-              label="Industrie"
+              label={d.industry}
               value={action.industry || "—"}
-              hint="Sous-segment précis du secteur (ex. Semiconductors dans Technologie). Deux entreprises d'un même secteur peuvent avoir des dynamiques très différentes selon leur industrie."
+              hint={d.industryHint}
             />
             <InfoRow
-              label="Employés"
+              label={d.employees}
               value={
                 action.fullTimeEmployees !== null
-                  ? action.fullTimeEmployees.toLocaleString("fr-FR")
+                  ? action.fullTimeEmployees.toLocaleString(intl)
                   : "—"
               }
-              hint="Effectif à temps plein. Donne l'échelle de l'entreprise : le chiffre d'affaires par employé (CA ÷ effectif) est un bon indicateur de productivité."
+              hint={d.employeesHint}
             />
             <InfoRow
-              label="Devise de cotation"
+              label={d.listingCurrency}
               value={action.currency || "—"}
-              hint="Devise dans laquelle le titre est coté. Si elle diffère de l'EUR (USD, CHF…), votre rendement réel inclut la variation de change entre l'achat et la revente."
+              hint={d.listingCurrencyHint}
             />
             {action.website ? (
               <div className="flex items-baseline justify-between gap-4 border-b border-border-cw/40 py-1.5 last:border-0">
-                <span className="shrink-0 text-xs text-text-muted">Site web</span>
+                <span className="shrink-0 text-xs text-text-muted">{d.website}</span>
                 <a
                   href={action.website}
                   target="_blank"
@@ -451,41 +436,39 @@ export function ActionDetailPanel({
               </div>
             ) : null}
           </div>
-
           <div className="rounded-lg border border-border-cw p-4">
             <p className="mb-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Identifiants
+              {d.identifiers}
             </p>
             <InfoRow
               label="Ticker"
               value={action.ticker}
-              hint="Symbole court de cotation (ex. NVDA). Attention aux collisions : deux entreprises peuvent partager un ticker sur des places différentes."
+              hint={d.tickerHint}
             />
             <InfoRow
-              label="Symbole Yahoo"
+              label={t.analyse.detail.etf.yahoo}
               value={action.tickerYahoo}
-              hint="Symbole utilisé pour récupérer les cours en temps réel via Yahoo Finance (suffixé par la place : .PA = Paris, .SW = Suisse, .KS = Corée…)."
+              hint={d.yahooHint}
             />
             {action.isin ? (
               <InfoRow
                 label="ISIN"
                 value={action.isin}
-                hint="Identifiant international unique à 12 caractères (2 lettres de pays + 9 caractères + clé). Le seul identifiant fiable à travers toutes les bourses."
+                hint={d.isinHint}
               />
             ) : null}
             <InfoRow
-              label="Place de cotation"
+              label={t.analyse.detail.etf.exchange}
               value={action.exchange || "—"}
-              hint="Bourse où le titre est négocié (NASDAQ, NYSE, Euronext…). Les horaires de cotation et la fiscalité des dividendes dépendent de la place."
+              hint={d.exchangeHint}
             />
           </div>
-
           {action.businessSummary ? (
             <div className="rounded-lg border border-border-cw p-4">
               <div className="mb-1 flex items-center gap-2">
                 <Globe2 className="h-4 w-4 text-text-muted" aria-hidden />
                 <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-                  L&apos;entreprise et son activité
+                  {d.businessSummary}
                 </p>
               </div>
               <p className="text-sm leading-relaxed text-text-secondary">

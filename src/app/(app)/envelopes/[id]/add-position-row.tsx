@@ -1,5 +1,4 @@
 "use client";
-
 import { useMemo, useState } from "react";
 import { useActionState } from "react";
 import { Plus, Search, X } from "lucide-react";
@@ -9,34 +8,31 @@ import { formatRate } from "@/lib/money";
 import { Badge, Button, Input } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
+  const { t } = useI18n();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     createPositionAction,
     {},
   );
-
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<EtfCatalogEntry | null>(null);
-
   const results = useMemo(
     () => (selected ? [] : searchEtfCatalog(query).slice(0, 8)),
     [query, selected],
   );
-
   const pick = (etf: EtfCatalogEntry) => {
     setSelected(etf);
     setQuery(etf.ticker);
   };
-
   const reset = () => {
     setOpen(false);
     setSelected(null);
     setQuery("");
   };
   useActionToast(state, reset);
-
   if (!open) {
     return (
       <button
@@ -45,17 +41,15 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
         className="flex w-full items-center justify-center gap-2 border-t border-border-cw px-6 py-3 text-sm text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-secondary"
       >
         <Plus className="h-4 w-4" aria-hidden />
-        Ajouter une position
+        {t.envelopes.positions.addPosition}
       </button>
     );
   }
-
   return (
     <div className="border-t border-border-cw px-6 py-5">
       <form action={action} className="space-y-4" noValidate>
         <input type="hidden" name="envelopeId" value={envelopeId} />
         {selected ? <input type="hidden" name="isin" value={selected.isin} /> : null}
-
         {selected ? (
           <div className="flex items-center justify-between rounded-lg border border-border-cw bg-bg-subtle px-3 py-3">
             <div className="min-w-0">
@@ -65,7 +59,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
               </p>
               <p className="truncate text-xs text-text-secondary">
                 {selected.name} · {selected.isin} · {selected.issuer} ·{" "}
-                {formatRate(selected.ter)} / an
+                {formatRate(selected.ter)} {t.envelopes.positions.perYear}
               </p>
             </div>
             <button
@@ -77,19 +71,19 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
               }}
             >
               <X className="h-3 w-3" aria-hidden />
-              Changer
+              {t.envelopes.positions.change}
             </button>
           </div>
         ) : (
           <div className="relative">
             <label htmlFor="pos-search" className="mb-1 block text-xs uppercase tracking-wide text-text-muted">
-              Valeur
+              {t.envelopes.positions.searchLabel}
             </label>
             <Input
               id="pos-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nom, ticker ou ISIN…"
+              placeholder={t.envelopes.positions.searchPlaceholder}
               autoComplete="off"
               aria-autocomplete="list"
             />
@@ -99,7 +93,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
             {results.length > 0 ? (
               <ul
                 role="listbox"
-                aria-label="ETF correspondants"
+                aria-label={t.envelopes.positions.resultsLabel}
                 className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border-cw bg-bg-elevated shadow-lg"
               >
                 {results.map((etf) => (
@@ -129,7 +123,6 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
             ) : null}
           </div>
         )}
-
         {selected ? (
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex-1">
@@ -137,7 +130,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
                 htmlFor="pos-quantity"
                 className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
               >
-                Nombre de parts
+                {t.envelopes.positions.quantity}
               </label>
               <Input
                 id="pos-quantity"
@@ -155,7 +148,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
                 htmlFor="pos-date"
                 className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
               >
-                Date d&apos;achat
+                {t.envelopes.positions.boughtAt}
               </label>
               <Input id="pos-date" name="boughtAt" type="date" required />
             </div>
@@ -165,7 +158,7 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
                   htmlFor="pos-price"
                   className="mb-1 block text-xs uppercase tracking-wide text-text-muted"
                 >
-                  Prix d&apos;achat (NAV €)
+                  {t.envelopes.positions.navPrice}
                 </label>
                 <Input
                   id="pos-price"
@@ -178,17 +171,16 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
                   placeholder="100,00"
                 />
                 <p className="mt-1 text-xs text-text-muted">
-                  Fonds non coté : saisissez le prix d&apos;achat constaté chez le courtier.
+                  {t.envelopes.positions.privPriceHint}
                 </p>
               </div>
             ) : null}
           </div>
         ) : (
           <p className="text-sm text-text-secondary">
-            Sélectionnez un ETF pour saisir le nombre de parts et la date d&apos;achat.
+            {t.envelopes.positions.selectEtf}
           </p>
         )}
-
         {state?.errors?.form ? (
           <p role="alert" className="text-sm text-negative">
             {state.errors.form[0]}
@@ -209,17 +201,16 @@ export function AddPositionRow({ envelopeId }: { envelopeId: string }) {
             {state.errors.boughtAt[0]}
           </p>
         ) : null}
-
         <div className="flex items-center gap-3">
           <Button
             type="submit"
             disabled={pending || !selected}
             className={cn("w-full sm:w-auto")}
           >
-            {pending ? "Ajout…" : "Ajouter la position"}
+            {pending ? t.envelopes.positions.adding : t.envelopes.positions.addPosition}
           </Button>
           <Button type="button" variant="ghost" onClick={reset} disabled={pending}>
-            Annuler
+            {t.common.cancel}
           </Button>
         </div>
       </form>

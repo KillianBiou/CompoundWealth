@@ -2,14 +2,7 @@ import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
 import { DeletePositionButton } from "./delete-position-button";
-
-const categoryLabels: Record<string, string> = {
-  ETF: "ETF",
-  STOCK: "Action",
-  BOND: "Obligation",
-  FUND: "Fonds",
-  OTHER: "Autre",
-};
+import { useI18n } from "@/i18n/provider";
 
 export interface PositionRow {
   id: string;
@@ -24,12 +17,6 @@ export interface PositionRow {
   valuationDate: Date | null;
   valuationSource: string | null;
 }
-
-const sourceLabels: Record<string, string> = {
-  yahoo: "Yahoo Finance",
-  import: "Import",
-  manuel: "Saisie manuelle",
-};
 
 export function PositionsTable({
   envelopeId,
@@ -47,16 +34,17 @@ export function PositionsTable({
   /** tickers/symboles Yahoo cliquables (actions), les autres lignes restent inertes */
   clickableSymbols?: Set<string>;
 }) {
+  const { t } = useI18n();
   return (
     <Card className="p-0">
       <div className="flex items-center justify-between p-6 pb-4">
-        <h2 className="font-heading text-lg font-semibold">Positions</h2>
+        <h2 className="font-heading text-lg font-semibold">{t.envelopes.positions.title}</h2>
         <Badge tone="neutral">{positions.length}</Badge>
       </div>
       {positions.length === 0 ? (
         <>
           <p className="px-6 pb-2 text-sm text-text-secondary">
-            Aucune position pour le moment. Ajoutez votre premier ETF.
+            {t.envelopes.positions.empty}
           </p>
           <AddPositionRow envelopeId={envelopeId} />
         </>
@@ -65,12 +53,12 @@ export function PositionsTable({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b-2 border-border-cw bg-bg-subtle/50 text-left text-xs uppercase tracking-wide text-text-muted">
-                <th className="px-6 py-3 font-medium">Nom</th>
-                <th className="px-4 py-3 font-medium">Catégorie</th>
-                <th className="px-4 py-3 text-right font-medium">Investi</th>
-                <th className="px-4 py-3 text-right font-medium">Valeur actuelle</th>
-                <th className="px-4 py-3 font-medium">Date d&apos;achat</th>
-                <th className="px-6 py-3" aria-label="Actions" />
+                <th className="px-6 py-3 font-medium">{t.envelopes.positions.cols.name}</th>
+                <th className="px-4 py-3 font-medium">{t.envelopes.positions.cols.category}</th>
+                <th className="px-4 py-3 text-right font-medium">{t.envelopes.positions.cols.invested}</th>
+                <th className="px-4 py-3 text-right font-medium">{t.envelopes.positions.cols.value}</th>
+                <th className="px-4 py-3 font-medium">{t.envelopes.positions.cols.boughtAt}</th>
+                <th className="px-6 py-3" aria-label={t.common.edit} />
               </tr>
             </thead>
             <tbody>
@@ -85,8 +73,8 @@ export function PositionsTable({
                         onClick={() => onSelectPosition(p)}
                         title={
                           p.isin && clickableIsins?.has(p.isin)
-                            ? "Voir le détail de l'ETF"
-                            : "Voir le détail de l'action"
+                            ? t.envelopes.positions.viewEtfDetail
+                            : t.envelopes.positions.viewActionDetail
                         }
                         className="cursor-pointer text-left font-medium text-text-primary transition-colors hover:text-accent-500"
                       >
@@ -107,7 +95,9 @@ export function PositionsTable({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge tone="neutral">{categoryLabels[p.category] ?? p.category}</Badge>
+                    <Badge tone="neutral">
+                      {t.envelopes.positions.categories[p.category as keyof typeof t.envelopes.positions.categories] ?? p.category}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {p.investedCents !== null ? (
@@ -115,7 +105,7 @@ export function PositionsTable({
                         {formatEurCents(p.investedCents)}
                       </span>
                     ) : (
-                      <span className="italic text-text-muted">état des lieux</span>
+                      <span className="italic text-text-muted">{t.envelopes.positions.statement}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
@@ -148,7 +138,9 @@ export function PositionsTable({
                           {p.valuationDate ? (
                             <span className="block text-xs font-normal text-text-muted">
                               {p.valuationDate.toLocaleDateString("fr-FR")}
-                              {p.valuationSource ? ` · ${sourceLabels[p.valuationSource] ?? p.valuationSource}` : ""}
+                              {p.valuationSource
+                                ? ` · ${t.envelopes.positions.sources[p.valuationSource as keyof typeof t.envelopes.positions.sources] ?? p.valuationSource}`
+                                : ""}
                             </span>
                           ) : null}
                         </span>

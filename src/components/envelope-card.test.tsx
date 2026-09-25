@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithI18n } from "../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { EnvelopeCard } from "./envelope-card";
 import type { EnvelopeSummary } from "@/server/queries";
@@ -28,21 +29,21 @@ const base: EnvelopeSummary = {
 
 describe("EnvelopeCard", () => {
   it("affiche le nom, le type et la valeur", () => {
-    render(<EnvelopeCard envelope={base} />);
+    renderWithI18n(<EnvelopeCard envelope={base} />);
     expect(screen.getByText("PEA Bourse")).toBeInTheDocument();
     expect(screen.getByText("PEA")).toBeInTheDocument();
     expect(screen.getByText(/Trade Republic/)).toBeInTheDocument();
   });
 
   it("affiche le gain en vert avec flèche hausse", () => {
-    render(<EnvelopeCard envelope={base} />);
+    renderWithI18n(<EnvelopeCard envelope={base} />);
     const gain = document.querySelector("p.text-positive");
     expect(gain?.textContent).toContain("↗");
     expect(gain?.textContent).toContain("200,00");
   });
 
   it("affiche la perte en corail avec flèche baisse", () => {
-    render(
+    renderWithI18n(
       <EnvelopeCard
         envelope={{ ...base, valueCents: 90_000, gainCents: -10_000 }}
       />,
@@ -53,7 +54,7 @@ describe("EnvelopeCard", () => {
   });
 
   it("état des lieux : gain non calculable affiché explicitement", () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <EnvelopeCard
         envelope={{ ...base, gainCents: null, hasUnknownInvested: true }}
       />,

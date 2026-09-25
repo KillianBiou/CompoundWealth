@@ -13,6 +13,7 @@ import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Card, Field, Input } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 import { LivretChart, type LivretPointRow } from "./livret-chart";
 
 export interface LivretDepositRow {
@@ -54,6 +55,7 @@ export function LivretSection({
     realRate: number;
   } | null;
 }) {
+  const { t } = useI18n();
   const [showCap, setShowCap] = useState(false);
   const [depositDate, setDepositDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [depositAmount, setDepositAmount] = useState("");
@@ -83,14 +85,10 @@ export function LivretSection({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-negative" aria-hidden />
           <div>
             <p className="text-sm font-semibold text-negative">
-              {formatEurCents(overCapCents)} au-dessus du plafond de 22 950 €
+              {t.envelopes.livret.overCapTitle.replace("{amount}", formatEurCents(overCapCents))}
             </p>
             <p className="mt-0.5 text-xs text-text-secondary">
-              Seuls les intérêts capitalisés peuvent porter le solde au-delà du plafond — les
-              versements y sont bloqués. Si ce solde dépasse le plafond par vos versements
-              historiques, le surplus est suivi hors livret : rémunération très faible, nocif
-              pour votre épargne. Placez-le sur un support rémunéré (autre livret réglementé,
-              fonds euros…).
+              {t.envelopes.livret.overCapText}
             </p>
           </div>
         </div>
@@ -99,30 +97,30 @@ export function LivretSection({
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div>
           <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-            Solde actuel
+            {t.envelopes.livret.balance}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-text-primary">
             {formatEurCents(balanceCents)}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
-            dont {formatEurCents(Math.max(0, balanceCents - totalDeposits))} d&apos;intérêts cumulés
+            {t.envelopes.livret.interestIncluded.replace("{amount}", formatEurCents(Math.max(0, balanceCents - totalDeposits)))}
           </p>
         </div>
         <div>
           <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-            Intérêts attendus (1 an)
+            {t.envelopes.livret.expectedInterest}
           </p>
           <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-positive">
             +{formatEurCents(projection?.interestCents ?? 0)}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
-            au taux de {pctLabel(rate)} · quinzaine par quinzaine
+            {t.envelopes.livret.atRate.replace("{rate}", pctLabel(rate))}
           </p>
         </div>
         {projection ? (
           <div>
             <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Pouvoir d&apos;achat à 1 an
+              {t.envelopes.livret.purchasingPower}
             </p>
             <p
               className={cn(
@@ -142,16 +140,18 @@ export function LivretSection({
               {projection.realRate >= 0 ? "+" : "−"}
               {Math.abs(projection.realRate * 100).toFixed(1).replace(".", ",")} % ·{" "}
               {projection.realChangeCents < 0
-                ? `votre épargne perd l'équivalent de ${formatEurCents(Math.abs(projection.realChangeCents))} en euros constants (inflation ${pctLabel(inflation)})`
-                : `l'inflation (${pctLabel(inflation)}) est couverte`}
+                ? t.envelopes.livret.realRateNeg
+                    .replace("{amount}", formatEurCents(Math.abs(projection.realChangeCents)))
+                    .replace("{inflation}", pctLabel(inflation))
+                : t.envelopes.livret.realRatePos.replace("{inflation}", pctLabel(inflation))}
             </p>
           </div>
         ) : (
           <div>
             <p className="text-xs font-medium tracking-wide text-text-secondary uppercase">
-              Pouvoir d&apos;achat à 1 an
+              {t.envelopes.livret.purchasingPower}
             </p>
-            <p className="mt-1 text-sm text-text-muted italic">Ajoutez un versement</p>
+            <p className="mt-1 text-sm text-text-muted italic">{t.envelopes.livret.addDeposit}</p>
           </div>
         )}
       </Card>
@@ -160,27 +160,21 @@ export function LivretSection({
         <div className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 p-4">
           <TrendingDown className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
           <p className="text-sm text-text-secondary">
-            <strong className="text-warning">Perte de pouvoir d&apos;achat :</strong> à taux de{" "}
-            {pctLabel(rate)} contre une inflation de {pctLabel(inflation)}, l&apos;inflation
-            détruit{" "}
-            <span className="font-semibold text-negative">
-              −{formatEurCents(projection.inflationLossCents)}
-            </span>{" "}
-            de valeur en un an, quand les intérêts n&apos;en rapportent que{" "}
-            <span className="text-positive">+{formatEurCents(projection.interestCents)}</span>.
-            Bilan net :{" "}
-            <span className="font-semibold text-negative">
-              −{formatEurCents(Math.abs(projection.realChangeCents))}
-            </span>{" "}
-            de pouvoir d&apos;achat ({(projection.realRate * 100).toFixed(1).replace(".", ",")} %).
-            Le livret protège la liquidité, pas la croissance.
+            <strong className="text-warning">{t.envelopes.livret.powerLossTitle}</strong> {t.envelopes.livret.powerLossText
+              .replace("{rate}", pctLabel(rate))
+              .replace("{inflation}", pctLabel(inflation))
+              .replace("{loss}", `−${formatEurCents(projection.inflationLossCents)}`)
+              .replace("{interest}", `+${formatEurCents(projection.interestCents)}`)
+              .replace("{net}", `−${formatEurCents(Math.abs(projection.realChangeCents))}`)
+              .replace("{rate2}", (projection.realRate * 100).toFixed(1).replace(".", ","))}
+            
           </p>
         </div>
       ) : null}
 
       <Card>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-heading text-lg font-semibold">Évolution du solde</h2>
+          <h2 className="font-heading text-lg font-semibold">{t.envelopes.livret.balanceEvolution}</h2>
           <Badge tone="neutral">{pctLabel(rate)}</Badge>
         </div>
         <LivretChart
@@ -192,13 +186,13 @@ export function LivretSection({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <h2 className="font-heading text-lg font-semibold">Versements et retraits</h2>
+          <h2 className="font-heading text-lg font-semibold">{t.envelopes.livret.depositsTitle}</h2>
           <form action={depositAction} className="mt-4 space-y-3" noValidate>
             <input type="hidden" name="envelopeId" value={envelopeId} />
             <div className="flex items-end gap-3">
               <div className="w-40 shrink-0">
                 <Field
-                  label="Date"
+                  label={t.envelopes.livret.date}
                   htmlFor="livret-deposit-date"
                   error={depositState?.errors?.date}
                 >
@@ -214,7 +208,7 @@ export function LivretSection({
               </div>
               <div className="flex-1">
                 <Field
-                  label="Montant (€, négatif pour un retrait)"
+                  label={t.envelopes.livret.amount}
                   htmlFor="livret-deposit-amount"
                   error={depositState?.errors?.amountEur}
                 >
@@ -257,10 +251,10 @@ export function LivretSection({
             >
               <PiggyBank className="h-4 w-4" aria-hidden />
               {depositPending
-                ? "Enregistrement…"
+                ? t.envelopes.livret.saving
                 : Number(depositAmount) < 0
-                  ? "Enregistrer le retrait"
-                  : "Enregistrer le versement"}
+                  ? t.envelopes.livret.saveWithdrawal
+                  : t.envelopes.livret.saveDeposit}
             </button>
           </form>
           {deposits.length > 0 ? (
@@ -274,25 +268,25 @@ export function LivretSection({
             </ul>
           ) : (
             <p className="mt-4 text-sm text-text-muted">
-              Aucun mouvement enregistré pour le moment.
+              {t.envelopes.livret.noMovements}
             </p>
           )}
         </Card>
 
         <Card>
-          <h2 className="font-heading text-lg font-semibold">Paramètres du livret</h2>
+          <h2 className="font-heading text-lg font-semibold">{t.envelopes.livret.settingsTitle}</h2>
           <p className="mt-1 text-xs text-text-muted">
-            Préremplis avec les valeurs usuelles ({pctLabel(LIVRET_A_RATE)} au 1er août 2026,
-            inflation {pctLabel(LIVRET_A_DEFAULT_INFLATION)}). Ajustez pour simuler d&apos;autres
-            scénarios.
+            {t.envelopes.livret.settingsHint
+              .replace("{rate}", pctLabel(LIVRET_A_RATE))
+              .replace("{inflation}", pctLabel(LIVRET_A_DEFAULT_INFLATION))}
           </p>
           <form action={settingsAction} className="mt-4 space-y-4" noValidate>
             <input type="hidden" name="envelopeId" value={envelopeId} />
             <Field
-              label="Taux de rémunération (%)"
+              label={t.envelopes.livret.rateLabel}
               htmlFor="livret-rate"
               error={settingsState?.errors?.interestRate}
-              hint="Taux officiel du Livret A, révisé chaque semestre"
+              hint={t.envelopes.livret.rateHint}
             >
               <Input
                 id="livret-rate"
@@ -306,10 +300,10 @@ export function LivretSection({
               />
             </Field>
             <Field
-              label="Inflation annuelle estimée (%)"
+              label={t.envelopes.livret.inflationLabel}
               htmlFor="livret-inflation"
               error={settingsState?.errors?.inflationRate}
-              hint="Utilisée pour calculer votre rendement réel (pouvoir d'achat)"
+              hint={t.envelopes.livret.inflationHint}
             >
               <Input
                 id="livret-inflation"
@@ -327,7 +321,7 @@ export function LivretSection({
               </p>
             ) : null}
             <Button type="submit" variant="secondary" disabled={settingsPending}>
-              {settingsPending ? "Enregistrement…" : "Mettre à jour les paramètres"}
+              {settingsPending ? t.envelopes.livret.saving : t.envelopes.livret.updateSettings}
             </Button>
           </form>
         </Card>
@@ -343,6 +337,7 @@ function DepositRow({
   envelopeId: string;
   deposit: LivretDepositRow;
 }) {
+  const { t } = useI18n();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     deleteLivretDepositAction,
     {},
@@ -370,7 +365,7 @@ function DepositRow({
           disabled={pending}
           className="cursor-pointer text-xs text-text-muted transition-colors hover:text-negative disabled:opacity-50"
         >
-          Supprimer
+          {t.common.delete}
         </button>
       </form>
     </li>

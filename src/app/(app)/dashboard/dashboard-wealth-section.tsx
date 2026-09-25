@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Card } from "@/components/ui";
+import { useI18n } from "@/i18n/provider";
 import { formatPercent } from "@/lib/money";
 import type { EnvelopeSummary } from "@/server/queries";
 import { WealthChart, type ChartSeriesToggle } from "./wealth-chart";
@@ -24,6 +25,7 @@ export function DashboardWealthSection({
   monthChangeRatio: number | null;
   yearChangeRatio: number | null;
 }) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState<VisibleState>(() =>
     Object.fromEntries(envelopeToggles.map((t) => [t.id, true])),
   );
@@ -51,27 +53,27 @@ export function DashboardWealthSection({
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="font-heading text-lg font-semibold">
-                Évolution du patrimoine
+                {t.dashboard.wealthTitle}
               </h2>
               <p className="mt-0.5 text-xs text-text-muted">
                 {monthChangeRatio !== null ? (
                   <>
-                    1 mois :{" "}
+                    {t.dashboard.oneMonth}{" "}
                     <span className={monthChangeRatio >= 0 ? "text-positive" : "text-negative"}>
                       {formatPercent(monthChangeRatio)}
                     </span>
                     {" · "}
                   </>
                 ) : null}
-                1 an :{" "}
+                {t.dashboard.oneYear}{" "}
                 {yearChangeRatio !== null ? (
                   <span className={yearChangeRatio >= 0 ? "text-positive" : "text-negative"}>
                     {formatPercent(yearChangeRatio)}
                   </span>
                 ) : (
-                  "historique insuffisant"
+                  t.dashboard.insufficientHistory
                 )}
-                <span className="ml-1">(hors versements)</span>
+                <span className="ml-1">{t.dashboard.excludingDeposits}</span>
               </p>
             </div>
           </div>
