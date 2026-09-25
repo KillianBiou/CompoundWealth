@@ -656,7 +656,11 @@
       "worldGrowthHint": "Actual World ETF growth from {start} to {end}; your own deposits replayed at the actual daily price. This is the real counterfactual: \"what would a simple World ETF have given?\"",
       "aheadReference": "Your portfolio is {delta} better than this reference",
       "behindReference": "Your portfolio is {delta} worse than this reference",
-      "worldGrowthValue": "Same deposits on this ETF: {value}"
+      "worldGrowthValue": "Same deposits on this ETF: {value}",
+      "refWorldReal": "Real World equity ETF ({cumulative} cumulative · {annualized} annualized)",
+      "verdictWorldReal": "Judged against the real MSCI World: your same deposits on a simple World ETF would be worth {value}, that is {delta} {direction}.",
+      "verdictWorldAhead": "better than your portfolio",
+      "verdictWorldBehind": "worse than your portfolio"
     },
     "diversification": {
       "score": "Score",
