@@ -278,6 +278,40 @@ describe("computePerformanceMetrics", () => {
     expect(result.contributedCents).toBe(100_000);
   });
 
+  it("sous-période : le capital au cutoff joue le rôle du premier versement", () => {
+    // cutoff 2024-01-15 : 100 000 € déjà présents, +50 000 € versés mi-2024,
+    // valeur finale 165 000 € → XIRR ≈ 12,02 %, Dietz ≈ 11,99 % (vérifiés)
+    const result = computePerformanceMetrics({
+      flows: [
+        { date: new Date("2024-01-15"), amountCents: 100_000 },
+        { date: new Date("2024-07-15"), amountCents: 50_000 },
+      ],
+      finalValueCents: 165_000,
+      finalDate: new Date("2025-01-15"),
+      startDate: new Date("2024-01-15"),
+      startValueCents: 100_000,
+    });
+    // seul le flux post-cutoff compte comme versement de la période
+    expect(result.contributedCents).toBe(50_000);
+    expect(result.gainCents).toBe(15_000);
+    expect(result.simpleReturn).toBeCloseTo(0.1, 4);
+    expect(result.xirr).toBeCloseTo(0.1202, 3);
+    expect(result.twrCumulative).toBeCloseTo(0.1199, 3);
+  });
+  it("sous-période sans flux : Dietz = rendement simple du capital initial", () => {
+    const result = computePerformanceMetrics({
+      flows: [{ date: new Date("2024-01-15"), amountCents: 100_000 }],
+      finalValueCents: 108_000,
+      finalDate: new Date("2025-01-15"),
+      startDate: new Date("2024-01-15"),
+      startValueCents: 100_000,
+    });
+    expect(result.contributedCents).toBe(0);
+    expect(result.gainCents).toBe(8_000);
+    expect(result.simpleReturn).toBeCloseTo(0.08, 4);
+    expect(result.twrCumulative).toBeCloseTo(0.08, 4);
+    expect(result.xirr).toBeCloseTo(0.0798, 3);
+  });
   it("données insuffisantes (< 30 jours) → métriques null", () => {
     const end = new Date("2025-01-30");
     const flows = [{ date: new Date("2025-01-01"), amountCents: 100_000 }];
@@ -325,6 +359,19 @@ describe("referenceFinalValue", () => {
     ];
     expect(referenceFinalValue(flows, end, 0.08)).toBe(
       Math.round(100_000 * Math.pow(1.08, 366 / 365)),
+    );
+  });
+  it("sous-période : le capital initial est aussi placé au taux de référence", () => {
+    const end = new Date("2025-01-15");
+    const start = new Date("2024-01-15");
+    const flows = [{ date: new Date("2024-07-15"), amountCents: 50_000 }];
+    const value = referenceFinalValue(flows, end, 0.08, 100_000, start);
+    // 366 jours pour le capital, 184 pour le versement (Act/365)
+    expect(value).toBe(
+      Math.round(
+        100_000 * Math.pow(1.08, 366 / 365) +
+          50_000 * Math.pow(1.08, 184 / 365),
+      ),
     );
   });
 });

@@ -533,9 +533,10 @@
       },
       "performance": {
         "title": "Performance",
-        "kpiLabel": "annualized XIRR · whole period",
+        "kpiLabel": "annualized XIRR · {period}",
         "detailLine1": "Gain: {gain}",
-        "detailLine2": "Annualized TWR: {twr}"
+        "detailLine2": "Annualized TWR: {twr}",
+        "kpiLabel1y": "annualized XIRR · last 12 months"
       },
       "exposure": {
         "title": "Exposure",
@@ -660,7 +661,13 @@
       "refWorldReal": "Real World equity ETF ({cumulative} cumulative · {annualized} annualized)",
       "verdictWorldReal": "Judged against the real MSCI World: your same deposits on a simple World ETF would be worth {value}, that is {delta} {direction}.",
       "verdictWorldAhead": "better than your portfolio",
-      "verdictWorldBehind": "worse than your portfolio"
+      "verdictWorldBehind": "worse than your portfolio",
+      "period1y": "1 year",
+      "period3y": "3 years",
+      "period5y": "5 years",
+      "periodAll": "All time",
+      "periodFrom": "Analyzed period: from {start} to today",
+      "periodAllHint": "Analyzed period: the portfolio's whole life"
     },
     "diversification": {
       "score": "Score",

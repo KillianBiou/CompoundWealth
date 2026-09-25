@@ -533,9 +533,10 @@
       },
       "performance": {
         "title": "Performance",
-        "kpiLabel": "XIRR annualisé · toute la période",
+        "kpiLabel": "XIRR annualisé · {period}",
         "detailLine1": "Gain : {gain}",
-        "detailLine2": "TWR annualisé : {twr}"
+        "detailLine2": "TWR annualisé : {twr}",
+        "kpiLabel1y": "XIRR annualisé · 12 derniers mois"
       },
       "exposure": {
         "title": "Exposition",
@@ -660,7 +661,13 @@
       "refWorldReal": "ETF actions Monde réel ({cumulative} cumulé · {annualized} annualisé)",
       "verdictWorldReal": "Jugé sur le MSCI World réel : vos mêmes versements sur un simple ETF Monde vaudraient {value}, soit {delta} {direction}.",
       "verdictWorldAhead": "de mieux que votre portefeuille",
-      "verdictWorldBehind": "de moins que votre portefeuille"
+      "verdictWorldBehind": "de moins que votre portefeuille",
+      "period1y": "1 an",
+      "period3y": "3 ans",
+      "period5y": "5 ans",
+      "periodAll": "Toute la durée",
+      "periodFrom": "Période analysée : du {start} à aujourd'hui",
+      "periodAllHint": "Période analysée : toute la vie du portefeuille"
     },
     "diversification": {
       "score": "Score",

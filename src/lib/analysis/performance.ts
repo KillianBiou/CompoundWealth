@@ -189,21 +189,35 @@ export function modifiedDietzReturn(
   flows: CashFlow[],
   finalValueCents: number,
   finalDate: Date,
+  startValueCents = 0,
+  startDate?: Date | null,
 ): ModifiedDietzResult | null {
   const end = toUtcMidnight(finalDate);
   const endTime = end.getTime();
   const sorted = flows
     .filter((f) => toUtcMidnight(f.date).getTime() <= endTime)
     .sort((a, b) => a.date.getTime() - b.date.getTime());
-  if (sorted.length === 0) return null;
-  const start = toUtcMidnight(sorted[0].date);
+  const hasStart = startDate != null;
+  const start = hasStart
+    ? toUtcMidnight(startDate)
+    : sorted[0]
+      ? toUtcMidnight(sorted[0].date)
+      : null;
+  if (start === null) return null;
+  // sous-période : seuls les flux postérieurs au cutoff comptent, le capital
+  // présent au cutoff entre au dénominateur comme V_début
+  const periodFlows = hasStart
+    ? sorted.filter((f) => f.date.getTime() > start.getTime())
+    : sorted;
+  const beginValue = hasStart ? Math.max(0, startValueCents) : 0;
+  if (periodFlows.length === 0 && beginValue <= 0) return null;
   const totalDays = dayDiff(start, end);
   if (totalDays <= 0) return null;
 
-  const netFlow = sorted.reduce((s, f) => s + f.amountCents, 0);
-  const gain = finalValueCents - netFlow;
-  let denominator = 0;
-  for (const flow of sorted) {
+  const netFlow = periodFlows.reduce((s, f) => s + f.amountCents, 0);
+  const gain = finalValueCents - beginValue - netFlow;
+  let denominator = beginValue;
+  for (const flow of periodFlows) {
     const weight = dayDiff(flow.date, end) / totalDays;
     denominator += flow.amountCents * weight;
   }
@@ -227,6 +241,10 @@ export interface PerformanceScope {
   finalValueCents: number;
   /** date finale de l'analyse */
   finalDate: Date;
+  /** début de la sous-période analysée (null/absent = toute la vie du niveau) */
+  startDate?: Date | null;
+  /** valeur du niveau au début de la sous-période, centimes (0 = démarre vide) */
+  startValueCents?: number;
 }
 
 export interface PerformanceMetricsResult {
@@ -258,6 +276,54 @@ export function computePerformanceMetrics(
     .map((f) => ({ date: toUtcMidnight(f.date), amountCents: f.amountCents }))
     .filter((f) => f.date.getTime() <= endTime)
     .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // --- sous-période -----------------------------------------------------------
+  // le capital présent au cutoff (startValueCents) joue le rôle du premier
+  // versement : flux XIRR à la date de début, V_début du Modified Dietz
+  if (scope.startDate != null) {
+    const startDate = toUtcMidnight(scope.startDate);
+    const startValueCents = Math.max(0, scope.startValueCents ?? 0);
+    const periodFlows = flows.filter(
+      (f) => f.date.getTime() > startDate.getTime(),
+    );
+    const totalDays = dayDiff(startDate, finalDate);
+    const contributedCents = periodFlows.reduce((s, f) => s + f.amountCents, 0);
+    const gainCents = scope.finalValueCents - startValueCents - contributedCents;
+    const simpleReturn =
+      startValueCents + contributedCents > 0
+        ? gainCents / (startValueCents + contributedCents)
+        : null;
+    const years = totalDays > 0 ? totalDays / DAYS_PER_YEAR : null;
+    const enoughData =
+      (startValueCents > 0 || periodFlows.length > 0) &&
+      totalDays >= MIN_PERIOD_DAYS &&
+      scope.finalValueCents > 0;
+    const xirrFlows =
+      startValueCents > 0
+        ? [{ date: startDate, amountCents: startValueCents }, ...periodFlows]
+        : periodFlows;
+    const xirrValue = enoughData
+      ? xirr(xirrFlows, scope.finalValueCents, finalDate)
+      : null;
+    const dietz = enoughData
+      ? modifiedDietzReturn(
+          periodFlows,
+          scope.finalValueCents,
+          finalDate,
+          startValueCents,
+          startDate,
+        )
+      : null;
+    return {
+      xirr: xirrValue,
+      twrAnnualized: dietz?.annualized ?? null,
+      twrCumulative: dietz?.cumulative ?? null,
+      simpleReturn,
+      gainCents,
+      contributedCents,
+      years,
+    };
+  }
 
   const contributedCents = flows.reduce((s, f) => s + f.amountCents, 0);
   const gainCents = scope.finalValueCents - contributedCents;
@@ -305,9 +371,20 @@ export function referenceFinalValue(
   flows: CashFlow[],
   finalDate: Date,
   rate: number,
+  startValueCents = 0,
+  startDate?: Date | null,
 ): number {
   const end = toUtcMidnight(finalDate);
   let futureValue = 0;
+  // sous-période : le capital présent en début de période est aussi placé au
+  // taux de référence, au prorata de la durée de la sous-période
+  if (startDate != null) {
+    const days = dayDiff(startDate, end);
+    if (days >= 0) {
+      futureValue +=
+        Math.max(0, startValueCents) * Math.pow(1 + rate, days / DAYS_PER_YEAR);
+    }
+  }
   for (const flow of flows) {
     const days = dayDiff(flow.date, end);
     if (days < 0) continue;

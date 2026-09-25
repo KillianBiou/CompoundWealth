@@ -213,6 +213,59 @@ describe("buildPerformanceReport", () => {
     );
   });
 
+  it("sous-période : le cutoff segmente flux et capital initial partout", () => {
+    // position achetée 100 000 € mi-2024, valorisée 102 000 € au cutoff
+    // 2025-01-15, +10 000 € versés après, valeur finale 118 000 €
+    const position = makePosition({
+      id: "pos-sub",
+      name: "WPEA",
+      investments: [
+        { date: new Date("2024-06-15"), amountCents: 100_000 },
+        { date: new Date("2025-06-15"), amountCents: 10_000 },
+      ],
+      investedCents: 110_000,
+      valueCents: 118_000,
+      boughtAt: new Date("2024-06-15"),
+      valuations: [
+        { date: new Date("2024-06-15"), valueCents: 100_000 },
+        { date: new Date("2025-01-15"), valueCents: 102_000 },
+        { date: new Date("2026-06-15"), valueCents: 118_000 },
+      ],
+    });
+    const periodStart = new Date("2025-01-15");
+    const report = buildPerformanceReport({
+      positions: [position],
+      livretFlows: [],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      period: "1y",
+      periodStart,
+      now: new Date("2026-01-15T00:00:00Z"),
+    });
+    expect(report.period).toBe("1y");
+    expect(report.periodStart?.toISOString()).toBe("2025-01-15T00:00:00.000Z");
+    // position : capital initial 102 000 € (dernière valorisation ≤ cutoff),
+    // un seul versement dans la période (10 000 €)
+    const level = report.positions[0];
+    expect(level.startValueCents).toBe(102_000);
+    expect(level.contributedCents).toBe(10_000);
+    expect(level.metrics?.gainCents).toBe(6_000);
+    expect(level.flows).toHaveLength(1);
+    // enveloppe : même segmentation, valeur initiale agrégée
+    const envelope = report.envelopes[0];
+    expect(envelope.startValueCents).toBe(102_000);
+    expect(envelope.contributedCents).toBe(10_000);
+    // total : capital initial = valorisation au cutoff
+    expect(report.total.startValueCents).toBe(102_000);
+    expect(report.total.contributedCents).toBe(10_000);
+    // références : le capital initial est placé au taux, le gain reste
+    // la valeur théorique moins (capital initial + versements de la période)
+    const world = report.worldReference!;
+    expect(world.gainCents).toBe(
+      world.valueCents - 102_000 - 10_000,
+    );
+  });
   it("transmet la croissance réelle du Monde sur la même période", () => {
     const report = buildPerformanceReport({
       positions: [makePosition()],
