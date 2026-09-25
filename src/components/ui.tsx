@@ -182,7 +182,7 @@ export function Kpi({
       {hint && open ? (
         <span
           role="tooltip"
-          className="absolute bottom-full left-0 z-20 mb-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case"
+          className="absolute top-full left-0 z-20 mt-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case"
         >
           {hint}
         </span>
