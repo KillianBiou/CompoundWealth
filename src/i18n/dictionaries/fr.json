@@ -636,8 +636,8 @@
       "vsReference": "vs votre portefeuille : {delta}",
       "referencesHint": "Valeur finale théorique si les mêmes versements avaient été placés au taux annuel indiqué, appliqué au prorata de la durée de détention de chaque versement — le rendement moyen historique des actions mondiales sert de référence « stratégie basique ».",
       "verdictTitle": "Verdict",
-      "verdictPositive": "Votre portefeuille bat les stratégies de référence : la complexité ajoute du rendement.",
-      "verdictWarning": "Votre portefeuille bat l'épargne de précaution mais pas un ETF Monde basique : la complexité n'apporte pas encore de rendement supplémentaire.",
+      "verdictPositive": "Votre portefeuille bat les références, y compris la croissance réelle du Monde sur la période : la complexité ajoute du rendement.",
+      "verdictWarning": "Votre portefeuille bat l'épargne de précaution mais fait moins bien que la croissance réelle du Monde sur la période : un ETF Monde simple aurait rapporté plus.",
       "verdictNegative": "Votre portefeuille fait moins bien que l'épargne de précaution : la complexité coûte du rendement.",
       "verdictNeutral": "Pas encore assez d'historique pour tirer un verdict.",
       "verdictHint": "Comparaison indicative : le XIRR inclut l'effet de vos dates de versement, la référence est un taux constant. Si l'écart est durablement négatif, simplifier (ETF large, frais bas) est probablement meilleur.",
@@ -653,7 +653,10 @@
       "refGain": "gain de la référence : {gain}",
       "worldGrowthLine": "MSCI World réel sur la même période : {cumulative} cumulé · {annualized} annualisé",
       "worldGrowthNa": "n/a",
-      "worldGrowthHint": "Croissance réelle de l'ETF Monde du {start} au {end}, pour confronter le verdict au marché réel et pas seulement à un taux constant."
+      "worldGrowthHint": "Croissance réelle de l'ETF Monde du {start} au {end} ; vos propres versements rejoués au cours réel du jour. C'est le vrai contre-factuel : « qu'aurait donné un simple ETF Monde ? »",
+      "aheadReference": "Votre portefeuille fait {delta} de mieux que cette référence",
+      "behindReference": "Votre portefeuille fait {delta} de moins bien que cette référence",
+      "worldGrowthValue": "Mêmes versements sur cet ETF : {value}"
     },
     "diversification": {
       "score": "Score",

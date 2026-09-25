@@ -299,6 +299,8 @@ const performance: PerformanceReport = {
     annualized: 0.11,
     startDate: new Date("2024-01-15T00:00:00Z"),
     endDate: new Date("2025-01-15T00:00:00Z"),
+    referenceValueCents: 11_300_00,
+    deltaCents: -207_00,
   },
 };
 
@@ -458,8 +460,16 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText(/gain de la référence : \+150,00 €/)).toBeInTheDocument();
     // gain de la référence Monde : 650 €, toujours > gain livret
     expect(screen.getByText(/gain de la référence : \+650,00 €/)).toBeInTheDocument();
-    // l'écart vs portefeuille est explicitement libellé « vs votre portefeuille »
-    expect(screen.getAllByText(/vs votre portefeuille/).length).toBe(2);
+    // l'écart vs portefeuille est libellé sans ambiguïté de direction :
+    // livret +631 € de mieux, Monde +131 € de mieux (ou « de moins bien » si négatif)
+    expect(
+      screen.getByText(/Votre portefeuille fait 631,00 € de mieux que cette référence/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Votre portefeuille fait 131,00 € de mieux que cette référence/),
+    ).toBeInTheDocument();
+    // jamais l'ancien libellé ambigu « vs votre portefeuille »
+    expect(screen.queryByText(/vs votre portefeuille/)).not.toBeInTheDocument();
   });
 
   it("le verdict affiche la croissance réelle du MSCI World sur la même période", () => {
@@ -467,6 +477,12 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText("Performance"));
     expect(screen.getByText(/MSCI World réel sur la même période/)).toBeInTheDocument();
     expect(screen.getByText(/\+11 %/)).toBeInTheDocument();
+    // la marche d'escalier DCA au cours réel du World :
+    // valeur 11 300 €, écart −207 € « de moins bien »
+    expect(screen.getByText(/Mêmes versements sur cet ETF : 11 300,00 €/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Votre portefeuille fait 207,00 € de moins bien que cette référence/),
+    ).toBeInTheDocument();
   });
   it("le panneau performance bascule vers le détail par actif", () => {
     renderView();
