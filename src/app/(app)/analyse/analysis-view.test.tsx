@@ -458,31 +458,36 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText("Performance"));
     // gain de la référence livret : 150 € (référence − contribué)
     expect(screen.getByText(/gain de la référence : \+150,00 €/)).toBeInTheDocument();
-    // gain de la référence Monde : 650 €, toujours > gain livret
-    expect(screen.getByText(/gain de la référence : \+650,00 €/)).toBeInTheDocument();
-    // l'écart vs portefeuille est libellé sans ambiguïté de direction :
-    // livret +631 € de mieux, Monde +131 € de mieux (ou « de moins bien » si négatif)
+    // la carte Monde affiche la référence RÉELLE quand le World réel est
+    // disponible (même référence que le verdict, pas le taux constant)
+    expect(screen.getByText(/ETF actions Monde réel/)).toBeInTheDocument();
+    // la carte Monde réelle : valeur 11 300 €, gain +850 €, écart −207 €,
+    // toutes dans le même bloc carte (textes coupés par les interpolations)
+    const worldCard = screen.getByText(/ETF actions Monde réel/).closest("div")!;
+    expect(worldCard).toHaveTextContent("11 300,00 €");
+    expect(worldCard).toHaveTextContent("gain de la référence : +850,00 €");
+    expect(worldCard).toHaveTextContent(
+      "Votre portefeuille fait 207,00 € de moins bien que cette référence",
+    );
+    // la carte livret reste la référence à taux constant
     expect(
       screen.getByText(/Votre portefeuille fait 631,00 € de mieux que cette référence/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Votre portefeuille fait 131,00 € de mieux que cette référence/),
     ).toBeInTheDocument();
     // jamais l'ancien libellé ambigu « vs votre portefeuille »
     expect(screen.queryByText(/vs votre portefeuille/)).not.toBeInTheDocument();
   });
 
-  it("le verdict affiche la croissance réelle du MSCI World sur la même période", () => {
+  it("le verdict est jugé sur le MSCI World réel et l'explique", () => {
     renderView();
     fireEvent.click(screen.getByText("Performance"));
-    expect(screen.getByText(/MSCI World réel sur la même période/)).toBeInTheDocument();
-    expect(screen.getByText(/\+11 %/)).toBeInTheDocument();
-    // la marche d'escalier DCA au cours réel du World :
-    // valeur 11 300 €, écart −207 € « de moins bien »
-    expect(screen.getByText(/Mêmes versements sur cet ETF : 11 300,00 €/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Votre portefeuille fait 207,00 € de moins bien que cette référence/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Verdict/)).toBeInTheDocument();
+    // le verdict mentionne la référence réelle et l'écart en une phrase
+    const verdictBlock = screen.getByText(/Verdict/).closest("div")!;
+    expect(verdictBlock).toHaveTextContent("Jugé sur le MSCI World réel");
+    expect(verdictBlock).toHaveTextContent("11 300,00 €");
+    expect(verdictBlock).toHaveTextContent("207,00 €");
+    // delta négatif : le World réel fait mieux que le portefeuille
+    expect(verdictBlock).toHaveTextContent("de moins que votre portefeuille");
   });
   it("le panneau performance bascule vers le détail par actif", () => {
     renderView();

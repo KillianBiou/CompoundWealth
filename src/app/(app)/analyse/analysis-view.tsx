@@ -820,18 +820,57 @@ function PerformancePanel({
           </div>
           <div className="rounded-lg border border-accent-500/25 bg-accent-500/5 p-3">
             <p className="text-xs font-medium text-text-secondary">
-              {t.analyse.performance.refWorld.replace("{rate}", formatPercent(report.worldEquityRate))}
+              {report.worldGrowth
+                ? t.analyse.performance.refWorldReal
+                    .replace("{cumulative}", formatSignedPercent(report.worldGrowth.cumulative))
+                    .replace(
+                      "{annualized}",
+                      report.worldGrowth.annualized !== null
+                        ? formatSignedPercent(report.worldGrowth.annualized)
+                        : t.analyse.performance.worldGrowthNa,
+                    )
+                : t.analyse.performance.refWorld.replace("{rate}", formatPercent(report.worldEquityRate))}
             </p>
             <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
-              {worldRef !== null ? formatEurCents(worldRef.valueCents) : "—"}
+              {report.worldGrowth
+                ? formatEurCents(report.worldGrowth.referenceValueCents)
+                : worldRef !== null
+                  ? formatEurCents(worldRef.valueCents)
+                  : "—"}
             </p>
-            {worldRef !== null ? (
+            {report.worldGrowth ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain.replace(
+                  "{gain}",
+                  signedEur(
+                    report.worldGrowth.referenceValueCents - total.contributedCents,
+                  ),
+                )}
+              </p>
+            ) : worldRef !== null ? (
               <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
                 {t.analyse.performance.refGain
                   .replace("{gain}", signedEur(worldRef.gainCents))}
               </p>
             ) : null}
-            {worldRef !== null ? (
+            {report.worldGrowth ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  report.worldGrowth.deltaCents >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {report.worldGrowth.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                    )}
+              </p>
+            ) : worldRef !== null ? (
               <p
                 className={cn(
                   "mt-0.5 text-xs tabular-nums",
@@ -847,6 +886,13 @@ function PerformancePanel({
                       "{delta}",
                       formatEurCents(Math.abs(worldRef.deltaCents)),
                     )}
+              </p>
+            ) : null}
+            {report.worldGrowth ? (
+              <p className="mt-1 text-xs text-text-muted">
+                {t.analyse.performance.worldGrowthHint
+                  .replace("{start}", report.worldGrowth.startDate.toLocaleDateString("fr-FR"))
+                  .replace("{end}", report.worldGrowth.endDate.toLocaleDateString("fr-FR"))}
               </p>
             ) : null}
           </div>
@@ -879,43 +925,20 @@ function PerformancePanel({
         </p>
         <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.verdictHint}</p>
         {report.worldGrowth ? (
-          <div className="mt-2 rounded-md border border-border-cw bg-bg-subtle/40 p-2">
-            <p className="text-xs text-text-secondary">
-              {t.analyse.performance.worldGrowthLine
-                .replace("{cumulative}", formatSignedPercent(report.worldGrowth.cumulative))
-                .replace(
-                  "{annualized}",
-                  report.worldGrowth.annualized !== null
-                    ? formatSignedPercent(report.worldGrowth.annualized)
-                    : t.analyse.performance.worldGrowthNa,
-                )}
-            </p>
-            <p className="mt-1 text-xs text-text-secondary">
-              {t.analyse.performance.worldGrowthValue
-                .replace("{value}", formatEurCents(report.worldGrowth.referenceValueCents))}
-            </p>
-            <p
-              className={cn(
-                "mt-0.5 text-xs tabular-nums",
-                report.worldGrowth.deltaCents >= 0 ? "text-positive" : "text-negative",
+          <p className="mt-2 text-xs text-text-muted">
+            {t.analyse.performance.verdictWorldReal
+              .replace("{value}", formatEurCents(report.worldGrowth.referenceValueCents))
+              .replace(
+                "{delta}",
+                formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+              )
+              .replace(
+                "{direction}",
+                report.worldGrowth.deltaCents >= 0
+                  ? t.analyse.performance.verdictWorldAhead
+                  : t.analyse.performance.verdictWorldBehind,
               )}
-            >
-              {report.worldGrowth.deltaCents >= 0
-                ? t.analyse.performance.aheadReference.replace(
-                    "{delta}",
-                    formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
-                  )
-                : t.analyse.performance.behindReference.replace(
-                    "{delta}",
-                    formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
-                  )}
-            </p>
-            <p className="mt-0.5 text-xs text-text-muted">
-              {t.analyse.performance.worldGrowthHint
-                .replace("{start}", report.worldGrowth.startDate.toLocaleDateString("fr-FR"))
-                .replace("{end}", report.worldGrowth.endDate.toLocaleDateString("fr-FR"))}
-            </p>
-          </div>
+          </p>
         ) : null}
       </div>
 
