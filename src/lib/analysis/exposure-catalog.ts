@@ -8,9 +8,12 @@ import { getEtfDetailByIsin } from "./etf-detail";
 
 export {
   COUNTRY_SHARE_THRESHOLD,
+  ECONOMIES,
+  economyOfCountry,
   OTHER_COUNTRIES_LABEL,
   ZONES,
   zoneOfCountry,
+  type EconomyKey,
   type ZoneKey,
 } from "./geo-zones";
 

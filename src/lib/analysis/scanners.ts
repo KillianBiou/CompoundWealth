@@ -1,5 +1,6 @@
 import {
   COUNTRY_SHARE_THRESHOLD,
+  economyOfCountry,
   getCountriesByIsin,
   getEtfExposureByIsin,
   getStockExposure,
@@ -478,15 +479,17 @@ export function analyzeSectors(positions: AnalysisPosition[]): DiversificationRe
 }
 
 /**
- * Scanner de diversification géographique — deux niveaux de granularité :
+ * Scanner de diversification géographique — trois niveaux de granularité :
  * `zone` agrège les pays du fichier ETF en zones continentales (Amérique du
  * Nord, Amérique latine, Europe, Asie de l'Est, Asie émergente, Afrique &
  * Moyen-Orient, Océanie) ; `country` liste chaque pays représentant au moins
- * 1 % du portefeuille, le reste étant regroupé en « Autres pays ».
+ * 1 % du portefeuille, le reste étant regroupé en « Autres pays » ;
+ * `economy` agrège les pays par type d'économie MSCI (développée, émergente,
+ * frontière).
  */
 export function analyzeRegions(
   positions: AnalysisPosition[],
-  granularity: "zone" | "country" = "zone",
+  granularity: "zone" | "country" | "economy" = "zone",
 ): DiversificationResult {
   if (granularity === "country") {
     const result = diversification(
@@ -501,12 +504,31 @@ export function analyzeRegions(
     );
     return mergeSmallCountries(result);
   }
+  const countriesOf = (position: AnalysisPosition) => getCountriesByIsin(position.isin);
+  if (granularity === "economy") {
+    return diversification(
+      positions,
+      (position) => {
+        const byEconomy = new Map<string, number>();
+        for (const country of countriesOf(position)) {
+          if (country.country === "Other") continue;
+          const economy = economyOfCountry(country.country) ?? "Other";
+          byEconomy.set(economy, (byEconomy.get(economy) ?? 0) + country.weight);
+        }
+        return [...byEconomy.entries()].map(([economy, weight]) => ({
+          label: economy,
+          weight,
+          exposureCents: Math.round(position.valueCents * weight),
+        }));
+      },
+      GEO_ALERT_THRESHOLD,
+    );
+  }
   return diversification(
     positions,
     (position) => {
-      const countries = getCountriesByIsin(position.isin);
       const byZone = new Map<string, number>();
-      for (const country of countries) {
+      for (const country of countriesOf(position)) {
         if (country.country === "Other") continue;
         const zone = zoneOfCountry(country.country) ?? "Other";
         byZone.set(zone, (byZone.get(zone) ?? 0) + country.weight);

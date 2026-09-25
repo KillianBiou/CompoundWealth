@@ -29,7 +29,11 @@ import { Badge, Kpi } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { useI18n } from "@/i18n/provider";
 import type { Dictionary } from "@/i18n/server";
-import { OTHER_COUNTRIES_LABEL, ZONES } from "@/lib/analysis/geo-zones";
+import {
+  ECONOMIES,
+  OTHER_COUNTRIES_LABEL,
+  ZONES,
+} from "@/lib/analysis/geo-zones";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import type { ActionDetail } from "@/lib/analysis/action-detail";
 import { fetchActionPriceHistoryAction } from "@/server/actions";
@@ -428,18 +432,24 @@ function DiversificationPanel({
   kind,
 }: {
   result: DiversificationResult;
-  kind: "sector" | "zone" | "country";
+  kind: "sector" | "zone" | "country" | "economy";
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<number | null>(null);
   const geoLabel = (key: string) =>
     kind === "zone"
       ? ZONES.find((z) => z.key === key)?.label ?? key
-      : key === OTHER_COUNTRIES_LABEL
-        ? t.analyse.diversification.otherCountries
-        : key;
+      : kind === "economy"
+        ? ECONOMIES.find((e) => e.key === key)?.label ?? key
+        : key === OTHER_COUNTRIES_LABEL
+          ? t.analyse.diversification.otherCountries
+          : key;
   const geoFlag = (key: string) =>
-    kind === "zone" ? ZONES.find((z) => z.key === key)?.flag ?? "" : "";
+    kind === "zone"
+      ? ZONES.find((z) => z.key === key)?.flag ?? ""
+      : kind === "economy"
+        ? ECONOMIES.find((e) => e.key === key)?.flag ?? ""
+        : "";
   const pieData = result.lines.slice(0, 8).map((line, index) => ({
     name: kind === "sector" ? line.sector : geoLabel(line.sector),
     value: line.amountCents / 100,
@@ -1156,16 +1166,21 @@ function ExposurePanel({
   sectors,
   regions,
   countries,
+  economies,
 }: {
   sectors: DiversificationResult;
   regions: DiversificationResult;
   /** répartition par pays (vue détaillée), pays < 1 % regroupés */
   countries: DiversificationResult;
+  /** répartition par type d'économie MSCI (développée / émergente / frontière) */
+  economies: DiversificationResult;
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<"sector" | "region">("region");
-  const [geoView, setGeoView] = useState<"zone" | "country">("zone");
-  const result = tab === "region" ? (geoView === "zone" ? regions : countries) : sectors;
+  const [geoView, setGeoView] = useState<"zone" | "country" | "economy">("zone");
+  const geoResult =
+    geoView === "zone" ? regions : geoView === "country" ? countries : economies;
+  const result = tab === "region" ? geoResult : sectors;
   const geoKind = tab === "region" ? geoView : "sector";
   return (
     <div className="space-y-5">
@@ -1226,6 +1241,18 @@ function ExposurePanel({
               String(countries.lines.filter((l) => l.sector !== OTHER_COUNTRIES_LABEL).length),
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => setGeoView("economy")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              geoView === "economy"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {t.analyse.diversification.viewEconomy}
+          </button>
         </div>
       ) : null}
       <DiversificationPanel result={result} kind={geoKind} />
@@ -1243,6 +1270,7 @@ export function AnalysisPageView({
   sectors,
   regions,
   countries,
+  economies,
   simulatorDefaults,
   etfDetails,
   actionDetails,
@@ -1253,6 +1281,8 @@ export function AnalysisPageView({
   regions: DiversificationResult;
   /** répartition par pays (vue détaillée), pays < 1 % regroupés */
   countries: DiversificationResult;
+  /** répartition par type d'économie MSCI (développée / émergente / frontière) */
+  economies: DiversificationResult;
   sectors: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
@@ -1480,7 +1510,12 @@ export function AnalysisPageView({
           <IncomePanel income={income} onSelectLine={openPosition} />
         ) : null}
         {openPanel === "exposition" ? (
-          <ExposurePanel sectors={sectors} regions={regions} countries={countries} />
+          <ExposurePanel
+            sectors={sectors}
+            regions={regions}
+            countries={countries}
+            economies={economies}
+          />
         ) : null}
         {openPanel === "simulateur" ? (
           <SimulationPanel

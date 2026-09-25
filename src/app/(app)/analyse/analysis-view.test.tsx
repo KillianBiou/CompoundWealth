@@ -162,6 +162,26 @@ const countries: DiversificationResult = {
   totalCents: 100_000_00,
 };
 
+const economies: DiversificationResult = {
+  lines: [
+    {
+      sector: "Developpe",
+      amountCents: 85_000_00,
+      share: 0.85,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
+    },
+    {
+      sector: "Emergent",
+      amountCents: 15_000_00,
+      share: 0.15,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 15_000_00 }],
+    },
+  ],
+  score: 4,
+  alerts: [],
+  totalCents: 100_000_00,
+};
+
 const simulatorDefaults: SimulatorDefaults = {
   investedWealthCents: 70_000_00,
   savingsWealthCents: 30_000_00,
@@ -180,6 +200,7 @@ function renderView() {
       sectors={sectors}
       regions={regions}
       countries={countries}
+      economies={economies}
       simulatorDefaults={simulatorDefaults}
       etfDetails={{
         [fees.lines[0].isin ?? "IE0002XZSHO1"]: {
@@ -330,6 +351,14 @@ describe("AnalysisPageView", () => {
     fireEvent.click(screen.getByText(/Pays \(2\)/));
     expect(screen.getAllByText("United States").length).toBeGreaterThan(0);
     expect(screen.getByText("Autres pays")).toBeInTheDocument();
+  });
+  it("la vue économie classe l'exposition développé / émergent / frontière", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    fireEvent.click(screen.getByText("Économie"));
+    expect(screen.getAllByText(/Marchés développés/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Marchés émergents/)).toBeInTheDocument();
+    expect(screen.queryByText(/Marchés frontières/)).not.toBeInTheDocument();
   });
 
   it("ouvre le panneau ETF au clic sur une ligne du scanner de frais", () => {

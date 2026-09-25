@@ -5,6 +5,7 @@ import {
   getIncomeAnalysis,
   getRegionAnalysis,
   getCountryAnalysis,
+  getEconomyAnalysis,
   getSectorAnalysis,
   getAnalysisPositions,
   getEtfDetailsByIsin,
@@ -20,13 +21,14 @@ export default async function AnalysePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [fees, income, sectors, regions, countries, positions, envelopes] =
+  const [fees, income, sectors, regions, countries, economies, positions, envelopes] =
     await Promise.all([
       getFeeAnalysis(),
       getIncomeAnalysis(),
       getSectorAnalysis(),
       getRegionAnalysis(),
       getCountryAnalysis(),
+      getEconomyAnalysis(),
       getAnalysisPositions(),
       getEnvelopeSummaries(),
     ]);
@@ -60,6 +62,7 @@ export default async function AnalysePage() {
       sectors={sectors}
       regions={regions}
       countries={countries}
+      economies={economies}
       simulatorDefaults={simulatorDefaults}
       etfDetails={getEtfDetailsByIsin()}
       actionDetails={getActionDetailsBySymbol()}
