@@ -1,0 +1,106 @@
+name,ticker,ticker_yahoo,isin,country,sector,exchange
+NVIDIA,NVDA,NVDA,US67066G1040,United States,Semiconductors,NASDAQ
+Apple,AAPL,AAPL,US0378331005,United States,Consumer Electronics,NASDAQ
+Microsoft,MSFT,MSFT,US5949181045,United States,Software,NASDAQ
+Alphabet (Class A),GOOGL,GOOGL,US02079K3059,United States,Internet,NASDAQ
+Amazon,AMZN,AMZN,US0231351064,United States,E-commerce,NASDAQ
+Broadcom,AVGO,AVGO,US1113371065,United States,Semiconductors,NASDAQ
+Meta Platforms,META,META,US30303M1027,United States,Internet,NASDAQ
+Tesla,TSLA,TSLA,US88160R1014,United States,Automotive,NASDAQ
+Berkshire Hathaway (B),BRK-B,BRK-B,US0846707026,United States,Conglomerate,NYSE
+Taiwan Semiconductor,TSM,TSM,TW0002330008,Taiwan,Semiconductors,NYSE ADR
+Eli Lilly,LLY,LLY,US5324571083,United States,Pharmaceuticals,NYSE
+Walmart,WMT,WMT,US9311422751,United States,Retail,NYSE
+JPMorgan Chase,JPM,JPM,US47810F1003,United States,Banking,NYSE
+Visa,V,V,US92826C8394,United States,Financial Services,NYSE
+Exxon Mobil,XOM,XOM,US30231G1022,United States,Oil & Gas,NYSE
+Oracle,ORCL,ORCL,US6844661196,United States,Software,NYSE
+UnitedHealth,UNH,UNH,US91324P1021,United States,Healthcare,NYSE
+Mastercard,MA,MA,US57636Q1040,United States,Financial Services,NYSE
+Johnson & Johnson,JNJ,JNJ,US4781601046,United States,Healthcare,NYSE
+Procter & Gamble,PG,PG,US7427181091,United States,Consumer Goods,NYSE
+Home Depot,HD,HD,US4370761029,United States,Retail,NYSE
+Cisco,CSCO,CSCO,US17275R1023,United States,Networking,NASDAQ
+Salesforce,CRM,CRM,US79466L3024,United States,Software,NYSE
+Adobe,ADBE,ADBE,US00724F1012,United States,Software,NASDAQ
+Costco,COST,COST,US2214641050,United States,Retail,NASDAQ
+Netflix,NFLX,NFLX,US64110L1061,United States,Media,NASDAQ
+AMD,AMD,AMD,US0079031078,United States,Semiconductors,NASDAQ
+ASML,ASML,ASML.AS,NL0010273215,Netherlands,Semiconductor Equipment,Euronext Amsterdam
+SAP,SAP,SAP.DE,DE0007164600,Germany,Software,Xetra
+Samsung Electronics,005930.KS,005930.KS,KR7009560009,South Korea,Consumer Electronics,KRX
+Alibaba,BABA,BABA,US01609W1028,China,E-commerce,NYSE ADR
+Tencent,0700.HK,0700.HK,KYG875721634,China (HK),Internet,HKEX
+Toyota,7203.T,7203.T,JP3630200003,Japan,Automotive,Tokyo
+Saudi Aramco,2222.SR,2222.SR,SA2H69000RJ3,Saudi Arabia,Oil & Gas,Tadawul
+LVMH,MC.PA,MC.PA,FR0000121014,France,Luxury,Euronext Paris
+Novo Nordisk,NOVO-B.CO,NOVO-B.CO,DK0060534915,Denmark,Pharmaceuticals,Copenhagen
+Hermès,RMS.PA,RMS.PA,FR0000052292,France,Luxury,Euronext Paris
+Nestlé,NESN.SW,NESN.SW,CH0038863350,Switzerland,Consumer Goods,SIX
+Roche (GS),ROG.SW,ROG.SW,CH0012032048,Switzerland,Pharmaceuticals,SIX
+Novartis,NOVN.SW,NOVN.SW,CH0012005267,Switzerland,Pharmaceuticals,SIX
+Sanofi,SAN.PA,SAN.PA,FR0000120578,France,Pharmaceuticals,Euronext Paris
+TotalEnergies,TTE.PA,TTE.PA,FR0000120271,France,Oil & Gas,Euronext Paris
+Shell,SHEL.L,SHEL.L,GB00BP80Y363,United Kingdom,Oil & Gas,LSE
+AstraZeneca,AZN.L,AZN.L,GB0007033584,United Kingdom,Pharmaceuticals,LSE
+HSBC,HSBA.L,HSBA.L,GB0005405396,United Kingdom,Banking,LSE
+Unilever,ULVR.L,ULVR.L,IE00B41NTY43,United Kingdom / NL,Consumer Goods,LSE
+Siemens,SIE.DE,SIE.DE,DE0007236101,Germany,Industrial,Xetra
+Airbus,AIR.PA,AIR.PA,,France / NL,Aerospace,Euronext Paris
+Schneider Electric,SU.PA,SU.PA,FR0000121972,France,Industrial,Euronext Paris
+Reliance Industries,RELIANCE.NS,RELIANCE.NS,INE002A01018,India,Conglomerate,NSE India
+TCS,TCS.NS,TCS.NS,INE467B01029,India,Software,NSE India
+HDFC Bank,HDFCBANK.NS,HDFCBANK.NS,INE040A01034,India,Banking,NSE India
+Kweichow Moutai,600519.SS,600519.SS,,China,Consumer Goods,Shanghai
+ICBC,1398.HK,1398.HK,,China,Banking,HKEX
+CATL,300750.SZ,300750.SZ,,China,Batteries,Shenzhen
+Pfizer,PFE,PFE,US7170811033,United States,Pharmaceuticals,NYSE
+Chevron,CVX,CVX,US1667642126,United States,Oil & Gas,NYSE
+AbbVie,ABBV,ABBV,US00287Y1091,United States,Pharmaceuticals,NYSE
+Merck & Co,MRK,MRK,US58933Y1055,United States,Pharmaceuticals,NYSE
+Bank of America,BAC,BAC,US0605051046,United States,Banking,NYSE
+Coca-Cola,KO,KO,US1912161007,United States,Consumer Goods,NYSE
+McDonald's,MCD,MCD,US57013N1063,United States,Restaurants,NYSE
+PepsiCo,PEP,PEP,US7134481081,United States,Consumer Goods,NASDAQ
+Disney,DIS,DIS,US2546871062,United States,Media,NYSE
+T-Mobile US,TMUS,TMUS,US87264A4024,United States,Telecom,NASDAQ
+Thermo Fisher,TMO,TMO,US9840321061,United States,Healthcare,NYSE
+Comcast,CMCSA,CMCSA,US20030N1019,United States,Media,NASDAQ
+Abbott Laboratories,ABT,ABT,US0028241000,United States,Healthcare,NYSE
+Accenture,ACN,ACN,IE00B4BNMY62,Ireland,Consulting,NYSE
+Qualcomm,QCOM,QCOM,US7475251035,United States,Semiconductors,NASDAQ
+Texas Instruments,TXN,TXN,US8728751091,United States,Semiconductors,NASDAQ
+IBM,IBM,IBM,US4592001014,United States,IT Services,NYSE
+General Electric,GE,GE,US3696041033,United States,Industrial,NYSE
+Caterpillar,CAT,CAT,US1491231015,United States,Industrial,NYSE
+Honeywell,HON,HON,US4385161066,United States,Industrial,NASDAQ
+Intel,INTC,INTC,US4581401001,United States,Semiconductors,NASDAQ
+Verizon,VZ,VZ,US92343V1044,United States,Telecom,NYSE
+Philip Morris,PM,PM,US7181721090,United States,Tobacco,NYSE
+Goldman Sachs,GS,GS,US38141G1040,United States,Banking,NYSE
+Morgan Stanley,MS,MS,US6174464176,United States,Banking,NYSE
+Union Pacific,UNP,UNP,US9079481091,United States,Transport,NYSE
+Lockheed Martin,LMT,LMT,US5412791065,United States,Defense,NYSE
+Booking Holdings,BKNG,BKNG,US3156061030,United States,Travel,NASDAQ
+Amgen,AMGN,AMGN,US0311621009,United States,Biotech,NASDAQ
+Micron,MU,MU,US5951121038,United States,Semiconductors,NASDAQ
+Palantir,PLTR,PLTR,US91939N1038,United States,Software,NASDAQ
+ServiceNow,NOW,NOW,US81762P1031,United States,Software,NYSE
+Uber,UBER,UBER,,United States,Mobility,NYSE
+Intuitive Surgical,ISRG,ISRG,US4618401088,United States,Medical Devices,NASDAQ
+Synopsys,SNPS,SNPS,US8716071076,United States,Software (EDA),NASDAQ
+Cadence Design,CDNS,CDNS,US22546N1094? ,United States,Software (EDA),NASDAQ
+Applied Materials,AMAT,AMAT,US0375331099,United States,Semiconductor Equipment,NASDAQ
+Lam Research,LRCX,LRCX,US5128061063? ,United States,Semiconductor Equipment,NASDAQ
+Royal Bank of Canada,RY,RY,CA7800891021,Canada,Banking,TSX / NYSE
+Wells Fargo,WFC,WFC,US9497461015,United States,Banking,NYSE
+American Express,AXP,AXP,US0258161094,United States,Financial Services,NYSE
+Palo Alto Networks,PANW,PANW,US6974351057,United States,Cybersecurity,NASDAQ
+Linde,LIN,LIN,IE00B2NPPK76,Ireland (UK),Industrial Chemicals,NASDAQ
+Shopify,SHOP,SHOP,,Canada,E-commerce,TSX / NYSE
+Prosus,PRX.AS,PRX.AS,,Netherlands,Tech Investment,Euronext Amsterdam
+Siemens Energy,ENR.DE,ENR.DE,,Germany,Energy Equipment,Xetra
+Air Liquide,AI.PA,AI.PA,FR0000120073,France,Industrial Gases,Euronext Paris
+Allianz,ALV.DE,ALV.DE,DE0008404005,Germany,Insurance,Xetra
+McKesson,MCK,MCK,US58155Q1035,United States,Healthcare Distribution,NYSE
+Intuit,INTU,INTU,,United States,Software,NASDAQ
