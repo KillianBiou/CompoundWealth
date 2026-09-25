@@ -2,7 +2,8 @@ import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
 import { currentValueCents } from "@/lib/portfolio/series";
-import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
+import { ETF_CATALOG, getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
+import { fetchMarketHistory } from "@/lib/market/quotes";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import { getEtfDetailByIsin, getEtfDetailByTicker, getAllEtfDetails } from "@/lib/analysis/etf-detail";
@@ -179,10 +180,46 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
 }
 
 /**
+ * Croissance réelle du MSCI World (ETF monde du catalogue, Yahoo) sur la
+ * période couverte par les versements : TWR de l'indice entre le premier
+ * flux et aujourd'hui, pour confronter le verdict à la performance réelle
+ * du marché et pas seulement à un taux constant. Un seul appel distant,
+ * échec gracieux (null) si l'historique est indisponible.
+ */
+async function getWorldGrowth(
+  firstFlowDate: Date | null,
+  now: Date,
+): Promise<PerformanceReport["worldGrowth"]> {
+  if (!firstFlowDate) return null;
+  // premier ETF « Monde » du catalogue (représentatif du MSCI World)
+  const world = ETF_CATALOG.find((e) => e.indexCategory === "Monde");
+  if (!world) return null;
+  const history = await fetchMarketHistory(world.isin, firstFlowDate, now);
+  if (!history.ok || history.points.length === 0) return null;
+  const points = history.points.filter(
+    (p) => p.date.getTime() >= firstFlowDate.getTime() && p.closeCents > 0,
+  );
+  if (points.length < 2) return null;
+  const start = points[0];
+  const end = points[points.length - 1];
+  const cumulative = (end.closeCents - start.closeCents) / start.closeCents;
+  const days = Math.round(
+    (end.date.getTime() - start.date.getTime()) / (24 * 3600 * 1000),
+  );
+  const years = days / 365;
+  const annualized =
+    years > 1 && cumulative > -1
+      ? Math.pow(1 + cumulative, 1 / years) - 1
+      : null;
+  return { cumulative, annualized, startDate: start.date, endDate: end.date };
+}
+
+/**
  * Rapport de performance (XIRR / TWR) : flux externes de toutes les
  * enveloppes (versements des positions + dépôts du livret, qui n'est pas
  * une position), valeur finale = patrimoine actuel. Trois niveaux de
- * détail : global, par enveloppe, par actif.
+ * détail : global, par enveloppe, par actif. Les flux sont normalisés à
+ * minuit UTC pour que chaque versement vive un nombre entier de jours.
  */
 export const getPerformanceReport = cache(async (): Promise<PerformanceReport> => {
   const userId = await requireUserId();
@@ -192,6 +229,7 @@ export const getPerformanceReport = cache(async (): Promise<PerformanceReport> =
     include: { deposits: { orderBy: { date: "asc" } } },
   });
   const nowTime = Date.now();
+  const now = new Date(nowTime);
   const livretFlows: { date: Date; amountCents: number }[] = [];
   let livretBalance = 0;
   for (const env of livretEnvelopes) {
@@ -208,12 +246,27 @@ export const getPerformanceReport = cache(async (): Promise<PerformanceReport> =
     livretBalance += current ? current.balanceCents : 0;
     livretFlows.push(...events);
   }
+  const firstFlowDate = positions.reduce<Date | null>((earliest, p) => {
+    const dates = [
+      ...(p.investments.length > 0
+        ? p.investments.map((inv) => inv.date.getTime())
+        : p.boughtAt
+          ? [p.boughtAt.getTime()]
+          : []),
+      ...livretFlows.map((f) => f.date.getTime()),
+    ];
+    if (dates.length === 0) return earliest;
+    const min = Math.min(...dates);
+    return earliest === null || min < earliest.getTime() ? new Date(min) : earliest;
+  }, null);
+  const worldGrowth = await getWorldGrowth(firstFlowDate, now).catch(() => null);
   return buildPerformanceReport({
     positions,
     livretFlows,
     livretValueCents: livretBalance,
     savingsRate: LIVRET_A_RATE,
     worldEquityRate: DEFAULT_EQUITY_RETURN,
+    worldGrowth,
   });
 });
 

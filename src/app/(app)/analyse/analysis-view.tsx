@@ -612,14 +612,28 @@ function performanceBadge(xirrValue: number | null) {
   return <Badge tone="negative">{formatPercent(xirrValue)}</Badge>;
 }
 
+type VerdictTone = "positive" | "warning" | "negative" | "neutral";
+
+/**
+ * Verdict sur la valeur finale du portefeuille vs les deux références
+ * « mêmes versements » : bat les deux → positive ; bat le livret mais pas
+ * le Monde → warning (la complexité n'apporte pas plus qu'un ETF large) ;
+ * sous le livret → negative.
+ */
 function verdictTone(
-  valueCents: number | null,
-  savingsRef: number | null,
-): "positive" | "warning" | "negative" | "neutral" {
-  if (valueCents === null || savingsRef === null) return "neutral";
-  if (valueCents > savingsRef) return "positive";
-  if (valueCents >= 0) return "warning";
-  return "negative";
+  valueCents: number,
+  savingsRefValueCents: number | null,
+  worldRefValueCents: number | null,
+): VerdictTone {
+  if (savingsRefValueCents === null && worldRefValueCents === null) return "neutral";
+  if (worldRefValueCents !== null && valueCents >= worldRefValueCents) return "positive";
+  if (savingsRefValueCents !== null && valueCents >= savingsRefValueCents) return "warning";
+  if (savingsRefValueCents !== null) return "negative";
+  return "neutral";
+}
+
+function signedEur(cents: number): string {
+  return `${cents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(cents))}`;
 }
 
 function PerformancePanel({
@@ -632,12 +646,15 @@ function PerformancePanel({
   const total = report.total;
   const metrics = total.metrics;
   const xirrValue = metrics?.xirr ?? null;
-  const twrValue = metrics?.twrAnnualized ?? null;
+  const twrValue = metrics?.twrAnnualized ?? metrics?.twrCumulative ?? null;
   const simpleValue = metrics?.simpleReturn ?? null;
-  const savingsRef = report.savingsReferenceValueCents;
-  const worldRef = report.worldReferenceValueCents;
-  const gain = metrics?.gainCents ?? null;
-  const verdict = verdictTone(total.valueCents, savingsRef);
+  const savingsRef = report.savingsReference;
+  const worldRef = report.worldReference;
+  const verdict = verdictTone(
+    total.valueCents,
+    savingsRef?.valueCents ?? null,
+    worldRef?.valueCents ?? null,
+  );
   const verdictText =
     verdict === "positive"
       ? t.analyse.performance.verdictPositive
@@ -647,10 +664,6 @@ function PerformancePanel({
           ? t.analyse.performance.verdictNegative
           : t.analyse.performance.verdictNeutral;
   const levels = detailTab === "envelopes" ? report.envelopes : report.positions;
-  const vsSavings =
-    savingsRef !== null && gain !== null ? total.valueCents - savingsRef : null;
-  const vsWorld =
-    worldRef !== null && gain !== null ? total.valueCents - worldRef : null;
 
   const levelsTable = (rows: PerformanceLevel[]) => (
     <div className="overflow-x-auto rounded-lg border border-border-cw">
@@ -685,7 +698,9 @@ function PerformancePanel({
                   {formatSignedPercent(m?.xirr ?? null)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
-                  {formatSignedPercent(m?.twrAnnualized ?? null)}
+                  {formatSignedPercent(
+                    m?.twrAnnualized ?? m?.twrCumulative ?? null,
+                  )}
                 </td>
               </tr>
             );
@@ -754,18 +769,24 @@ function PerformancePanel({
               {t.analyse.performance.refSavings.replace("{rate}", formatPercent(report.savingsRate))}
             </p>
             <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
-              {savingsRef !== null ? formatEurCents(savingsRef) : "—"}
+              {savingsRef !== null ? formatEurCents(savingsRef.valueCents) : "—"}
             </p>
-            {vsSavings !== null ? (
+            {savingsRef !== null ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain
+                  .replace("{gain}", signedEur(savingsRef.gainCents))}
+              </p>
+            ) : null}
+            {savingsRef !== null ? (
               <p
                 className={cn(
                   "mt-0.5 text-xs tabular-nums",
-                  vsSavings >= 0 ? "text-positive" : "text-negative",
+                  savingsRef.deltaCents >= 0 ? "text-positive" : "text-negative",
                 )}
               >
                 {t.analyse.performance.vsReference
-                  .replace("{delta}", formatEurCents(Math.abs(vsSavings)))}
-                {vsSavings >= 0 ? " ↑" : " ↓"}
+                  .replace("{delta}", formatEurCents(Math.abs(savingsRef.deltaCents)))}
+                {savingsRef.deltaCents >= 0 ? " ↑" : " ↓"}
               </p>
             ) : null}
           </div>
@@ -774,18 +795,24 @@ function PerformancePanel({
               {t.analyse.performance.refWorld.replace("{rate}", formatPercent(report.worldEquityRate))}
             </p>
             <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
-              {worldRef !== null ? formatEurCents(worldRef) : "—"}
+              {worldRef !== null ? formatEurCents(worldRef.valueCents) : "—"}
             </p>
-            {vsWorld !== null ? (
+            {worldRef !== null ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain
+                  .replace("{gain}", signedEur(worldRef.gainCents))}
+              </p>
+            ) : null}
+            {worldRef !== null ? (
               <p
                 className={cn(
                   "mt-0.5 text-xs tabular-nums",
-                  vsWorld >= 0 ? "text-positive" : "text-negative",
+                  worldRef.deltaCents >= 0 ? "text-positive" : "text-negative",
                 )}
               >
                 {t.analyse.performance.vsReference
-                  .replace("{delta}", formatEurCents(Math.abs(vsWorld)))}
-                {vsWorld >= 0 ? " ↑" : " ↓"}
+                  .replace("{delta}", formatEurCents(Math.abs(worldRef.deltaCents)))}
+                {worldRef.deltaCents >= 0 ? " ↑" : " ↓"}
               </p>
             ) : null}
           </div>
@@ -817,6 +844,25 @@ function PerformancePanel({
           {verdictText}
         </p>
         <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.verdictHint}</p>
+        {report.worldGrowth ? (
+          <div className="mt-2 rounded-md border border-border-cw bg-bg-subtle/40 p-2">
+            <p className="text-xs text-text-secondary">
+              {t.analyse.performance.worldGrowthLine
+                .replace("{cumulative}", formatSignedPercent(report.worldGrowth.cumulative))
+                .replace(
+                  "{annualized}",
+                  report.worldGrowth.annualized !== null
+                    ? formatSignedPercent(report.worldGrowth.annualized)
+                    : t.analyse.performance.worldGrowthNa,
+                )}
+            </p>
+            <p className="mt-0.5 text-xs text-text-muted">
+              {t.analyse.performance.worldGrowthHint
+                .replace("{start}", report.worldGrowth.startDate.toLocaleDateString("fr-FR"))
+                .replace("{end}", report.worldGrowth.endDate.toLocaleDateString("fr-FR"))}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div>
@@ -1796,14 +1842,20 @@ export function AnalysisPageView({
               <br />
               {t.analyse.cards.performance.detailLine2.replace(
                 "{twr}",
-                formatSignedPercent(performance.total.metrics?.twrAnnualized ?? null),
+                // période ≤ 1 an : le Modified Dietz annualisé n'est pas défini,
+                // on affiche le cumulé (plus honnête qu'un annualisé court)
+                formatSignedPercent(
+                  performance.total.metrics?.twrAnnualized ??
+                    performance.total.metrics?.twrCumulative ??
+                    null,
+                ),
               )}
             </>
           }
           onClick={open}
           disabled={
             performance.total.metrics?.xirr === null &&
-            performance.total.metrics?.twrAnnualized === null
+            performance.total.metrics?.twrCumulative === null
           }
         />
         <ExposureCard

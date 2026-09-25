@@ -31,40 +31,56 @@ function makePosition(overrides: Partial<AnalysisPosition> = {}): AnalysisPositi
 }
 
 describe("buildLevel", () => {
-  it("calcule XIRR et TWR d'un niveau avec valorisations complètes", () => {
+  it("calcule XIRR et Modified Dietz d'un niveau sur ses seuls flux", () => {
     const level = buildLevel({
       id: "pos-1",
       name: "MSCI World",
-      valuations: [
-        { date: new Date("2024-01-15"), valueCents: 100_000 },
-        { date: new Date("2025-01-15"), valueCents: 110_000 },
-      ],
       flows: [{ date: new Date("2024-01-15"), amountCents: 100_000 }],
       finalValueCents: 110_000,
       finalDate: NOW,
     });
-    expect(level.metrics?.xirr).toBeCloseTo(0.1, 1);
-    expect(level.metrics?.twrCumulative).toBeCloseTo(0.1, 2);
+    // 366 jours : XIRR convention Excel ≈ 9,97 %
+    expect(level.metrics?.xirr).toBeCloseTo(0.0997, 3);
+    // flux unique : le TWR approché (Modified Dietz) = rendement simple
+    expect(level.metrics?.twrCumulative).toBeCloseTo(0.1, 4);
     expect(level.contributedCents).toBe(100_000);
     expect(level.valueCents).toBe(110_000);
   });
 
-  it("approxime les valorisations quand absentes (XIRR reste exact)", () => {
+  it("normalise les flux à minuit UTC (dépôt livret 22:00Z ≡ 00:00Z)", () => {
     const level = buildLevel({
       id: "pos-2",
       name: "NVIDIA",
-      valuations: [],
-      flows: [{ date: new Date("2024-01-15"), amountCents: 100_000 }],
+      flows: [{ date: new Date("2024-01-15T22:00:00.000Z"), amountCents: 100_000 }],
       finalValueCents: 120_000,
       finalDate: NOW,
-      approximateValuations: true,
     });
-    expect(level.metrics?.xirr).toBeCloseTo(0.2, 1);
+    expect(level.flows[0].date.toISOString()).toBe("2024-01-15T00:00:00.000Z");
+    expect(level.metrics?.xirr).toBeCloseTo(0.1994, 3);
+  });
+
+  it("TWR d'une position quasi flat ≈ son rendement simple, quel que soit le nombre de versements", () => {
+    const flows = Array.from({ length: 12 }, (_, i) => ({
+      date: new Date(2024, i, 1),
+      amountCents: 10_000,
+    }));
+    const level = buildLevel({
+      id: "pos-3",
+      name: "IFRE",
+      flows,
+      finalValueCents: 120_300, // +0,25 % de gain réel
+      finalDate: NOW,
+    });
+    const simple = level.metrics?.simpleReturn ?? 0;
+    const twr = level.metrics?.twrCumulative ?? 1;
+    expect(simple).toBeCloseTo(0.0025, 3);
+    // cohérence : jamais plusieurs dizaines de fois le rendement simple
+    expect(Math.abs(twr - simple)).toBeLessThan(0.01);
   });
 });
 
 describe("buildPerformanceReport", () => {
-  it("assemble total, enveloppes, positions et références", () => {
+  it("assemble total, enveloppes, positions et références avec gains et écarts", () => {
     const positions = [
       makePosition(),
       makePosition({
@@ -95,12 +111,33 @@ describe("buildPerformanceReport", () => {
     // 2 enveloppes d'investissement (le livret n'a pas de position)
     expect(report.envelopes).toHaveLength(2);
     expect(report.positions).toHaveLength(2);
-    // références : mêmes versements au taux livret vs taux actions
-    expect(report.savingsReferenceValueCents).not.toBeNull();
-    expect(report.worldReferenceValueCents).not.toBeNull();
-    expect(report.worldReferenceValueCents!).toBeGreaterThan(
-      report.savingsReferenceValueCents!,
-    );
+
+    // références « mêmes versements » : valeur, vrai gain, écart vs portefeuille
+    const savings = report.savingsReference!;
+    const world = report.worldReference!;
+    expect(savings).not.toBeNull();
+    expect(world).not.toBeNull();
+    expect(world.valueCents).toBeGreaterThan(savings.valueCents);
+    // le vrai gain de la référence Monde (8 %/an) dépasse celui du livret
+    expect(world.gainCents).toBeGreaterThan(savings.gainCents);
+    // l'écart est la valeur du portefeuille moins la valeur de référence
+    expect(savings.deltaCents).toBe(report.total.valueCents - savings.valueCents);
+    expect(world.deltaCents).toBe(report.total.valueCents - world.valueCents);
+  });
+
+  it("le gain de la référence Monde est toujours supérieur au gain Livret (anti-inversion)", () => {
+    const report = buildPerformanceReport({
+      positions: [makePosition()],
+      livretFlows: [],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      now: NOW,
+    });
+    const savings = report.savingsReference!;
+    const world = report.worldReference!;
+    expect(savings.gainCents).toBeGreaterThan(0);
+    expect(world.gainCents).toBeGreaterThan(savings.gainCents);
   });
 
   it("sans aucun flux, les références sont null", () => {
@@ -112,8 +149,85 @@ describe("buildPerformanceReport", () => {
       worldEquityRate: 0.08,
       now: NOW,
     });
-    expect(report.savingsReferenceValueCents).toBeNull();
-    expect(report.worldReferenceValueCents).toBeNull();
+    expect(report.savingsReference).toBeNull();
+    expect(report.worldReference).toBeNull();
+    expect(report.worldGrowth).toBeNull();
     expect(report.total.metrics?.xirr).toBeNull();
+  });
+
+  it("critères d'acceptation : TWR plausible sur un gain réel de 2,9 %, position flat ≈ simple", () => {
+    // PEA : gain réel +2,9 % sur 12 versements mensuels ; IFRE quasi flat
+    const peaFlows = Array.from({ length: 12 }, (_, i) => ({
+      date: new Date(Date.UTC(2025, i, 1)),
+      amountCents: 75_000,
+    }));
+    const ifreFlows = Array.from({ length: 10 }, (_, i) => ({
+      date: new Date(Date.UTC(2025, i + 1, 1)),
+      amountCents: 10_000,
+    }));
+    const positions = [
+      makePosition({
+        id: "pea-pos",
+        name: "PEA ETF",
+        envelopeId: "env-pea",
+        envelopeName: "PEA",
+        envelopeType: "PEA",
+        investments: peaFlows,
+        investedCents: 900_000,
+        valueCents: 900_000 + 26_100,
+        boughtAt: new Date(Date.UTC(2025, 0, 1)),
+        valuations: [],
+      }),
+      makePosition({
+        id: "ifre-pos",
+        name: "IFRE",
+        envelopeId: "env-cto",
+        envelopeName: "CTO",
+        envelopeType: "CTO",
+        investments: ifreFlows,
+        investedCents: 100_000,
+        valueCents: 100_020,
+        boughtAt: new Date(Date.UTC(2025, 1, 1)),
+        valuations: [],
+      }),
+    ];
+    const report = buildPerformanceReport({
+      positions,
+      livretFlows: [{ date: new Date(Date.UTC(2025, 5, 1)), amountCents: 5_000 }],
+      livretValueCents: 5_040,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      now: new Date("2026-06-30T00:00:00Z"),
+    });
+    const total = report.total.metrics!;
+    const ifre = report.positions.find((p) => p.name === "IFRE")!.metrics!;
+    // le TWR cumulé du total reste plausible (quelques %), pas 87 %
+    expect(total.twrCumulative!).toBeGreaterThan(0);
+    expect(total.twrCumulative!).toBeLessThan(0.08);
+    // position quasi flat : TWR ≈ rendement simple, jamais +57 %
+    expect(Math.abs(ifre.twrCumulative! - ifre.simpleReturn!)).toBeLessThan(0.005);
+    expect(ifre.twrCumulative!).toBeLessThan(0.01);
+    // gain de la référence Monde toujours > gain Livret (anti-inversion)
+    expect(report.worldReference!.gainCents).toBeGreaterThan(
+      report.savingsReference!.gainCents,
+    );
+  });
+
+  it("transmet la croissance réelle du Monde sur la même période", () => {
+    const report = buildPerformanceReport({
+      positions: [makePosition()],
+      livretFlows: [],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      worldGrowth: {
+        cumulative: 0.12,
+        annualized: 0.12,
+        startDate: new Date("2024-01-15"),
+        endDate: new Date("2025-01-15"),
+      },
+      now: NOW,
+    });
+    expect(report.worldGrowth?.cumulative).toBeCloseTo(0.12, 6);
   });
 });
