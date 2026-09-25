@@ -1,7 +1,11 @@
 import {
+  COUNTRY_SHARE_THRESHOLD,
+  getCountriesByIsin,
   getEtfExposureByIsin,
   getStockExposure,
   isUSStock,
+  OTHER_COUNTRIES_LABEL,
+  zoneOfCountry,
   type RegionKey,
   type Sector,
 } from "./exposure-catalog";
@@ -473,23 +477,82 @@ export function analyzeSectors(positions: AnalysisPosition[]): DiversificationRe
   );
 }
 
-/** Répartition géographique réelle, ETF dépliés (look-through). */
-export function analyzeRegions(positions: AnalysisPosition[]): DiversificationResult {
+/**
+ * Scanner de diversification géographique — deux niveaux de granularité :
+ * `zone` agrège les pays du fichier ETF en zones continentales (Amérique du
+ * Nord, Amérique latine, Europe, Asie de l'Est, Asie émergente, Afrique &
+ * Moyen-Orient, Océanie) ; `country` liste chaque pays représentant au moins
+ * 1 % du portefeuille, le reste étant regroupé en « Autres pays ».
+ */
+export function analyzeRegions(
+  positions: AnalysisPosition[],
+  granularity: "zone" | "country" = "zone",
+): DiversificationResult {
+  if (granularity === "country") {
+    const result = diversification(
+      positions,
+      (position) =>
+        getCountriesByIsin(position.isin).map((c) => ({
+          label: c.country,
+          weight: c.weight,
+          exposureCents: Math.round(position.valueCents * c.weight),
+        })),
+      GEO_ALERT_THRESHOLD,
+    );
+    return mergeSmallCountries(result);
+  }
   return diversification(
     positions,
     (position) => {
-      const exposure = position.isStock
-        ? getStockExposure(position.isin)
-        : getEtfExposureByIsin(position.isin);
-      if (!exposure) return [];
-      return exposure.regions.map((r) => ({
-        label: r.region,
-        weight: r.weight,
-        exposureCents: Math.round(position.valueCents * r.weight),
+      const countries = getCountriesByIsin(position.isin);
+      const byZone = new Map<string, number>();
+      for (const country of countries) {
+        if (country.country === "Other") continue;
+        const zone = zoneOfCountry(country.country) ?? "Other";
+        byZone.set(zone, (byZone.get(zone) ?? 0) + country.weight);
+      }
+      return [...byZone.entries()].map(([zone, weight]) => ({
+        label: zone,
+        weight,
+        exposureCents: Math.round(position.valueCents * weight),
       }));
     },
     GEO_ALERT_THRESHOLD,
   );
+}
+
+/**
+ * Fusionne en « Autres pays » les lignes sous le seuil de 1 % et l'entrée
+ * « Other » du fichier ETF (pays non détaillés par le fonds) : les petits
+ * pays n'encombrent pas la vue détaillée, leurs contributions sont sommées
+ * et leurs contributeurs conservés.
+ */
+function mergeSmallCountries(result: DiversificationResult): DiversificationResult {
+  const isOther = (l: SectorBreakdownLine) =>
+    l.sector === "Other" || l.sector === OTHER_COUNTRIES_LABEL;
+  const kept = result.lines.filter((l) => !isOther(l) && l.share >= COUNTRY_SHARE_THRESHOLD);
+  const small = result.lines.filter((l) => isOther(l) || l.share < COUNTRY_SHARE_THRESHOLD);
+  if (small.length === 0) return result;
+  const amountCents = small.reduce((s, l) => s + l.amountCents, 0);
+  const contributorsMap = new Map<string, number>();
+  for (const line of small) {
+    for (const c of line.contributors) {
+      contributorsMap.set(c.name, (contributorsMap.get(c.name) ?? 0) + c.amountCents);
+    }
+  }
+  const otherLine: SectorBreakdownLine = {
+    sector: OTHER_COUNTRIES_LABEL,
+    amountCents,
+    share: result.totalCents > 0 ? amountCents / result.totalCents : 0,
+    contributors: [...contributorsMap.entries()].map(([name, amountCents]) => ({
+      name,
+      amountCents,
+    })),
+  };
+  return {
+    ...result,
+    lines: [...kept, ...(amountCents > 0 ? [otherLine] : [])],
+  };
 }
 
 export type { RegionKey, Sector };

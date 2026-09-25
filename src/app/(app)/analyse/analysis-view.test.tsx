@@ -136,6 +136,31 @@ const regions: DiversificationResult = {
   alerts: [],
   totalCents: 100_000_00,
 };
+const countries: DiversificationResult = {
+  lines: [
+    {
+      sector: "United States",
+      amountCents: 58_000_00,
+      share: 0.58,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 58_000_00 }],
+    },
+    {
+      sector: "France",
+      amountCents: 27_000_00,
+      share: 0.27,
+      contributors: [{ name: "MSCI France", amountCents: 27_000_00 }],
+    },
+    {
+      sector: "Autres pays",
+      amountCents: 5_000_00,
+      share: 0.05,
+      contributors: [{ name: "MSCI World Swap PEA", amountCents: 5_000_00 }],
+    },
+  ],
+  score: 5,
+  alerts: [],
+  totalCents: 100_000_00,
+};
 
 const simulatorDefaults: SimulatorDefaults = {
   investedWealthCents: 70_000_00,
@@ -154,6 +179,7 @@ function renderView() {
       income={income}
       sectors={sectors}
       regions={regions}
+      countries={countries}
       simulatorDefaults={simulatorDefaults}
       etfDetails={{
         [fees.lines[0].isin ?? "IE0002XZSHO1"]: {
@@ -295,6 +321,15 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText("Sectoriel")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Sectoriel"));
     expect(screen.getAllByText("Technologie").length).toBeGreaterThan(0);
+  });
+  it("le sélecteur géographique bascule entre zones et pays détaillés", () => {
+    renderView();
+    fireEvent.click(screen.getAllByText("Exposition")[0]);
+    expect(screen.getByText("Zones")).toBeInTheDocument();
+    expect(screen.getByText(/Pays \(2\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Pays \(2\)/));
+    expect(screen.getAllByText("United States").length).toBeGreaterThan(0);
+    expect(screen.getByText("Autres pays")).toBeInTheDocument();
   });
 
   it("ouvre le panneau ETF au clic sur une ligne du scanner de frais", () => {

@@ -625,7 +625,10 @@
       "empty": "Exposition inconnue pour vos positions.",
       "disclaimer": "Look-through : ETF dépliés selon la répartition de leur indice de référence (approximations destinées à être remplacées par les holdings réelles).",
       "tabGeographic": "Géographique",
-      "tabSector": "Sectoriel"
+      "tabSector": "Sectoriel",
+      "viewZone": "Zones",
+      "viewCountry": "Pays ({count})",
+      "otherCountries": "Autres pays"
     },
     "simulator": {
       "capitalHorizon": "Capital à l'horizon ({year})",
