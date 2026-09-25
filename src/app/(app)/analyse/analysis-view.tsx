@@ -286,6 +286,22 @@ function IncomePanel({
     label: `${t.analyse.months[m.month]} ${String(m.year).slice(2)}`,
     amountEur: m.amountCents / 100,
   }));
+  const frequencyLabel = (line: IncomeLine) => {
+    if (line.paymentsPerYear === null) return "—";
+    if (line.paymentsPerYear === 12) return t.analyse.income.freqMonthly;
+    if (line.paymentsPerYear === 4) return t.analyse.income.freqQuarterly;
+    if (line.paymentsPerYear === 2) return t.analyse.income.freqSemiAnnual;
+    if (line.paymentsPerYear === 1) return t.analyse.income.freqAnnual;
+    return t.analyse.income.freqTimes.replace("{count}", String(line.paymentsPerYear));
+  };
+  const nextPaymentLabel = (line: IncomeLine) => {
+    if (line.nextPayment === null) return "—";
+    const { year, month, amountCents } = line.nextPayment;
+    return t.analyse.income.nextPaymentValue
+      .replace("{month}", t.analyse.months[month])
+      .replace("{year}", String(year))
+      .replace("{amount}", formatEurCents(amountCents));
+  };
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
@@ -332,7 +348,8 @@ function IncomePanel({
           <thead>
             <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
               <th className="px-3 py-2 font-medium">{t.analyse.income.colSource}</th>
-              <th className="px-3 py-2 font-medium">{t.analyse.income.colType}</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colFrequency}</th>
+              <th className="px-3 py-2 font-medium">{t.analyse.income.colNextPayment}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.col12}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colProjection}</th>
               <th className="px-3 py-2 text-right font-medium">{t.analyse.income.colYield}</th>
@@ -341,7 +358,7 @@ function IncomePanel({
           <tbody>
             {income.lines.map((line) => (
               <tr
-                key={`${line.positionId}-${line.kind}`}
+                key={line.positionId}
                 className={cn(
                   "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
                   (line.isin || line.symbol) && "cursor-pointer",
@@ -349,13 +366,8 @@ function IncomePanel({
                 onClick={() => (line.isin || line.symbol) && onSelectLine(line)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
-                <td className="px-3 py-2">
-                  {line.kind === "cash" ? (
-                    <Badge tone="positive">{t.analyse.income.typeCash}</Badge>
-                  ) : (
-                    <Badge tone="neutral">{t.analyse.income.typeAcc}</Badge>
-                  )}
-                </td>
+                <td className="px-3 py-2 text-text-secondary">{frequencyLabel(line)}</td>
+                <td className="px-3 py-2 text-text-secondary">{nextPaymentLabel(line)}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
                   {formatEurCents(line.twelveMonthsCents)}
                 </td>
@@ -369,7 +381,7 @@ function IncomePanel({
             ))}
             {income.lines.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
+                <td colSpan={6} className="px-3 py-6 text-center text-text-muted">
                   {t.analyse.income.empty}
                 </td>
               </tr>
@@ -377,6 +389,31 @@ function IncomePanel({
           </tbody>
         </table>
       </div>
+      {income.excludedLines.length > 0 ? (
+        <div className="rounded-lg border border-border-cw bg-bg-subtle/30 p-3">
+          <p className="mb-2 text-xs font-medium text-text-secondary">
+            {t.analyse.income.excludedTitle}
+          </p>
+          <ul className="space-y-1">
+            {income.excludedLines.map((line) => (
+              <li
+                key={line.positionId}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="truncate text-text-secondary">
+                  {line.name}
+                  <span className="text-text-muted"> · {line.envelopeName}</span>
+                </span>
+                <span className="whitespace-nowrap text-text-muted">
+                  {line.reason === "capitalizing"
+                    ? t.analyse.income.excludedAcc
+                    : t.analyse.income.excludedNoDividend}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="text-xs text-text-muted">{t.analyse.income.disclaimer}</p>
     </div>
   );
@@ -1347,7 +1384,7 @@ export function AnalysisPageView({
             </>
           }
           onClick={open}
-          disabled={income.lines.length === 0}
+          disabled={income.lines.length === 0 && income.excludedLines.length === 0}
         />
         <ScannerCard
           id="abonnements"

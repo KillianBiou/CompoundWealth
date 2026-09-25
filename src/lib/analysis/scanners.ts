@@ -1,10 +1,12 @@
 import {
   getEtfExposureByIsin,
   getStockExposure,
+  isUSStock,
   type RegionKey,
   type Sector,
 } from "./exposure-catalog";
 import { getEtfDetailByIsin } from "./etf-detail";
+import { getActionDetailBySymbol } from "./action-detail";
 
 /* -------------------------------------------------------------------------- */
 /*                                                                            */
@@ -182,27 +184,41 @@ export interface IncomeLine {
   /** ticker/symbole brut de la position (ISIN après import broker) */
   symbol: string | null;
   envelopeName: string;
-  /** type de revenu : cash (dividende versé) ou capitalisé (estimation) */
-  kind: "cash" | "capitalized";
-  /** montant 12 derniers mois en centimes */
+  /** cash perçu sur les 12 derniers mois glissants, centimes */
   twelveMonthsCents: number;
-  /** estimation 12 prochains mois, centimes */
+  /** estimation des 12 prochains mois, centimes */
   projectedCents: number;
   /** yield sur la valeur actuelle */
   yieldOnValue: number | null;
+  /** mois de versement estimés (0 = janvier), issus de l'historique réel ; null si inconnu */
+  paymentMonths: number[] | null;
+  /** nombre de versements par an estimé */
+  paymentsPerYear: number | null;
+  /** prochain versement estimé (mois + montant) */
+  nextPayment: { year: number; month: number; amountCents: number } | null;
+}
+
+/** position qui ne verse aucun dividende en cash — hors périmètre du scanner */
+export interface ExcludedIncomeLine {
+  positionId: string;
+  name: string;
+  isin: string | null;
+  symbol: string | null;
+  envelopeName: string;
+  reason: "capitalizing" | "no_dividend";
 }
 
 export interface IncomeAnalysisResult {
   /** revenus cash perçus sur 12 mois glissants, centimes */
   cashTwelveMonthsCents: number;
-  /** estimation des 12 prochains mois (cash + capitalisés), centimes */
+  /** estimation des 12 prochains mois (cash uniquement), centimes */
   projectedTwelveMonthsCents: number;
-  /** dividendes capitalisés estimés sur 12 mois (ETF Acc), centimes */
-  capitalizedTwelveMonthsCents: number;
   lines: IncomeLine[];
+  /** positions ne versant aucun dividende en cash (ETF Acc, actions sans dividende) */
+  excludedLines: ExcludedIncomeLine[];
   /** yield global pondéré = revenus estimés / valeur totale */
   yieldOnValue: number | null;
-  /** versements mensuels attendus (date du mois + montant), pour le calendrier */
+  /** versements estimés des 12 prochains mois (mois + montant), pour le calendrier */
   monthlyCalendar: { year: number; month: number; amountCents: number }[];
 }
 
@@ -213,8 +229,20 @@ function monthsAgo(now: Date, months: number): Date {
 }
 
 /**
- * Scanner de revenus passifs : cash reçu sur 12 mois glissants (dividendes,
- * intérêts) + estimation des 12 prochains mois (capitalisés inclus).
+ * Versements trimestriels usuels des actions américaines payantes
+ * (mars / juin / septembre / décembre) — calendrier par défaut quand aucun
+ * historique réel n'est disponible.
+ */
+const US_STOCK_PAYMENT_MONTHS = [2, 5, 8, 11];
+
+/**
+ * Scanner de revenus passifs : seules les positions versant des dividendes
+ * en cash sont listées — ETF distribuants (fichier de référence) et actions
+ * payantes (rendement du fichier actions). Le cash perçu sur 12 mois
+ * glissants est rapporté, les 12 prochains mois sont estimés avec leur
+ * calendrier de versement. Les ETF capitalisants (Acc) et les valeurs sans
+ * dividende sont explicitement exclus : leurs dividendes, s'ils existent,
+ * sont réinvestis dans le cours, jamais versés en cash.
  */
 export function analyzeIncome(
   positions: AnalysisPosition[],
@@ -222,10 +250,9 @@ export function analyzeIncome(
 ): IncomeAnalysisResult {
   let cash12 = 0;
   let projected = 0;
-  let capitalized = 0;
   let totalValue = 0;
   const lines: IncomeLine[] = [];
-  const calendar = new Map<string, number>();
+  const excludedLines: ExcludedIncomeLine[] = [];
   const cutoff = monthsAgo(now, 12);
 
   for (const position of positions) {
@@ -234,63 +261,104 @@ export function analyzeIncome(
     const cash = position.cashIncomeCents.filter((c) => c.date.getTime() >= cutoff.getTime());
     const cash12ForPosition = cash.reduce((s, c) => s + c.amountCents, 0);
     cash12 += cash12ForPosition;
-    const detail = getEtfDetailByIsin(position.isin);
-    const exposure =
-      position.isStock
-        ? getStockExposure(position.isin)
-        : getEtfExposureByIsin(position.isin);
-    const estimatedYield =
-      detail?.dividendYield2025 !== null && detail?.dividendYield2025 !== undefined
-        ? detail.dividendYield2025
-        : (exposure?.dividendYield ?? 0);
-    const capitalizedEstimate = Math.round(position.valueCents * estimatedYield);
-    if (capitalizedEstimate > 0) {
-      capitalized += capitalizedEstimate;
-      lines.push({
+
+    const etfDetail = position.isStock ? null : getEtfDetailByIsin(position.isin);
+    const actionDetail = position.isStock
+      ? getActionDetailBySymbol(position.isin ?? position.symbol ?? "")
+      : null;
+    const distributingEtf = etfDetail?.distributing ?? false;
+    const dividendYield = position.isStock
+      ? (actionDetail?.dividendYield ?? null)
+      : distributingEtf
+        ? (etfDetail?.dividendYield2025 ?? null)
+        : null;
+    const isPayer =
+      cash12ForPosition > 0 ||
+      (position.isStock && (dividendYield ?? 0) > 0) ||
+      (!position.isStock && distributingEtf && dividendYield !== null);
+
+    if (!isPayer) {
+      excludedLines.push({
         positionId: position.id,
         name: position.name,
         isin: position.isin,
         symbol: position.symbol,
         envelopeName: position.envelopeName,
-        kind: "capitalized",
-        twelveMonthsCents: cash12ForPosition,
-        projectedCents: capitalizedEstimate,
-        yieldOnValue: position.valueCents > 0 ? estimatedYield : null,
+        reason: etfDetail && !etfDetail.distributing ? "capitalizing" : "no_dividend",
       });
-    } else if (cash12ForPosition > 0) {
-      lines.push({
-        positionId: position.id,
-        name: position.name,
-        isin: position.isin,
-        symbol: position.symbol,
-        envelopeName: position.envelopeName,
-        kind: "cash",
-        twelveMonthsCents: cash12ForPosition,
-        projectedCents: cash12ForPosition,
-        yieldOnValue: position.valueCents > 0 ? cash12ForPosition / position.valueCents : null,
-      });
+      continue;
     }
-    projected += Math.max(capitalizedEstimate, cash12ForPosition);
+
+    const projectedForPosition =
+      dividendYield !== null && position.valueCents > 0
+        ? Math.round(position.valueCents * dividendYield)
+        : cash12ForPosition;
+    projected += projectedForPosition;
+
+    const historyMonths = [...new Set(position.cashIncomeCents.map((c) => c.date.getMonth()))].sort(
+      (a, b) => a - b,
+    );
+    const defaultMonths =
+      position.isStock && position.isin !== null && isUSStock(position.isin)
+        ? US_STOCK_PAYMENT_MONTHS
+        : null;
+    const paymentMonths = historyMonths.length > 0 ? historyMonths : defaultMonths;
+    const perPaymentCents =
+      paymentMonths !== null ? Math.round(projectedForPosition / paymentMonths.length) : null;
+
+    let nextPayment: IncomeLine["nextPayment"] = null;
+    if (paymentMonths !== null && perPaymentCents !== null) {
+      const upcoming = paymentMonths.find((m) => m >= now.getMonth());
+      nextPayment =
+        upcoming === undefined
+          ? { year: now.getFullYear() + 1, month: paymentMonths[0], amountCents: perPaymentCents }
+          : { year: now.getFullYear(), month: upcoming, amountCents: perPaymentCents };
+    }
+
+    lines.push({
+      positionId: position.id,
+      name: position.name,
+      isin: position.isin,
+      symbol: position.symbol,
+      envelopeName: position.envelopeName,
+      twelveMonthsCents: cash12ForPosition,
+      projectedCents: projectedForPosition,
+      yieldOnValue:
+        position.valueCents > 0
+          ? dividendYield !== null
+            ? dividendYield
+            : cash12ForPosition / position.valueCents
+          : null,
+      paymentMonths,
+      paymentsPerYear: paymentMonths?.length ?? null,
+      nextPayment,
+    });
   }
 
-  for (const income of positions.flatMap((p) => p.cashIncomeCents)) {
-    if (income.date.getTime() < cutoff.getTime()) continue;
-    const key = `${income.date.getFullYear()}-${income.date.getMonth()}`;
-    calendar.set(key, (calendar.get(key) ?? 0) + income.amountCents);
+  const nowMonth = now.getMonth();
+  const calendar = new Map<string, { year: number; month: number; amountCents: number }>();
+  for (const line of lines) {
+    if (line.paymentMonths === null || line.projectedCents <= 0) continue;
+    const perPayment = Math.round(line.projectedCents / line.paymentMonths.length);
+    for (let offset = 0; offset < 12; offset += 1) {
+      const month = (nowMonth + offset) % 12;
+      if (!line.paymentMonths.includes(month)) continue;
+      const year = now.getFullYear() + Math.floor((nowMonth + offset) / 12);
+      const key = `${year}-${month}`;
+      const entry = calendar.get(key) ?? { year, month, amountCents: 0 };
+      entry.amountCents += perPayment;
+      calendar.set(key, entry);
+    }
   }
-
-  const monthlyCalendar = [...calendar.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, amountCents]) => {
-      const [year, month] = key.split("-").map(Number);
-      return { year, month, amountCents };
-  });
+  const monthlyCalendar = [...calendar.values()].sort(
+    (a, b) => a.year - b.year || a.month - b.month,
+  );
 
   return {
     cashTwelveMonthsCents: cash12,
     projectedTwelveMonthsCents: projected,
-    capitalizedTwelveMonthsCents: capitalized,
     lines: lines.sort((a, b) => b.projectedCents - a.projectedCents),
+    excludedLines,
     yieldOnValue: totalValue > 0 ? projected / totalValue : null,
     monthlyCalendar,
   };

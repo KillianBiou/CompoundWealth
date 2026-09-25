@@ -196,7 +196,7 @@ describe("identités de référence — données distantes exactes", () => {
     expect(ifre).not.toBeNull();
     expect(ifre!.indexTracked).toBe("MSCI France");
     expect(ifre!.ter).toBeCloseTo(0.0025, 6);
-    expect(ifre!.distributing).toBe(true);
+    expect(ifre!.distributing).toBe(false);
     // France ~89 % (quelques Netherlands/Luxembourg via sièges)
     const fr = ifre!.countries.find((c) => c.name === "France");
     expect(fr).toBeDefined();
