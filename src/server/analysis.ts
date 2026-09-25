@@ -81,6 +81,7 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
         id: position.id,
         name: position.name,
         isin,
+        symbol: position.symbol,
         envelopeId: envelope.id,
         envelopeName: envelope.name,
         envelopeType: envelope.type,

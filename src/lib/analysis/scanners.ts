@@ -18,6 +18,8 @@ export interface AnalysisPosition {
   name: string;
   /** ISIN si connu (positions importées), sinon ticker/nom */
   isin: string | null;
+  /** ticker/symbole brut de la position (souvent l'ISIN après import) */
+  symbol: string | null;
   /** enveloppe parente */
   envelopeId: string;
   envelopeName: string;
@@ -49,6 +51,8 @@ export interface FeeLine {
   positionId: string;
   name: string;
   isin: string | null;
+  /** ticker/symbole brut de la position (ISIN après import broker) */
+  symbol: string | null;
   envelopeName: string;
   ter: number | null;
   /** taux de frais d'enveloppe (custody), 0 pour PEA/CTO français standard */
@@ -119,6 +123,7 @@ export function analyzeFees(positions: AnalysisPosition[]): FeeAnalysisResult {
       positionId: position.id,
       name: position.name,
       isin: position.isin,
+      symbol: position.symbol,
       envelopeName: position.envelopeName,
       ter,
       custodyRate,
@@ -174,6 +179,8 @@ export interface IncomeLine {
   positionId: string;
   name: string;
   isin: string | null;
+  /** ticker/symbole brut de la position (ISIN après import broker) */
+  symbol: string | null;
   envelopeName: string;
   /** type de revenu : cash (dividende versé) ou capitalisé (estimation) */
   kind: "cash" | "capitalized";
@@ -243,6 +250,7 @@ export function analyzeIncome(
         positionId: position.id,
         name: position.name,
         isin: position.isin,
+        symbol: position.symbol,
         envelopeName: position.envelopeName,
         kind: "capitalized",
         twelveMonthsCents: cash12ForPosition,
@@ -254,6 +262,7 @@ export function analyzeIncome(
         positionId: position.id,
         name: position.name,
         isin: position.isin,
+        symbol: position.symbol,
         envelopeName: position.envelopeName,
         kind: "cash",
         twelveMonthsCents: cash12ForPosition,

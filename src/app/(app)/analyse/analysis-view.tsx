@@ -18,6 +18,7 @@ import {
 import {
   Coins,
   Globe2,
+  LineChart as LineIcon,
   PieChart as PieIcon,
   Receipt,
   TrendingUp,
@@ -28,8 +29,11 @@ import { Badge, Kpi } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { REGIONS } from "@/lib/analysis/exposure-catalog";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
+import type { ActionDetail } from "@/lib/analysis/action-detail";
+import { fetchActionPriceHistoryAction } from "@/server/actions";
 import { SidePanel } from "./side-panel";
 import { EtfDetailPanel } from "./etf-detail-panel";
+import { ActionDetailPanel } from "./action-detail-panel";
 import {
   simulateTwoTracks,
   type SimulatorDefaults,
@@ -37,7 +41,9 @@ import {
 import type {
   DiversificationResult,
   FeeAnalysisResult,
+  FeeLine,
   IncomeAnalysisResult,
+  IncomeLine,
 } from "@/lib/analysis/scanners";
 
 const CATEGORY_COLORS = [
@@ -55,7 +61,14 @@ function colorFor(index: number): string {
   return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 }
 
-type PanelId = "frais" | "revenus" | "exposition" | "simulateur" | "abonnements" | "etf";
+type PanelId =
+  | "frais"
+  | "revenus"
+  | "exposition"
+  | "simulateur"
+  | "abonnements"
+  | "etf"
+  | "action";
 
 const MONTHS = [
   "janv.", "févr.", "mars", "avr.", "mai", "juin",
@@ -151,10 +164,10 @@ function scoreBadge(score: number | null) {
 
 function FeePanel({
   fees,
-  onSelectIsin,
+  onSelectLine,
 }: {
   fees: FeeAnalysisResult;
-  onSelectIsin: (isin: string) => void;
+  onSelectLine: (line: FeeLine) => void;
 }) {
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
   return (
@@ -192,9 +205,9 @@ function FeePanel({
                 key={line.positionId}
                 className={cn(
                   "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
-                  line.isin && "cursor-pointer",
+                  (line.isin || line.symbol) && "cursor-pointer",
                 )}
-                onClick={() => line.isin && onSelectIsin(line.isin)}
+                onClick={() => (line.isin || line.symbol) && onSelectLine(line)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
@@ -267,10 +280,10 @@ function FeePanel({
 
 function IncomePanel({
   income,
-  onSelectIsin,
+  onSelectLine,
 }: {
   income: IncomeAnalysisResult;
-  onSelectIsin: (isin: string) => void;
+  onSelectLine: (line: IncomeLine) => void;
 }) {
   const calendarData = income.monthlyCalendar.map((m) => ({
     label: `${MONTHS[m.month]} ${String(m.year).slice(2)}`,
@@ -334,9 +347,9 @@ function IncomePanel({
                 key={`${line.positionId}-${line.kind}`}
                 className={cn(
                   "border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30",
-                  line.isin && "cursor-pointer",
+                  (line.isin || line.symbol) && "cursor-pointer",
                 )}
-                onClick={() => line.isin && onSelectIsin(line.isin)}
+                onClick={() => (line.isin || line.symbol) && onSelectLine(line)}
               >
                 <td className="px-3 py-2 text-text-primary">{line.name}</td>
                 <td className="px-3 py-2">
@@ -1162,6 +1175,7 @@ export function AnalysisPageView({
   regions,
   simulatorDefaults,
   etfDetails,
+  actionDetails,
 }: {
   fees: FeeAnalysisResult;
   income: IncomeAnalysisResult;
@@ -1170,9 +1184,15 @@ export function AnalysisPageView({
   simulatorDefaults: SimulatorDefaults;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
   etfDetails: Record<string, EtfDetail>;
+  /** détails CSV des actions, par symbole Yahoo ou ISIN */
+  actionDetails: Record<string, ActionDetail>;
 }) {
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ActionDetail | null>(null);
+  const [priceHistory, setPriceHistory] = useState<
+    { date: string; price: number }[]
+  >([]);
   const [previousPanel, setPreviousPanel] = useState<PanelId | null>(null);
   const [simParams, updateSimParams] = useSimParams(simulatorDefaults);
   const open = (id: PanelId) => {
@@ -1182,11 +1202,50 @@ export function AnalysisPageView({
   const close = () => {
     setOpenPanel(null);
     setPreviousPanel(null);
+    setSelectedAction(null);
+    setPriceHistory([]);
   };
   const openEtf = (isin: string) => {
+    setSelectedAction(null);
+    setPriceHistory([]);
     setSelectedIsin(isin);
     setPreviousPanel((prev) => (prev === null ? openPanel : prev));
     setOpenPanel("etf");
+  };
+  const openAction = async (action: ActionDetail) => {
+    setSelectedIsin(null);
+    setSelectedAction(action);
+    setPriceHistory([]);
+    setPreviousPanel((prev) => (prev === null ? openPanel : prev));
+    setOpenPanel("action");
+    try {
+      const history = await fetchActionPriceHistoryAction(action.tickerYahoo);
+      if (history.ok) setPriceHistory(history.points);
+    } catch {
+      // historique indisponible : le panneau s'affiche sans graphique
+    }
+  };
+  const openPosition = ({
+    isin,
+    symbol,
+  }: {
+    isin: string | null;
+    symbol: string | null;
+  }) => {
+    if (isin && etfDetails[isin]) {
+      openEtf(isin);
+      return;
+    }
+    const candidates = [symbol?.trim().toUpperCase(), isin].filter(
+      (value): value is string => value !== null && value !== undefined && value !== "",
+    );
+    for (const candidate of candidates) {
+      const action = actionDetails[candidate];
+      if (action) {
+        void openAction(action);
+        return;
+      }
+    }
   };
   const back = () => {
     if (previousPanel === null) return;
@@ -1232,6 +1291,15 @@ export function AnalysisPageView({
           : "ETF",
       subtitle: selectedIsin !== null ? selectedIsin : undefined,
       icon: <PieIcon className="h-5 w-5" aria-hidden />,
+    },
+    action: {
+      title: selectedAction
+        ? selectedAction.longName || selectedAction.name
+        : "Action",
+      subtitle: selectedAction
+        ? `${selectedAction.ticker} · ${selectedAction.exchange || selectedAction.tickerYahoo}`
+        : undefined,
+      icon: <LineIcon className="h-5 w-5" aria-hidden />,
     },
   };
 
@@ -1318,9 +1386,13 @@ export function AnalysisPageView({
       <SidePanel
         open={openPanel !== null}
         onClose={close}
-        onBack={openPanel === "etf" && previousPanel !== null ? back : undefined}
+        onBack={
+          (openPanel === "etf" || openPanel === "action") && previousPanel !== null
+            ? back
+            : undefined
+        }
         backLabel={
-          openPanel === "etf" && previousPanel !== null
+          (openPanel === "etf" || openPanel === "action") && previousPanel !== null
             ? `Retour — ${panels[previousPanel].title}`
             : undefined
         }
@@ -1328,9 +1400,11 @@ export function AnalysisPageView({
         subtitle={openPanel !== null ? panels[openPanel].subtitle : undefined}
         icon={openPanel !== null ? panels[openPanel].icon : undefined}
       >
-        {openPanel === "frais" ? <FeePanel fees={fees} onSelectIsin={openEtf} /> : null}
+        {openPanel === "frais" ? (
+          <FeePanel fees={fees} onSelectLine={openPosition} />
+        ) : null}
         {openPanel === "revenus" ? (
-          <IncomePanel income={income} onSelectIsin={openEtf} />
+          <IncomePanel income={income} onSelectLine={openPosition} />
         ) : null}
         {openPanel === "exposition" ? (
           <ExposurePanel sectors={sectors} regions={regions} />
@@ -1344,6 +1418,12 @@ export function AnalysisPageView({
         ) : null}
         {openPanel === "etf" && selectedIsin && etfDetails[selectedIsin] ? (
           <EtfDetailPanel etf={etfDetails[selectedIsin]} />
+        ) : null}
+        {openPanel === "action" && selectedAction ? (
+          <ActionDetailPanel
+            action={selectedAction}
+            priceHistory={priceHistory}
+          />
         ) : null}
         {openPanel === "abonnements" ? (
           <p className="py-8 text-center text-sm text-text-muted">

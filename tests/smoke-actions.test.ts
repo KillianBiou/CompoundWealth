@@ -60,6 +60,19 @@ describe("CSV des 105 actions (actionDetail.csv)", () => {
     expect(details[0].dataAsOf).toBe("2026-09-25");
   });
 
+  it("SpaceX (SPCX) présente avec ses identifiants NASDAQ", () => {
+    const spcx = getActionDetailBySymbol("SPCX");
+    expect(spcx).not.toBeNull();
+    expect(spcx!.isin).toBe("US84615Q1031");
+    expect(spcx!.currency).toBe("USD");
+    expect(spcx!.sector).toBe("Industrials");
+    expect(spcx!.industry).toBe("Aerospace & Defense");
+    expect(spcx!.price).toBe(148.03);
+    expect(spcx!.marketCap).toBeGreaterThan(1_000_000_000_000);
+    expect(spcx!.fiftyTwoWeekHigh).toBe(225.64);
+    expect(spcx!.businessSummary.length).toBeGreaterThan(100);
+    expect(spcx!.notes.length).toBeGreaterThan(50);
+  });
   it("aucune ligne sans prix ni capitalisation", () => {
     const details = getAllActionDetails();
     const withoutPrice = details.filter((d) => d.price === null || d.price <= 0);
