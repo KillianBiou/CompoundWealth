@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
+import { renderWithI18n } from "../../../../tests/test-utils";
 import { describe, expect, it } from "vitest";
 import { EtfDetailPanel } from "./etf-detail-panel";
 import { getEtfDetailByIsin } from "@/lib/analysis/etf-detail";
@@ -12,7 +13,7 @@ import { getEtfDetailByIsin } from "@/lib/analysis/etf-detail";
 function renderIwdaPanel() {
   const iwda = getEtfDetailByIsin("IE00B4L5Y983");
   expect(iwda).not.toBeNull();
-  render(<EtfDetailPanel etf={iwda!} />);
+  renderWithI18n(<EtfDetailPanel etf={iwda!} />);
   return iwda!;
 }
 

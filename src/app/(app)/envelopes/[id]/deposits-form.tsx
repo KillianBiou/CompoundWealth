@@ -6,6 +6,7 @@ import { updateDepositsAction, type ActionState } from "@/server/actions";
 import { formatEurCents } from "@/lib/money";
 import { Badge, Button, Field, Input } from "@/components/ui";
 import { useActionToast } from "@/components/use-action-toast";
+import { useI18n } from "@/i18n/provider";
 
 export function DepositsBadge({
   envelopeId,
@@ -16,6 +17,7 @@ export function DepositsBadge({
   depositsCents: number;
   depositCapLabel: string;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updateDepositsAction,
@@ -38,11 +40,11 @@ export function DepositsBadge({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Modifier les versements"
+        title={t.envelopes.deposits.edit}
         className="rounded-full transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/60"
       >
         <Badge tone="accent">
-          Versements : {formatEurCents(depositsCents)} / {depositCapLabel} ✎
+          {t.envelopes.deposits.badge.replace("{amount}", formatEurCents(depositsCents)).replace("{cap}", depositCapLabel)}
         </Badge>
       </button>
 
@@ -51,7 +53,7 @@ export function DepositsBadge({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           role="dialog"
           aria-modal="true"
-          aria-label="Modifier les versements"
+          aria-label={t.envelopes.deposits.edit}
           onClick={(e) => {
             if (e.target === e.currentTarget) setOpen(false);
           }}
@@ -62,13 +64,13 @@ export function DepositsBadge({
           >
             <div className="mb-4 flex items-start justify-between gap-2">
               <h3 className="font-heading text-lg font-semibold">
-                Versements cumulés
+                {t.envelopes.deposits.title}
               </h3>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 className="text-text-muted hover:text-text-primary"
-                aria-label="Fermer"
+                aria-label={t.common.close}
               >
                 <X className="h-4 w-4" aria-hidden />
               </button>
@@ -83,18 +85,13 @@ export function DepositsBadge({
             >
               <input type="hidden" name="envelopeId" value={envelopeId} />
               <p className="text-sm text-text-secondary">
-                Indiquez le total des sommes que vous avez versées sur cette
-                enveloppe depuis son ouverture. Le plafond réglementaire est de{" "}
-                {depositCapLabel}.
+                {t.envelopes.deposits.text.replace("{cap}", depositCapLabel)}
               </p>
               <p className="text-xs text-text-muted">
-                « J&apos;arrive en cours » : reprenez le cumul affiché par votre
-                courtier. Les versements servent au calcul du gain/perte — tant
-                qu&apos;ils ne sont pas renseignés, le gain ne peut pas être
-                calculé pour les positions sans montant investi connu.
+                {t.envelopes.deposits.hint}
               </p>
               <Field
-                label="Versements cumulés (€)"
+                label={t.envelopes.deposits.label}
                 htmlFor="deposits-input"
                 error={state?.errors?.depositsEur}
               >
@@ -118,10 +115,10 @@ export function DepositsBadge({
                   variant="secondary"
                   onClick={() => setOpen(false)}
                 >
-                  Annuler
+                  {t.common.cancel}
                 </Button>
                 <Button type="submit" disabled={pending}>
-                  {pending ? "Enregistrement…" : "Enregistrer"}
+                  {pending ? t.envelopes.deposits.saving : t.common.save}
                 </Button>
               </div>
             </form>

@@ -43,6 +43,30 @@ describe("tradeRepublicAdapter", () => {
     expect(result.envelopes.find((e) => e.type === "CTO")).toBeDefined();
     const cto = result.envelopes.find((e) => e.type === "CTO")!;
     expect(cto.positions.map((p) => p.isin)).toEqual(["US67066G1040"]);
+    expect(result.envelopes.find((e) => e.type === "PRIV")).toBeUndefined();
+  });
+
+  it("route un BUY TRADING PRIVATE_FUND vers l'enveloppe Non coté", () => {
+    const csv = [
+      '"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency"',
+      '"2026-05-08T08:29:30.133Z","2026-05-08","DEFAULT","TRADING","BUY","PRIVATE_FUND","Private Equity","LU3176111881","0.0469690000","106.4523000000","","","","EUR"',
+    ].join("\n");
+    const result = tradeRepublicAdapter.parse(csv);
+    const priv = result.envelopes.find((e) => e.type === "PRIV")!;
+    expect(priv).toBeDefined();
+    expect(priv.name).toBe("Non coté Trade Republic");
+    expect(priv.openedAt).toBe("2026-05-08");
+    expect(priv.depositsCents).toBe(500);
+    expect(priv.positions).toHaveLength(1);
+    const position = priv.positions[0];
+    expect(position.isin).toBe("LU3176111881");
+    expect(position.category).toBe("FUND");
+    expect(position.quantity).toBeCloseTo(0.046969, 6);
+    expect(position.investedCents).toBe(500);
+    expect(position.unitPriceCents).toBe(10_645);
+    expect(position.valuations).toEqual([
+      { date: "2026-05-08", valueCents: Math.round(0.046969 * 10_645) },
+    ]);
   });
 
   it("cumule parts, investi et valorisations pour un même ISIN", () => {

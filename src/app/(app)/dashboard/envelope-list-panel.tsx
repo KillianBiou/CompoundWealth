@@ -16,6 +16,7 @@ import {
   formatPercent,
 } from "@/lib/money";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 export type EnvelopeKind = "savings" | "equity";
 
@@ -25,11 +26,17 @@ export interface VisibleState {
 
 type ViewMode = "detailed" | "grid" | "compact";
 
-const viewModes: { key: ViewMode; label: string; icon: typeof List }[] = [
-  { key: "detailed", label: "Détaillée", icon: Rows3 },
-  { key: "grid", label: "Semi-compacte", icon: LayoutGrid },
-  { key: "compact", label: "Compacte", icon: List },
+const viewModes: { key: ViewMode; icon: typeof List }[] = [
+  { key: "detailed", icon: Rows3 },
+  { key: "grid", icon: LayoutGrid },
+  { key: "compact", icon: List },
 ];
+
+const viewModeKeys: Record<ViewMode, "detailed" | "grid" | "compact"> = {
+  detailed: "detailed",
+  grid: "grid",
+  compact: "compact",
+};
 
 const kindStyles: Record<
   EnvelopeKind,
@@ -82,14 +89,15 @@ function ToggleSwitch({
   label: string;
   size?: "sm" | "md";
 }) {
+  const { t } = useI18n();
   const styles = kindStyles[kind];
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label={`${label} — afficher dans le graphique`}
-      title="Afficher dans le graphique"
+      aria-label={`${label} — ${t.dashboard.showInChart}`}
+      title={t.dashboard.showInChart}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -114,10 +122,14 @@ function ToggleSwitch({
   );
 }
 
-function gainPill(gain: number | null, investedCents: number) {
+function gainPill(
+  gain: number | null,
+  investedCents: number,
+  t: ReturnType<typeof useI18n>["t"],
+) {
   if (gain === null) {
     return (
-      <span className="text-sm italic text-text-muted">Gain non calculable</span>
+      <span className="text-sm italic text-text-muted">{t.dashboard.gainNotComputable}</span>
     );
   }
   const ratio = investedCents > 0 ? gain / investedCents : null;
@@ -137,19 +149,22 @@ function gainPill(gain: number | null, investedCents: number) {
 }
 
 function DcaMonthlyInfo({ envelope }: { envelope: PanelEnvelope }) {
+  const { t } = useI18n();
   if (!envelope.dcaMonthlyCents || envelope.dcaMonthlyCents <= 0) {
-    return <span className="text-xs text-text-muted">DCA : aucun</span>;
+    return <span className="text-xs text-text-muted">{t.dashboard.dcaNone}</span>;
   }
+  const payments = envelope.dcaMonthlyPayments ?? 0;
   return (
     <span className="text-xs text-text-secondary tabular-nums">
-      DCA 1 mois :{" "}
+      {t.dashboard.dcaOneMonth}{" "}
       <span className="font-medium text-accent-500">
         {formatEurCents(envelope.dcaMonthlyCents)}
       </span>
       <span className="text-text-muted">
         {" "}
-        · {envelope.dcaMonthlyPayments ?? 0} versement
-        {(envelope.dcaMonthlyPayments ?? 0) > 1 ? "s" : ""}
+        {t.dashboard.dcaPayments
+          .replace("{count}", String(payments))
+          .replace("{s}", payments > 1 ? "s" : "")}
       </span>
     </span>
   );
@@ -164,6 +179,7 @@ function Sparkline({
   gainCents: number | null;
   className?: string;
 }) {
+  const { t } = useI18n();
   if (series.length < 2) {
     return (
       <div
@@ -172,7 +188,7 @@ function Sparkline({
           className,
         )}
       >
-        Historique en construction…
+        {t.dashboard.historyBuilding}
       </div>
     );
   }
@@ -194,7 +210,7 @@ function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       className={cn("h-12", className)}
       role="img"
-      aria-label="Évolution récente de la valeur"
+      aria-label={t.dashboard.recentChange}
       preserveAspectRatio="none"
     >
       <polyline
@@ -210,6 +226,7 @@ function Sparkline({
 }
 
 function TopPositionsInfo({ envelope }: { envelope: PanelEnvelope }) {
+  const { t } = useI18n();
   if (envelope.topPositions.length === 0) return null;
   const top = envelope.topPositions[0];
   const rest = envelope.topPositions.length - 1;
@@ -220,7 +237,7 @@ function TopPositionsInfo({ envelope }: { envelope: PanelEnvelope }) {
       </span>{" "}
       {formatEurCentsCompact(top.valueCents)}
       {rest > 0 ? (
-        <span className="text-text-muted"> (+{rest} autre{rest > 1 ? "s" : ""})</span>
+        <span className="text-text-muted"> {t.dashboard.otherPositions.replace("{count}", String(rest)).replace("{s}", rest > 1 ? "s" : "")}</span>
       ) : null}
     </p>
   );
@@ -272,6 +289,7 @@ function CompactEnvelope({
   visible: boolean;
   onToggleEnvelope: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const styles = kindStyles[envelope.kind];
   return (
     <div
@@ -290,7 +308,11 @@ function CompactEnvelope({
           {envelope.name}
         </p>
         <p className="shrink-0 text-xs text-text-muted">
-          {envelope.type === "LIVRET_A" ? "Livret A" : envelope.type}
+          {envelope.type === "LIVRET_A"
+          ? t.dashboard.envelopeType.LIVRET_A
+          : envelope.type === "PRIV"
+            ? t.dashboard.envelopeType.PRIV
+            : envelope.type}
         </p>
       </Link>
       <div className="flex shrink-0 items-center gap-3 tabular-nums">
@@ -329,6 +351,7 @@ function DetailedEnvelope({
   visible: boolean;
   onToggleEnvelope: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const styles = kindStyles[envelope.kind];
   const isLivret = envelope.type === "LIVRET_A";
   return (
@@ -357,18 +380,25 @@ function DetailedEnvelope({
                   : "border-positive/40 text-positive",
               )}
             >
-              {isLivret ? "Livret A" : envelope.type}
+              {isLivret
+              ? t.dashboard.envelopeType.LIVRET_A
+              : envelope.type === "PRIV"
+                ? t.dashboard.envelopeType.PRIV
+                : envelope.type}
             </span>
           </div>
           <p className="mt-0.5 text-xs text-text-muted">
             {envelope.broker ? `${envelope.broker} · ` : ""}
             {envelope.openedAt
-              ? `ouvert le ${new Date(envelope.openedAt).toLocaleDateString("fr-FR", {
-                  month: "short",
-                  year: "numeric",
-                })}`
+              ? t.dashboard.openedOn.replace(
+                  "{date}",
+                  new Date(envelope.openedAt).toLocaleDateString("fr-FR", {
+                    month: "short",
+                    year: "numeric",
+                  }),
+                )
               : isLivret
-                ? "épargne de précaution"
+                ? t.dashboard.precautionSavings
                 : "—"}
           </p>
         </Link>
@@ -395,27 +425,27 @@ function DetailedEnvelope({
           <p className="font-heading text-3xl font-semibold tabular-nums text-text-primary">
             {formatEurCents(envelope.valueCents)}
           </p>
-          <p className="mt-1.5">{gainPill(envelope.gainCents, envelope.investedCents)}</p>
+          <p className="mt-1.5">{gainPill(envelope.gainCents, envelope.investedCents, t)}</p>
         </Link>
         <div className="flex flex-col items-end gap-1.5 text-right">
           {isLivret ? (
             <>
               <p className="text-xs text-text-secondary tabular-nums">
-                Versé{" "}
+                {t.dashboard.deposited}{" "}
                 <span className="font-medium text-text-primary">
                   {formatEurCents(envelope.investedCents)}
                 </span>
               </p>
               {envelope.overCapCents && envelope.overCapCents > 0 ? (
                 <p className="text-xs text-negative tabular-nums">
-                  ⚠ {formatEurCents(envelope.overCapCents)} au-dessus du plafond
+                  {t.dashboard.aboveCap.replace("{amount}", formatEurCents(envelope.overCapCents))}
                 </p>
               ) : null}
             </>
           ) : (
             <>
               <p className="text-xs text-text-secondary tabular-nums">
-                {envelope.positionsCount} position{envelope.positionsCount > 1 ? "s" : ""} · investi{" "}
+                {t.dashboard.positionsInvested.replace("{count}", String(envelope.positionsCount)).replace("{s}", envelope.positionsCount > 1 ? "s" : "")}{" "}
                 <span className="font-medium text-text-primary">
                   {formatEurCents(envelope.investedCents)}
                 </span>
@@ -439,6 +469,7 @@ function SemiCompactEnvelope({
   visible: boolean;
   onToggleEnvelope: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const styles = kindStyles[envelope.kind];
   const isLivret = envelope.type === "LIVRET_A";
   return (
@@ -456,7 +487,11 @@ function SemiCompactEnvelope({
             {envelope.name}
           </p>
           <p className="mt-0.5 text-xs text-text-muted">
-            {isLivret ? "Livret A" : envelope.type}
+            {isLivret
+              ? t.dashboard.envelopeType.LIVRET_A
+              : envelope.type === "PRIV"
+                ? t.dashboard.envelopeType.PRIV
+                : envelope.type}
             {envelope.broker ? ` · ${envelope.broker}` : ""}
           </p>
         </Link>
@@ -470,17 +505,17 @@ function SemiCompactEnvelope({
         <p className="font-heading text-2xl font-semibold tabular-nums text-text-primary">
           {formatEurCents(envelope.valueCents)}
         </p>
-        <p className="mt-1">{gainPill(envelope.gainCents, envelope.investedCents)}</p>
+        <p className="mt-1">{gainPill(envelope.gainCents, envelope.investedCents, t)}</p>
       </Link>
       <div className="mt-auto flex items-center justify-between border-t border-border-cw/60 pt-2.5">
         <p className="text-xs text-text-muted">
           {isLivret
-            ? `Versé ${formatEurCentsCompact(envelope.investedCents)}${
+            ? `${t.dashboard.deposited} ${formatEurCentsCompact(envelope.investedCents)}${
                 envelope.overCapCents && envelope.overCapCents > 0
-                  ? ` · ⚠ ${formatEurCentsCompact(envelope.overCapCents)} hors plafond`
+                  ? ` ${t.dashboard.offCap.replace("{amount}", formatEurCentsCompact(envelope.overCapCents))}`
                   : ""
               }`
-            : `${envelope.positionsCount} position${envelope.positionsCount > 1 ? "s" : ""} · investi ${formatEurCentsCompact(envelope.investedCents)}`}
+            : `${t.dashboard.positionsInvested.replace("{count}", String(envelope.positionsCount)).replace("{s}", envelope.positionsCount > 1 ? "s" : "")} ${formatEurCentsCompact(envelope.investedCents)}`}
         </p>
         <DcaMonthlyInfo envelope={envelope} />
       </div>
@@ -496,14 +531,20 @@ interface CategoryData {
   totalValueCents: number;
 }
 
-const categoryMeta: Record<EnvelopeKind, { label: string; description: string }> = {
+const categoryMeta: Record<
+  EnvelopeKind,
+  {
+    labelKey: "savingsLabel" | "equityLabel";
+    descriptionKey: "savingsDesc" | "equityDesc";
+  }
+> = {
   savings: {
-    label: "Épargne",
-    description: "Livrets et fonds euros — capital stable, rendement faible",
+    labelKey: "savingsLabel",
+    descriptionKey: "savingsDesc",
   },
   equity: {
-    label: "Investissement",
-    description: "PEA et CTO — actions et ETF, croissance long terme",
+    labelKey: "equityLabel",
+    descriptionKey: "equityDesc",
   },
 };
 
@@ -518,6 +559,7 @@ export function EnvelopeListPanel({
   onToggleEnvelope: (id: string) => void;
   onToggleCategory: (kind: EnvelopeKind, next?: boolean) => void;
 }) {
+  const { t } = useI18n();
   const [view, setView] = useState<ViewMode>("grid");
   const [collapsed, setCollapsed] = useState<Record<EnvelopeKind, boolean>>({
     savings: false,
@@ -525,9 +567,12 @@ export function EnvelopeListPanel({
   });
 
   const categories = useMemo<CategoryData[]>(() => {
-    const build = (kind: EnvelopeKind, list: EnvelopeSummary[]): CategoryData => ({
+    const build = (kind: EnvelopeKind, list: EnvelopeSummary[]): CategoryData => {
+      const meta = categoryMeta[kind];
+      return {
       key: kind,
-      ...categoryMeta[kind],
+      label: t.dashboard.category[meta.labelKey],
+      description: t.dashboard.category[meta.descriptionKey],
       envelopes: list.map((e) => ({
         id: e.id,
         name: e.name,
@@ -549,23 +594,26 @@ export function EnvelopeListPanel({
         topPositions: e.topPositions ?? [],
       })),
       totalValueCents: list.reduce((s, e) => s + e.valueCents, 0),
-    });
+      };
+    };
     return [
       build("savings", envelopes.filter((e) => e.type === "LIVRET_A")),
       build("equity", envelopes.filter((e) => e.type !== "LIVRET_A")),
     ].filter((c) => c.envelopes.length > 0);
-  }, [envelopes]);
+  }, [envelopes, t]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-heading text-lg font-semibold">Mes enveloppes</h2>
+        <h2 className="font-heading text-lg font-semibold">{t.dashboard.myEnvelopes}</h2>
         <div
           className="flex gap-1 rounded-lg border border-border-cw bg-bg-subtle p-1"
           role="group"
-          aria-label="Disposition des enveloppes"
+          aria-label={t.dashboard.viewMode}
         >
-          {viewModes.map(({ key, label, icon: Icon }) => (
+          {viewModes.map(({ key, icon: Icon }) => {
+            const label = t.dashboard.layout[viewModeKeys[key]];
+            return (
             <button
               key={key}
               type="button"
@@ -582,7 +630,8 @@ export function EnvelopeListPanel({
               <Icon className="h-3.5 w-3.5" aria-hidden />
               <span className="hidden sm:inline">{label}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -639,14 +688,13 @@ export function EnvelopeListPanel({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-text-muted">
-                  {category.envelopes.length} enveloppe
-                  {category.envelopes.length > 1 ? "s" : ""}
+                  {t.dashboard.envelopeCount.replace("{count}", String(category.envelopes.length)).replace("{s}", category.envelopes.length > 1 ? "s" : "")}
                 </span>
                 <ToggleSwitch
                   checked={allVisible}
                   onToggle={() => onToggleCategory(category.key)}
                   kind={category.key}
-                  label={`${category.label} — catégorie entière`}
+                  label={t.dashboard.wholeCategory.replace("{label}", category.label)}
                   size="md"
                 />
               </div>

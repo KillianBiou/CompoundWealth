@@ -72,6 +72,30 @@ describe("historicalCagr", () => {
     ];
     expect(historicalCagr(valuations, [], now)).toBeNull();
   });
+
+  it("ne gonfle pas le rendement quand les versements dominent (DCA)", () => {
+    // départ à 1 000 €, 12 versements de 500 €, valeur finale 7 200 € sur ~1 an
+    // l'ancienne formule (gain / capital initial) donnait ~+68 %/an ;
+    // pondéré par le temps, le rendement réel est modeste
+    const valuations = [
+      { date: new Date("2025-09-01"), valueCents: 100_000 },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        date: new Date(2025, 9 + i, 1),
+        valueCents: 100_000 + (i + 1) * 50_000 + (i + 1) * 1_000,
+      })),
+    ];
+    const invested = [
+      { date: new Date("2025-09-01"), valueCents: 100_000 },
+      ...Array.from({ length: 12 }, (_, i) => ({
+        date: new Date(2025, 9 + i, 1),
+        valueCents: 100_000 + (i + 1) * 50_000,
+      })),
+    ];
+    const cagr = historicalCagr(valuations, invested, now);
+    expect(cagr).not.toBeNull();
+    expect(cagr!).toBeLessThan(0.25);
+    expect(cagr!).toBeGreaterThan(0);
+  });
 });
 
 describe("buildSimulatorDefaults", () => {
@@ -82,6 +106,7 @@ describe("buildSimulatorDefaults", () => {
       id: "p1",
       name: "World",
       isin: "IE0002XZSHO1",
+      symbol: null,
       envelopeId: "e1",
       envelopeName: "PEA",
       envelopeType: "PEA",

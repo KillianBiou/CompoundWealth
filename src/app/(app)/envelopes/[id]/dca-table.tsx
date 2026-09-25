@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { deleteDcaLineAction, toggleDcaLineAction } from "@/server/actions";
 import { useToast } from "@/components/toast";
 import { cn } from "@/components/cn";
+import { useI18n } from "@/i18n/provider";
 
 export interface DcaTableRow {
   id: string;
@@ -25,6 +26,7 @@ function formatEur(cents: number): string {
 }
 
 function ToggleButton({ row, envelopeId }: { row: DcaTableRow; envelopeId: string }) {
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   return (
@@ -39,19 +41,22 @@ function ToggleButton({ row, envelopeId }: { row: DcaTableRow; envelopeId: strin
           await toggleDcaLineAction(formData);
           toast.success(
             row.active
-              ? `${row.ticker} mis en pause — plus d'achat automatique planifié`
-              : `${row.ticker} repris — prochaine échéance ${row.nextDateLabel ?? "à venir"}`,
+              ? t.envelopes.dca.table.pauseToast.replace("{ticker}", row.ticker)
+              : t.envelopes.dca.table.resumeToast
+                  .replace("{ticker}", row.ticker)
+                  .replace("{date}", row.nextDateLabel ?? t.envelopes.dca.table.resumeDateUnknown),
           );
         });
       }}
       className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-accent-500/50 hover:text-text-primary disabled:opacity-50"
     >
-      {row.active ? "Mettre en pause" : "Reprendre"}
+      {row.active ? t.envelopes.dca.table.pause : t.envelopes.dca.table.resume}
     </button>
   );
 }
 
 function DeleteButton({ row, envelopeId }: { row: DcaTableRow; envelopeId: string }) {
+  const { t } = useI18n();
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   return (
@@ -64,27 +69,28 @@ function DeleteButton({ row, envelopeId }: { row: DcaTableRow; envelopeId: strin
           formData.set("lineId", row.id);
           formData.set("envelopeId", envelopeId);
           await deleteDcaLineAction(formData);
-          toast.success(`DCA ${row.ticker} supprimé`);
+          toast.success(t.envelopes.dca.table.deleteToast.replace("{ticker}", row.ticker));
         });
       }}
       className="cursor-pointer rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-secondary transition-colors hover:border-negative/60 hover:text-negative disabled:opacity-50"
     >
-      Supprimer
+      {t.envelopes.dca.table.delete}
     </button>
   );
 }
 
 export function DcaTable({ envelopeId, rows }: { envelopeId: string; rows: DcaTableRow[] }) {
+  const { t } = useI18n();
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b-2 border-border-cw bg-bg-subtle/50 text-left text-xs uppercase tracking-wide text-text-muted">
-            <th className="px-6 py-3 font-medium">Titre</th>
-            <th className="px-4 py-3 font-medium">Montant max</th>
-            <th className="px-4 py-3 font-medium">Périodicité</th>
-            <th className="px-4 py-3 font-medium">Prochaine échéance</th>
-            <th className="px-6 py-3 text-right font-medium" aria-label="Actions" />
+            <th className="px-6 py-3 font-medium">{t.envelopes.dca.table.security}</th>
+            <th className="px-4 py-3 font-medium">{t.envelopes.dca.table.maxAmount}</th>
+            <th className="px-4 py-3 font-medium">{t.envelopes.dca.table.frequency}</th>
+            <th className="px-4 py-3 font-medium">{t.envelopes.dca.table.nextDate}</th>
+            <th className="px-6 py-3 text-right font-medium" aria-label={t.common.edit} />
           </tr>
         </thead>
         <tbody>
@@ -118,7 +124,7 @@ export function DcaTable({ envelopeId, rows }: { envelopeId: string; rows: DcaTa
                     ) : null}
                   </>
                 ) : (
-                  <span className="italic text-text-muted">En pause</span>
+                  <span className="italic text-text-muted">{t.envelopes.dca.table.paused}</span>
                 )}
               </td>
               <td className="px-6 py-3">
