@@ -19,6 +19,7 @@ model User {
   numberLocale  String    @default("fr")
   createdAt    DateTime  @default(now())
   envelopes    Envelope[]
+  goals        Goal[]
 }
 
 model Envelope {
@@ -39,6 +40,38 @@ model Envelope {
   valuations  EnvelopeValuation[]
   dcaPlans    DcaPlan[]
   deposits    EnvelopeDeposit[]
+  goals       Goal[]      @relation("GoalEnvelopes")
+
+  @@index([userId])
+}
+
+enum GoalType {
+  SAFETY_NET
+  FIRE
+  RETIREMENT
+  DOWN_PAYMENT
+  CUSTOM_LIFEVENT
+  CUSTOM
+}
+
+model Goal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      GoalType
+  name      String
+  icon      String   @default("target")
+
+  targetAmountCents         Int?
+  targetRentCents           Int?
+  targetMonths             Int?
+  targetDate               DateTime?
+  withdrawalRate          Float?
+  monthlyExpensesCents    Int?
+  monthlyContributionCents Int?
+
+  createdAt DateTime @default(now())
+  envelopes Envelope[] @relation("GoalEnvelopes")
 
   @@index([userId])
 }

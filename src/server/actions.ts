@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
+import { getSecurityByIsin } from "@/lib/stock-catalog";
 import {
   LIVRET_A_DEFAULT_INFLATION,
   LIVRET_A_DEPOSIT_CAP_CENTS,
@@ -18,6 +19,7 @@ import {
   createDcaSchema,
   createLivretDcaSchema,
   envelopeSchema,
+  goalSchema,
   livretDepositSchema,
   livretSettingsSchema,
   loginSchema,
@@ -548,10 +550,10 @@ export async function createDcaAction(
       active: true,
       lines: {
         create: lines.map((line) => {
-          const etf = getEtfByIsin(line.isin)!;
+          const security = getSecurityByIsin(line.isin)!;
           return {
-            isin: etf.isin,
-            name: `${etf.ticker} — ${etf.name}`,
+            isin: security.isin,
+            name: `${security.ticker} — ${security.name}`,
             maxAmountCents: eurosToCents(line.maxAmountEur),
             active: true,
           };
@@ -1292,4 +1294,237 @@ export async function fetchActionPriceHistoryAction(
       price: p.closeCents / 100,
     }));
   return { ok: true, points };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  Buts                                       */
+/* -------------------------------------------------------------------------- */
+
+import { checkGoalEnvelopes, type LinkableEnvelope } from "@/lib/goals/linking";
+
+async function validateGoalEnvelopes(
+  userId: string,
+  goalType: "SAFETY_NET" | "FIRE" | "RETIREMENT" | "DOWN_PAYMENT" | "CUSTOM_LIFEVENT" | "CUSTOM",
+  envelopeIds: string[],
+): Promise<{ errors?: Record<string, string[]> }> {
+  const envelopes: LinkableEnvelope[] = await prisma.envelope.findMany({
+    where: { id: { in: envelopeIds }, userId },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      closedAt: true,
+      goals: { select: { id: true } },
+    },
+  }).then((rows) =>
+    rows.map((e) => ({
+      id: e.id,
+      name: e.name,
+      type: e.type as LinkableEnvelope["type"],
+      closedAt: e.closedAt,
+      goalIds: e.goals.map((g) => g.id),
+    })),
+  );
+  const error = checkGoalEnvelopes(goalType, envelopes, envelopeIds);
+  if (error) return { errors: { envelopeIds: [error] } };
+  return {};
+}
+
+export async function createGoalAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const raw = {
+    type: str(formData, "type"),
+    name: str(formData, "name"),
+    icon: str(formData, "icon"),
+    targetAmountEur: str(formData, "targetAmountEur"),
+    targetRentEur: str(formData, "targetRentEur"),
+    targetMonths: str(formData, "targetMonths"),
+    targetDate: str(formData, "targetDate"),
+    withdrawalRate: str(formData, "withdrawalRate"),
+    monthlyExpensesEur: str(formData, "monthlyExpensesEur"),
+    monthlyContributionEur: str(formData, "monthlyContributionEur"),
+    envelopeIds: formData.getAll("envelopeIds").map(String),
+  };
+  // les champs non renseignés sont omis (et non "" coercé en 0 par z.coerce)
+  const optional = {
+    ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
+    ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
+    ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
+    ...(raw.targetDate !== "" ? { targetDate: raw.targetDate } : {}),
+    ...(raw.withdrawalRate !== "" ? { withdrawalRate: raw.withdrawalRate } : {}),
+    ...(raw.monthlyExpensesEur !== "" ? { monthlyExpensesEur: raw.monthlyExpensesEur } : {}),
+    ...(raw.monthlyContributionEur !== ""
+      ? { monthlyContributionEur: raw.monthlyContributionEur }
+      : {}),
+  };
+  const parsed = goalSchema.safeParse({
+    type: raw.type,
+    name: raw.name,
+    icon: raw.icon,
+    envelopeIds: raw.envelopeIds,
+    ...optional,
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const data = parsed.data;
+
+  if (data.type === "SAFETY_NET") {
+    const existing = await prisma.goal.findFirst({
+      where: { userId: session.userId, type: "SAFETY_NET" },
+      select: { id: true },
+    });
+    if (existing) {
+      return {
+        errors: { form: ["Un matelas de sécurité existe déjà — un seul par compte"] },
+      };
+    }
+  }
+
+  const check = await validateGoalEnvelopes(session.userId, data.type, data.envelopeIds);
+  if (check.errors) return { errors: check.errors };
+
+  const goal = await prisma.goal.create({
+    data: {
+      userId: session.userId,
+      type: data.type,
+      name: data.name,
+      icon: data.icon || "target",
+      targetAmountCents: data.targetAmountEur ? eurosToCents(data.targetAmountEur) : null,
+      targetRentCents: data.targetRentEur ? eurosToCents(data.targetRentEur) : null,
+      targetMonths: data.targetMonths ?? null,
+      targetDate: data.targetDate ? new Date(data.targetDate) : null,
+      withdrawalRate: data.withdrawalRate ?? null,
+      monthlyExpensesCents: data.monthlyExpensesEur
+        ? eurosToCents(data.monthlyExpensesEur)
+        : null,
+      monthlyContributionCents: data.monthlyContributionEur
+        ? eurosToCents(data.monthlyContributionEur)
+        : null,
+      envelopes: {
+        connect: data.envelopeIds.map((id) => ({ id })),
+      },
+    },
+  });
+  revalidatePath("/buts");
+  revalidatePath("/dashboard");
+  redirect(`/buts/${goal.id}`);
+}
+
+export async function updateGoalAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const goalId = str(formData, "goalId");
+  const goal = await prisma.goal.findFirst({
+    where: { id: goalId, userId: session.userId },
+  });
+  if (!goal) return { message: "But introuvable" };
+
+  const raw = {
+    type: goal.type,
+    name: str(formData, "name"),
+    icon: str(formData, "icon"),
+    targetAmountEur: str(formData, "targetAmountEur"),
+    targetRentEur: str(formData, "targetRentEur"),
+    targetMonths: str(formData, "targetMonths"),
+    targetDate: str(formData, "targetDate"),
+    withdrawalRate: str(formData, "withdrawalRate"),
+    monthlyExpensesEur: str(formData, "monthlyExpensesEur"),
+    monthlyContributionEur: str(formData, "monthlyContributionEur"),
+    envelopeIds: formData.getAll("envelopeIds").map(String),
+  };
+  // les champs non renseignés sont omis (et non "" coercé en 0 par z.coerce)
+  const optional = {
+    ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
+    ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
+    ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
+    ...(raw.targetDate !== "" ? { targetDate: raw.targetDate } : {}),
+    ...(raw.withdrawalRate !== "" ? { withdrawalRate: raw.withdrawalRate } : {}),
+    ...(raw.monthlyExpensesEur !== "" ? { monthlyExpensesEur: raw.monthlyExpensesEur } : {}),
+    ...(raw.monthlyContributionEur !== ""
+      ? { monthlyContributionEur: raw.monthlyContributionEur }
+      : {}),
+  };
+  const parsed = goalSchema.safeParse({
+    type: raw.type,
+    name: raw.name,
+    icon: raw.icon,
+    envelopeIds: raw.envelopeIds,
+    ...optional,
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const data = parsed.data;
+
+  const check = await validateGoalEnvelopes(
+    session.userId,
+    data.type,
+    data.envelopeIds,
+  );
+  if (check.errors) return { errors: check.errors };
+
+  await prisma.goal.update({
+    where: { id: goal.id },
+    data: {
+      name: data.name,
+      icon: data.icon || "target",
+      targetAmountCents: data.targetAmountEur ? eurosToCents(data.targetAmountEur) : null,
+      targetRentCents: data.targetRentEur ? eurosToCents(data.targetRentEur) : null,
+      targetMonths: data.targetMonths ?? null,
+      targetDate: data.targetDate ? new Date(data.targetDate) : null,
+      withdrawalRate: data.withdrawalRate ?? null,
+      monthlyExpensesCents: data.monthlyExpensesEur
+        ? eurosToCents(data.monthlyExpensesEur)
+        : null,
+      monthlyContributionCents: data.monthlyContributionEur
+        ? eurosToCents(data.monthlyContributionEur)
+        : null,
+    },
+  });
+  // détache les enveloppes retirées, attache les nouvelles (m-n)
+  const goalWithLinks = await prisma.goal.findFirst({
+    where: { id: goal.id },
+    select: { envelopes: { select: { id: true } } },
+  });
+  const currentIds = goalWithLinks?.envelopes.map((e) => e.id) ?? [];
+  const toDetach = currentIds.filter((id) => !data.envelopeIds.includes(id));
+  const toAttach = data.envelopeIds.filter((id) => !currentIds.includes(id));
+  if (toDetach.length > 0 || toAttach.length > 0) {
+    await prisma.goal.update({
+      where: { id: goal.id },
+      data: {
+        envelopes: {
+          ...(toDetach.length > 0
+            ? { disconnect: toDetach.map((id) => ({ id })) }
+            : {}),
+          ...(toAttach.length > 0
+            ? { connect: toAttach.map((id) => ({ id })) }
+            : {}),
+        },
+      },
+    });
+  }
+  revalidatePath("/buts");
+  revalidatePath(`/buts/${goal.id}`);
+  revalidatePath("/dashboard");
+  redirect(`/buts/${goal.id}`);
+}
+
+export async function deleteGoalAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const goalId = String(formData.get("goalId") ?? "");
+  // SetNull sur la relation : les enveloppes redeviennent non allouées
+  await prisma.goal.deleteMany({
+    where: { id: goalId, userId: session.userId },
+  });
+  revalidatePath("/buts");
+  revalidatePath("/dashboard");
+  redirect("/buts");
 }

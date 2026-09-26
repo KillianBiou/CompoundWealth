@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   LineChart,
+  Target,
 } from "lucide-react";
 import { logoutAction } from "@/server/actions";
 import { useI18n } from "@/i18n/provider";
@@ -18,6 +19,7 @@ const NAV_KEYS = [
   { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
   { href: "/envelopes", key: "envelopes", icon: Landmark },
   { href: "/analyse", key: "analyse", icon: LineChart },
+  { href: "/buts", key: "goals", icon: Target },
   { href: "/settings", key: "settings", icon: Settings },
 ] as const;
 
