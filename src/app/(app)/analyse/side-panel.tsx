@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import { cn } from "@/components/cn";
+import { CopyButton } from "@/components/copy-button";
 import { useI18n } from "@/i18n/provider";
 
 /**
@@ -15,6 +16,8 @@ export function SidePanel({
   onClose,
   onBack,
   backLabel,
+  copyText,
+  copyLabel,
   title,
   subtitle,
   icon,
@@ -26,6 +29,10 @@ export function SidePanel({
   onBack?: () => void;
   /** libellé accessible du bouton retour (défaut : « Retour ») */
   backLabel?: string;
+  /** texte copié par le bouton presse-papier ; absent = pas de bouton */
+  copyText?: string | (() => string);
+  /** libellé du contenu copié (toast), défaut : titre du panneau */
+  copyLabel?: string;
   title: string;
   subtitle?: string;
   icon?: React.ReactNode;
@@ -93,6 +100,9 @@ export function SidePanel({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {copyText !== undefined ? (
+              <CopyButton text={copyText} label={copyLabel ?? title} variant="icon" />
+            ) : null}
             {onBack ? (
               <button
                 type="button"

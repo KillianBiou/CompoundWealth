@@ -1,8 +1,9 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
-import { currentValueCents } from "@/lib/portfolio/series";
-import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
+import { currentValueCents, valueAt } from "@/lib/portfolio/series";
+import { ETF_CATALOG, getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
+import { fetchMarketHistory } from "@/lib/market/quotes";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
 import type { EtfDetail } from "@/lib/analysis/etf-detail";
 import { getEtfDetailByIsin, getEtfDetailByTicker, getAllEtfDetails } from "@/lib/analysis/etf-detail";
@@ -20,6 +21,22 @@ import {
   type IncomeAnalysisResult,
   type DiversificationResult,
 } from "@/lib/analysis/scanners";
+import { DEFAULT_EQUITY_RETURN } from "@/lib/analysis/scanners";
+import {
+  buildPerformanceReport,
+  type PerformanceReport,
+} from "@/lib/analysis/performance-report";
+import {
+  PERFORMANCE_PERIODS,
+  type PerformancePeriodKey,
+} from "@/lib/analysis/performance-periods";
+import {
+  mergeCashFlows,
+  positionCashFlows,
+  toUtcMidnight,
+} from "@/lib/analysis/performance";
+import { worldGrowthFromPoints } from "@/lib/analysis/world-growth";
+import { buildLivretBalanceSeries, LIVRET_A_RATE } from "@/lib/livret";
 
 /* -------------------------------------------------------------------------- */
 /*                          Positions agrégées d'analyse                       */
@@ -99,6 +116,10 @@ export const getAnalysisPositions = cache(async (): Promise<AnalysisPosition[]> 
           amountCents: income.amountCents,
         })),
         isStock: position.category === "STOCK" || (isin ? isUSStock(isin) : false),
+        valuations: position.valuations.map((v) => ({
+          date: v.date,
+          valueCents: v.valueCents,
+        })),
       });
     }
   }
@@ -167,6 +188,153 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
   }
   return bySymbol;
 }
+
+/**
+ * Rapport de performance (XIRR / TWR) pour chaque période du sélecteur
+ * (1 an par défaut, 3 ans, 5 ans, toute la vie du portefeuille) : flux
+ * externes de toutes les enveloppes (versements des positions + dépôts du
+ * livret, qui n'est pas une position), valeur finale = patrimoine actuel.
+ * Pour une sous-période, la valeur au cutoff vient des valorisations
+ * historiques (dernière valorisation connue avant la date, 0 avant la
+ * première). Trois niveaux de détail : global, par enveloppe, par actif.
+ * Les flux sont normalisés à minuit UTC pour que chaque versement vive un
+ * nombre entier de jours.
+ */
+export const getPerformanceReports = cache(
+  async (): Promise<
+    Record<PerformancePeriodKey, PerformanceReport | null>
+  > => {
+    const userId = await requireUserId();
+    const positions = await getAnalysisPositions();
+    const livretEnvelopes = await prisma.envelope.findMany({
+      where: { userId, closedAt: null, type: "LIVRET_A" },
+      include: { deposits: { orderBy: { date: "asc" } } },
+    });
+    const nowTime = Date.now();
+    const now = new Date(nowTime);
+    const livretFlows: { date: Date; amountCents: number }[] = [];
+    const livretSeries: { date: Date; balanceCents: number }[][] = [];
+    let livretBalance = 0;
+    let livretValueDate: Date | null = null;
+    for (const env of livretEnvelopes) {
+      const rate = env.interestRate ?? LIVRET_A_RATE;
+      const events = env.deposits.map((dep) => ({
+        date: dep.date,
+        amountCents: dep.amountCents,
+      }));
+      const series = buildLivretBalanceSeries(events, rate);
+      const current =
+        [...series].reverse().find((p) => p.date.getTime() <= nowTime) ??
+        series[0] ??
+        null;
+      livretBalance += current ? current.balanceCents : 0;
+      // date d'observation du solde : la quinzaine du dernier point connu,
+      // c'est elle qui clôt la période de détention du livret
+      if (current && (!livretValueDate || current.date > livretValueDate)) {
+        livretValueDate = current.date;
+      }
+      livretSeries.push(series);
+      livretFlows.push(...events);
+    }
+    // flux externes du portefeuille, triés et normalisés UTC minuit : c'est
+    // la « marche d'escalier » DCA rejouée au cours réel du MSCI World
+    const allFlows = mergeCashFlows([
+      ...positions.flatMap((p) => positionCashFlows(p)),
+      ...livretFlows.map((f) => ({
+        date: toUtcMidnight(f.date),
+        amountCents: f.amountCents,
+      })),
+    ]);
+    if (allFlows.length === 0) {
+      return { "1y": null, "3y": null, "5y": null, all: null };
+    }
+    const firstFlowDate = allFlows[0].date;
+
+    // un seul appel Yahoo pour toutes les périodes : l'historique complet
+    // du premier flux à aujourd'hui
+    const world = ETF_CATALOG.find((e) => e.indexCategory === "Monde");
+    const worldHistory = world
+      ? await fetchMarketHistory(world.isin, firstFlowDate, now).catch(
+          () => null,
+        )
+      : null;
+    const worldPoints =
+      worldHistory && worldHistory.ok
+        ? worldHistory.points.filter(
+            (p) =>
+              p.date.getTime() >= firstFlowDate.getTime() && p.closeCents > 0,
+          )
+        : [];
+
+    const reports: Record<PerformancePeriodKey, PerformanceReport | null> = {
+      "1y": null,
+      "3y": null,
+      "5y": null,
+      all: null,
+    };
+    for (const { key, days } of PERFORMANCE_PERIODS) {
+      // cutoff de la période ; « all » démarre au premier flux
+      const periodStart =
+        days === null
+          ? null
+          : toUtcMidnight(new Date(nowTime - days * 24 * 3600 * 1000));
+      // période plus ancienne que le portefeuille : indisponible (null),
+      // sauf « all » qui couvre toujours toute sa durée
+      if (
+        periodStart !== null &&
+        periodStart.getTime() < firstFlowDate.getTime()
+      ) {
+        continue;
+      }
+      // solde du livret au cutoff : dernière quinzaine connue avant la date
+      const livretStartValueCents = periodStart
+        ? livretSeries.reduce((sum, series) => {
+            const point =
+              [...series]
+                .reverse()
+                .find((p) => p.date.getTime() <= periodStart.getTime()) ?? null;
+            return sum + (point ? point.balanceCents : 0);
+          }, 0)
+        : 0;
+      // croissance réelle du Monde sur la période, même historique de cours ;
+      // le capital déjà présent au cutoff (mêmes valorisations que le reste du
+      // rapport) est racheté en parts de World au cours du cutoff — même
+      // périmètre que le XIRR de la sous-période, sinon le verdict « 1y »
+      // contredirait le verdict « all »
+      const periodWorldFlows = periodStart
+        ? allFlows.filter((f) => f.date.getTime() > periodStart.getTime())
+        : allFlows;
+      const positionsStartValueCents = periodStart
+        ? positions.reduce(
+            (sum, p) => sum + valueAt(p.valuations ?? [], periodStart),
+            0,
+          )
+        : 0;
+      const worldStartValueCents =
+        positionsStartValueCents + livretStartValueCents;
+      const worldGrowth = worldGrowthFromPoints(
+        periodWorldFlows,
+        worldPoints,
+        periodStart,
+        worldStartValueCents,
+      );
+      reports[key] = buildPerformanceReport({
+        positions,
+        livretFlows,
+        livretValueCents: livretBalance,
+        savingsRate: LIVRET_A_RATE,
+        worldEquityRate: DEFAULT_EQUITY_RETURN,
+        worldGrowth,
+        period: key,
+        periodStart,
+        livretStartValueCents,
+        livretValueDate,
+        now,
+      });
+    }
+    return reports;
+  },
+);
 
 /** Épargne mensuelle moyenne (12 mois glissants) depuis les versements réels. */
 export const getAverageMonthlySavingsCents = cache(async (): Promise<number | null> => {
