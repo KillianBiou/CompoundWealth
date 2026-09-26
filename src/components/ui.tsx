@@ -70,7 +70,7 @@ export function Badge({
   className,
   children,
 }: {
-  tone?: "neutral" | "positive" | "negative" | "warning" | "accent";
+  tone?: "neutral" | "positive" | "negative" | "warning" | "accent" | "gold";
   className?: string;
   children: ReactNode;
 }) {
@@ -80,6 +80,7 @@ export function Badge({
     negative: "bg-negative/10 text-negative border-negative/30",
     warning: "bg-warning/10 text-warning border-warning/30",
     accent: "bg-accent-100 text-accent-500 border-accent-500/30",
+    gold: "bg-gold/10 text-gold border-gold/40",
   } as const;
   return (
     <span

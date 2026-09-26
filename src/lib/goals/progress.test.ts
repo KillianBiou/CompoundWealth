@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeGoalMetrics,
+  monthsToFillGoal,
   isCapitalizedGoal,
   monthsBetween,
   projectCapital,
@@ -571,5 +572,75 @@ describe("constantes", () => {
     expect(SAFETY_NET_ALERT_MONTHS).toBe(3);
     expect(SAFETY_NET_EXCESS_FACTOR).toBe(1.5);
     expect(OVERFUNDED_FACTOR).toBe(1.5);
+  });
+});
+
+describe("monthsToFillGoal", () => {
+  it("10 000 € à 500 €/mois sans rendement → 20 mois", () => {
+    expect(monthsToFillGoal(0, 1_000_000, 50_000, 0)).toBe(20);
+  });
+
+  it("capital restant exact → mois entiers", () => {
+    expect(monthsToFillGoal(500_000, 1_000_000, 50_000, 0)).toBe(10);
+  });
+
+  it("déjà atteint → 0 ; sans contribution ni rendement → null", () => {
+    expect(monthsToFillGoal(1_000_000, 1_000_000, 50_000, 0)).toBe(0);
+    expect(monthsToFillGoal(0, 1_000_000, 0, 0)).toBeNull();
+  });
+
+  it("avec rendement → moins de mois que sans rendement", () => {
+    const flat = monthsToFillGoal(0, 2_000_000, 50_000, 0)!;
+    const grown = monthsToFillGoal(0, 2_000_000, 50_000, 0.06)!;
+    expect(grown!).toBeLessThan(flat!);
+  });
+});
+
+describe("matelas : mois pour remplir (monthsToFill)", () => {
+  it("6 000 € actuels, cible 15 000 €, 300 €/mois, livret 3 % → ~28 mois", () => {
+    const m = computeGoalMetrics({
+      type: "SAFETY_NET",
+      linkedValueCents: 600_000,
+      targetAmountCents: 1_500_000,
+      monthlyContributionCents: 30_000,
+      cashReturn: 0.03,
+      createdAt: new Date(2025, 0, 1),
+      now: NOW,
+    });
+    expect(m.monthsToFill).not.toBeNull();
+    expect(m.monthsToFill!).toBeGreaterThan(25);
+    expect(m.monthsToFill!).toBeLessThan(32);
+  });
+
+  it("sans contribution → null", () => {
+    const m = computeGoalMetrics({
+      type: "SAFETY_NET",
+      linkedValueCents: 600_000,
+      targetAmountCents: 1_500_000,
+      createdAt: new Date(2025, 0, 1),
+      now: NOW,
+    });
+    expect(m.monthsToFill).toBeNull();
+  });
+});
+
+describe("FIRE : rendement requis", () => {
+  it("capital cible, date cible et contribution → rendement requis calculé", () => {
+    const m = computeGoalMetrics({
+      type: "FIRE",
+      linkedValueCents: 5_000_000,
+      targetRentCents: 85_000,
+      withdrawalRate: 0.04,
+      monthlyContributionCents: 50_000,
+      createdAt: new Date(2025, 0, 1),
+      targetDate: new Date(2045, 0, 1),
+      expectedReturn: 0.062,
+      now: NOW,
+    });
+    // capital cible = 850 × 12 / 0,04 = 255 000 €, 50 000 € actuels, 500 €/mois, 20 ans
+    expect(m.capitalTargetCents).toBe(25_500_000);
+    expect(m.requiredReturn).not.toBeNull();
+    expect(m.requiredReturn!).toBeGreaterThan(0.03);
+    expect(m.requiredReturn!).toBeLessThan(0.05);
   });
 });

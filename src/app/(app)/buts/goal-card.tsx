@@ -58,7 +58,14 @@ export function GoalCard({ goal }: { goal: GoalSummary }) {
 
   return (
     <Link href={`/buts/${goal.id}`} className="group block">
-      <Card className="h-full transition-colors group-hover:border-accent-500/50">
+      <Card
+        className={cn(
+          "h-full transition-colors",
+          m.status === "achieved"
+            ? "border-gold/40 bg-gold/5 group-hover:border-gold/70"
+            : "group-hover:border-accent-500/50",
+        )}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate font-medium text-text-primary group-hover:text-accent-500">
@@ -109,7 +116,10 @@ export function GoalCard({ goal }: { goal: GoalSummary }) {
             aria-valuemax={100}
           >
             <div
-              className={cn("h-full rounded-full bg-accent-500")}
+              className={cn(
+                "h-full rounded-full",
+                m.status === "achieved" ? "bg-gold" : "bg-accent-500",
+              )}
               style={{ width: `${Math.min(100, progressPct)}%` }}
             />
           </div>

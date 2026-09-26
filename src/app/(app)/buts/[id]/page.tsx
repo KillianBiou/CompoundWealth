@@ -4,12 +4,14 @@ import { getCurrentUser, getGoal, getGoalExpectedReturn } from "@/server/queries
 import {
   isCapitalizedGoal,
   monthsBetween,
+  monthsToFillGoal,
   projectCapital,
   requiredMonthlySavings,
   requiredTrajectoryAt,
+  DEFAULT_WITHDRAWAL_RATE,
 } from "@/lib/goals/progress";
 import { formatEurCents, formatPercent } from "@/lib/money";
-import { ButtonLink, Card, Kpi } from "@/components/ui";
+import { Badge, ButtonLink, Card, Kpi } from "@/components/ui";
 import { HintLabel } from "@/app/(app)/analyse/hint-label";
 import { GoalStatusBadge } from "../goal-status-badge";
 import { GoalProgressChart } from "./goal-progress-chart";
@@ -101,6 +103,52 @@ export default async function GoalDetailPage({
     trajectory: requiredTrajectoryAt(goal.createdAt, goal.targetDate, p.date),
   }));
 
+  // suite dorée : projection mensuelle (DCA + rendement attendu) jusqu'au but atteint
+  const progressProjectionPoints = (() => {
+    const target =
+      goal.type === "SAFETY_NET"
+        ? m.capitalTargetCents
+        : goal.type === "FIRE"
+          ? m.capitalTargetCents
+          : goal.targetAmountCents;
+    if (target === null || target <= goal.linkedValueCents) return [];
+    if (goal.effectiveMonthlyContributionCents <= 0 && expectedReturn <= 0) return [];
+    const months = monthsToFillGoal(
+      goal.linkedValueCents,
+      target,
+      goal.effectiveMonthlyContributionCents,
+      expectedReturn,
+    );
+    if (months === null) return [];
+    const monthlyRate = Math.pow(1 + expectedReturn, 1 / 12) - 1;
+    const points: { date: number; metric: number; projected: number; trajectory: number }[] = [];
+    // point de jonction : la valeur actuelle reprise comme premier point projeté
+    let value = goal.linkedValueCents;
+    for (let i = 0; i <= months; i += 1) {
+      const at = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      if (i > 0) value = value * (1 + monthlyRate) + goal.effectiveMonthlyContributionCents;
+      const metric =
+        goal.type === "SAFETY_NET"
+          ? goal.monthlyExpensesCents && goal.monthlyExpensesCents > 0
+            ? value / goal.monthlyExpensesCents
+            : null
+          : goal.type === "FIRE"
+            ? Math.round((value * (goal.withdrawalRate ?? DEFAULT_WITHDRAWAL_RATE)) / 12)
+            : target > 0
+              ? value / target
+              : null;
+      if (metric !== null) {
+        points.push({
+          date: at.getTime(),
+          metric: i === 0 ? metric : null as unknown as number,
+          projected: metric,
+          trajectory: requiredTrajectoryAt(goal.createdAt, goal.targetDate, at),
+        });
+      }
+    }
+    return points;
+  })();
+
   // graphique 2 : valeur agrégée des enveloppes liées
   const valuePoints = goal.linkedSeries.map((p) => ({
     date: p.date.getTime(),
@@ -152,7 +200,13 @@ export default async function GoalDetailPage({
       </div>
 
       {/* bloc héro : l'actuel et le but en évidence */}
-      <Card className="space-y-4">
+      <Card
+        className={
+          m.status === "achieved"
+            ? "space-y-4 border-gold/40 bg-gold/5"
+            : "space-y-4"
+        }
+      >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <HintLabel uppercase>{t.goals.detail.current}</HintLabel>
@@ -172,7 +226,11 @@ export default async function GoalDetailPage({
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-bg-subtle">
           <div
-            className="h-full rounded-full bg-accent-500"
+            className={
+              m.status === "achieved"
+                ? "h-full rounded-full bg-gold"
+                : "h-full rounded-full bg-accent-500"
+            }
             style={{ width: `${Math.min(100, Math.max(0, m.displayProgress * 100))}%` }}
           />
         </div>
@@ -195,16 +253,35 @@ export default async function GoalDetailPage({
           value={formatEurCents(goal.effectiveMonthlyContributionCents)}
           hint={t.goals.detail.contributionHint}
         />
-        <Kpi
-          label={t.goals.detail.requiredReturn}
-          value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
-          sub={`${t.goals.detail.expectedReturn} : ${formatPercent(expectedReturn)}`}
-        />
+        {goal.type === "SAFETY_NET" ? (
+          /* matelas : pas de rendement requis — le remplissage au DCA actuel */
+          <Kpi
+            label={t.goals.detail.monthsToFill}
+            value={
+              m.monthsToFill !== null
+                ? `${m.monthsToFill} ${t.goals.detail.monthsUnit}`
+                : "—"
+            }
+            hint={t.goals.detail.monthsToFillHint}
+          />
+        ) : (
+          <Kpi
+            label={t.goals.detail.requiredReturn}
+            value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+            sub={`${t.goals.detail.expectedReturn} : ${formatPercent(expectedReturn)}`}
+          />
+        )}
         {m.requiredMonthlySavingsAtReturnCents !== null ? (
           <Kpi
             label={t.goals.detail.requiredSavingsAtReturn}
             value={formatEurCents(m.requiredMonthlySavingsAtReturnCents)}
             hint={t.goals.detail.requiredSavingsHint}
+          />
+        ) : m.monthsToFill !== null && goal.type !== "SAFETY_NET" ? (
+          <Kpi
+            label={t.goals.detail.monthsToFill}
+            value={`${m.monthsToFill} ${t.goals.detail.monthsUnit}`}
+            hint={t.goals.detail.monthsToFillHint}
           />
         ) : (
           <Kpi
@@ -252,7 +329,7 @@ export default async function GoalDetailPage({
         </div>
         {progressPoints.length > 0 ? (
           <GoalProgressChart
-            points={progressPoints}
+            points={[...progressPoints, ...progressProjectionPoints]}
             type={goal.type}
             metricMode={safetyAmountMode ? "progress" : "months"}
             locale={locale}
@@ -297,13 +374,28 @@ export default async function GoalDetailPage({
           <ul className="divide-y divide-border-cw/60">
             {goal.envelopes.map((env) => (
               <li key={env.id} className="flex items-center justify-between gap-3 py-2.5">
-                <Link
-                  href={`/envelopes/${env.id}`}
-                  className="text-sm font-medium hover:text-accent-500"
-                >
-                  {env.name}
-                </Link>
-                <div className="flex items-center gap-3">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <Link
+                    href={`/envelopes/${env.id}`}
+                    className="text-sm font-medium hover:text-accent-500"
+                  >
+                    {env.name}
+                  </Link>
+                  {env.sharedGoalNames.length > 0 ? (
+                    <span className="flex items-center gap-1.5">
+                      <Badge tone="warning">
+                        {t.goals.detail.envelopeShared.replace(
+                          "{count}",
+                          String(env.sharedGoalNames.length),
+                        )}
+                      </Badge>
+                      <span className="truncate text-xs text-text-muted">
+                        {env.sharedGoalNames.join(", ")}
+                      </span>
+                    </span>
+                  ) : null}
+                </span>
+                <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs text-text-muted">{env.type}</span>
                   <span className="text-sm tabular-nums text-text-primary">
                     {formatEurCents(env.valueCents)}

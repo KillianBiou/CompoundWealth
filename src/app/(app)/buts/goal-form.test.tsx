@@ -27,7 +27,7 @@ function makeEnvelope(overrides: Partial<LinkableEnvelope & { valueCents?: numbe
     name: "PEA Bourse",
     type: "PEA" as const,
     closedAt: null,
-    goalId: null,
+    goalIds: [] as string[],
     valueCents: 1_820_000,
     ...overrides,
   };
@@ -129,7 +129,7 @@ describe("GoalForm — édition", () => {
     updateAction.mockResolvedValueOnce(undefined);
     renderWithI18n(
       <GoalForm
-        envelopes={[makeEnvelope({ goalId: "goal-1" })]}
+        envelopes={[makeEnvelope({ goalIds: ["goal-1"] })]}
         initial={{
           id: "goal-1",
           type: "FIRE",

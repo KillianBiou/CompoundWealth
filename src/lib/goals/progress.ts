@@ -106,6 +106,12 @@ export interface GoalMetrics {
   requiredMonthlySavingsCents: number | null;
   /** épargne mensuelle nécessaire au rendement attendu, centimes */
   requiredMonthlySavingsAtReturnCents: number | null;
+  /**
+   * Mois estimés pour remplir le but à la contribution mensuelle actuelle,
+   * au rendement attendu (capitalisation mensuelle). Null si pas de cible,
+   * pas de contribution ou inatteignable.
+   */
+  monthsToFill: number | null;
   status: GoalStatus;
 }
 
@@ -233,9 +239,10 @@ export function needsAttention(status: GoalStatus): boolean {
 /** Ton sémantique du badge de statut — les tons existants de l'app. */
 export function statusTone(
   status: GoalStatus,
-): "positive" | "negative" | "warning" | "neutral" | "accent" {
+): "positive" | "negative" | "warning" | "neutral" | "accent" | "gold" {
   switch (status) {
     case "achieved":
+      return "gold";
     case "onTrack":
       return "positive";
     case "alert":
@@ -249,6 +256,28 @@ export function statusTone(
     case "overfunded":
       return "neutral";
   }
+}
+
+/**
+ * Mois pour atteindre la cible à contribution fixe et rendement annuel donné
+ * (capitalisation mensuelle, même mécanique que projectCapital).
+ * Retourne null si inatteignable (> 600 mois) ou si déjà atteint (0).
+ */
+export function monthsToFillGoal(
+  currentCents: number,
+  targetCents: number,
+  monthlyContributionCents: number,
+  annualRate: number,
+): number | null {
+  if (targetCents <= 0 || currentCents >= targetCents) return 0;
+  if (monthlyContributionCents <= 0 && annualRate <= 0) return null;
+  const monthlyRate = Math.pow(1 + annualRate, 1 / 12) - 1;
+  let value = currentCents;
+  for (let m = 1; m <= 600; m += 1) {
+    value = value * (1 + monthlyRate) + monthlyContributionCents;
+    if (value >= targetCents) return m;
+  }
+  return null;
 }
 
 /** Calcule toutes les métriques et le statut d'un but. */
@@ -291,6 +320,10 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
     else if (monthsCovered !== null && monthsCovered < SAFETY_NET_ALERT_MONTHS)
       status = "alert";
     else status = "onTrack";
+    const cashReturn =
+      input.cashReturn !== null && input.cashReturn !== undefined && input.cashReturn >= 0
+        ? input.cashReturn
+        : 0;
     return {
       progress,
       displayProgress: Math.min(1, Math.max(0, progress)),
@@ -305,6 +338,10 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
           ? Math.max(0, Math.ceil(target - linkedValueCents))
           : null,
       requiredMonthlySavingsAtReturnCents: null,
+      monthsToFill:
+        target !== null && target > linkedValueCents && contribution > 0
+          ? monthsToFillGoal(linkedValueCents, target, contribution, cashReturn)
+          : null,
       status,
     };
   }
@@ -327,6 +364,16 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
     if (targetDate && targetDate.getTime() < now.getTime() && progress < 1) {
       status = "late";
     }
+    const fireRequiredReturn =
+      capitalTarget !== null && capitalTarget > linkedValueCents
+        ? requiredAnnualReturn(
+            linkedValueCents,
+            capitalTarget,
+            targetDate ? yearsLeft : 0,
+            contribution,
+          )
+        : null;
+    const fireExpected = input.expectedReturn ?? null;
     return {
       progress,
       displayProgress: Math.min(1, Math.max(0, progress)),
@@ -334,8 +381,9 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
       monthsCovered: null,
       currentRentCents: currentRent,
       capitalTargetCents: capitalTarget,
-      requiredReturn: null,
-      realisticReturn: null,
+      requiredReturn: fireRequiredReturn,
+      realisticReturn:
+        fireExpected !== null ? Math.max(0, fireExpected - REALISM_MARGIN) : null,
       requiredMonthlySavingsCents:
         capitalTarget && capitalTarget > linkedValueCents
           ? Math.ceil(
@@ -343,6 +391,15 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
             )
           : 0,
       requiredMonthlySavingsAtReturnCents: null,
+      monthsToFill:
+        capitalTarget !== null && capitalTarget > linkedValueCents && contribution > 0
+          ? monthsToFillGoal(
+              linkedValueCents,
+              capitalTarget,
+              contribution,
+              fireExpected ?? 0,
+            )
+          : null,
       status,
     };
   }
@@ -432,6 +489,10 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
     realisticReturn: realistic,
     requiredMonthlySavingsCents: requiredSavings,
     requiredMonthlySavingsAtReturnCents: requiredSavingsAtReturn,
+    monthsToFill:
+      target > linkedValueCents && contribution > 0
+        ? monthsToFillGoal(linkedValueCents, target, contribution, expected ?? 0)
+        : null,
     status,
   };
 }
