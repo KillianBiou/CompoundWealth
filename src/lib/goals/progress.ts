@@ -48,6 +48,50 @@ export const OVERFUNDED_FACTOR = 1.5;
 /** Projection > cible × 1,1 → excédentaire. */
 export const SURPLUS_PROJECTION_FACTOR = 1.1;
 
+/**
+ * Échelle de précaution du matelas de sécurité — parlons couverture, pas
+ * rendement : pour de l'épargne de précaution, la seule question est
+ * « combien de temps mes dépenses sont-elles couvertes ».
+ *
+ * 1. "critical" : < 1 mois couvert — épargne très précaire ;
+ * 2. "fragile"  : 1 à < 3 mois (zone d'alerte universelle du matelas) ;
+ * 3. "partial"  : ≥ 3 mois mais < 50 % de la cible ;
+ * 4. "building" : ≥ 50 % de la cible — plus de la moitié du chemin ;
+ * 5. "robust"   : ≥ 100 % de la cible — réserve au complet ;
+ * 6. "excess"   : > 150 % de la cible — liquidité dormante.
+ *
+ * Mode montant (pas de dépenses saisies) : les mois ne sont pas calculables,
+ * l'échelle retombe sur la progression (10 % / 25 % / 50 % / 100 % / 150 %).
+ */
+export type SafetyNetLevel =
+  | "critical"
+  | "fragile"
+  | "partial"
+  | "building"
+  | "robust"
+  | "excess";
+
+export function safetyNetLevel(
+  monthsCovered: number | null,
+  targetMonths: number | null,
+  progress: number,
+): SafetyNetLevel {
+  if (monthsCovered !== null && targetMonths !== null && targetMonths > 0) {
+    if (monthsCovered >= targetMonths * OVERFUNDED_FACTOR) return "excess";
+    if (monthsCovered >= targetMonths) return "robust";
+    if (monthsCovered / targetMonths >= 0.5) return "building";
+    if (monthsCovered >= SAFETY_NET_ALERT_MONTHS) return "partial";
+    if (monthsCovered >= 1) return "fragile";
+    return "critical";
+  }
+  if (progress >= OVERFUNDED_FACTOR) return "excess";
+  if (progress >= 1) return "robust";
+  if (progress >= 0.5) return "building";
+  if (progress >= 0.25) return "partial";
+  if (progress >= 0.1) return "fragile";
+  return "critical";
+}
+
 /** Buts dont la progression est un capital (rendement requis pertinent). */
 export function isCapitalizedGoal(type: GoalType): boolean {
   return (
@@ -550,10 +594,22 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
       ? projectCapital(linkedValueCents, contribution, realistic ?? 0, yearsLeft)
       : null;
 
+  // même mécanique que FIRE : au rythme actuel (contribution + rendement
+  // attendu), le but sera-t-il rempli à la date cible ? Sinon « en retard »
+  // plutôt que « sur la bonne voie » — l'échéance engage, pas la trajectoire
+  const projectedAtExpected =
+    targetDate && targetDate.getTime() > now.getTime() && target > 0
+      ? projectCapital(linkedValueCents, contribution, expected ?? 0, yearsLeft)
+      : null;
+  const missedDeadline =
+    projectedAtExpected !== null ? projectedAtExpected < target : false;
+
   let status: GoalStatus;
   if (progress >= OVERFUNDED_FACTOR) status = "overfunded";
   else if (target > 0 && progress >= 1) status = "achieved";
   else if (targetDate && targetDate.getTime() < now.getTime() && progress < 1)
+    status = "late";
+  else if (missedDeadline && contribution + (expected ?? 0) > 0)
     status = "late";
   else if (
     isCapitalizedGoal(type) &&

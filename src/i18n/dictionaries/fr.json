@@ -1087,7 +1087,27 @@
         "extreme": "Le rendement requis dépasse très largement ce que la bourse fait en moyenne : quasiment impossible — repensez la cible, l'échéance ou la contribution."
       },
       "shortHorizonWarning": "Horizon court (< 5 ans) : un crash de marché peut suffire à faire rater l'objectif — la moyenne long terme n'aura pas le temps de lisser.",
-      "requiredReturnHint": "Rendement annuel nécessaire pour atteindre la cible à la date voulue, avec votre capital et votre contribution actuels. La couleur indique s'il est raisonnable."
+      "requiredReturnHint": "Rendement annuel nécessaire pour atteindre la cible à la date voulue, avec votre capital et votre contribution actuels. La couleur indique s'il est raisonnable.",
+      "coverage": "Couverture actuelle",
+      "coverageHint": "Mois de dépenses couverts par votre épargne de précaution.",
+      "cashRate": "Taux livret pondéré",
+      "cashRateHint": "Taux des enveloppes liquides liées, pondéré par leur valeur.",
+      "safetyScale": {
+        "critical": "Épargne très précaire",
+        "fragile": "Épargne précaire",
+        "partial": "Réserve partielle",
+        "building": "Réserve en construction",
+        "robust": "Réserve solide",
+        "excess": "Réserve excessive"
+      },
+      "safetyScaleExplain": {
+        "critical": "Moins d'un mois de dépenses couvert : la moindre imprévu peut vous forcer à vendre en urgence. Priorité absolue avant tout investissement.",
+        "fragile": "1 à 3 mois de dépenses couverts : la zone d'alerte du matelas. Un pépin sérieux (travail, santé, voiture) épuiserait la réserve.",
+        "partial": "Au moins 3 mois couverts mais moins de la moitié de la cible : la base de sécurité est là, continuez l'effort régulier.",
+        "building": "Plus de la moitié de la cible atteinte : le plus dur est fait, la discipline régulière fait le reste.",
+        "robust": "Cible atteinte : vos dépenses sont couvertes sur la durée visée. La réserve joue pleinement son rôle d'amortisseur.",
+        "excess": "Plus d'une fois et demie la cible : de l'argent dort à faible rendement — la part excédentaire pourrait alimenter d'autres buts."
+      }
     },
     "combinedGoTo": "Voir mes buts"
   }
