@@ -98,6 +98,22 @@ export default async function GoalDetailPage({
         )
       : null;
   const needsAdjust = ["compromised", "underfunded", "late"].includes(m.status);
+  // date réaliste : mois nécessaires au rythme actuel (contribution + rendement
+  // attendu) pour atteindre la cible — remplace la date cible quand le rythme
+  // actuel ne tient pas l'échéance
+  const realisticFillMonths =
+    showAdjust && goal.targetAmountCents !== null
+      ? monthsToFillGoal(
+          goal.linkedValueCents,
+          goal.targetAmountCents,
+          goal.effectiveMonthlyContributionCents,
+          expectedReturn,
+        )
+      : null;
+  const realisticDate =
+    realisticFillMonths !== null && realisticFillMonths > 0
+      ? new Date(now.getFullYear(), now.getMonth() + realisticFillMonths, 1).toLocaleDateString(locale)
+      : null;
 
   // faisabilité du but : rendement requis vs moyenne bourse vs passé lié
   // (jamais pour le matelas — l'analyse de précaution la remplace)
@@ -105,6 +121,10 @@ export default async function GoalDetailPage({
     goal.type === "SAFETY_NET" ? null : m.requiredReturn,
     goal.type === "SAFETY_NET" ? null : goal.linkedPastReturn,
     expectedReturn,
+    goal.type !== "SAFETY_NET" &&
+      m.requiredReturn === null &&
+      m.capitalTargetCents !== null &&
+      goal.linkedValueCents < m.capitalTargetCents,
   );
   const shortHorizon = isShortHorizonConcern(feasibility, yearsLeft);
   // couleur du KPI « rendement requis » : même grille que l'encadré
@@ -347,7 +367,14 @@ export default async function GoalDetailPage({
           <div className="grid grid-cols-1 gap-6 border-t border-border-cw pt-6 sm:grid-cols-3 xl:flex-1 xl:border-t-0 xl:pt-0 xl:pl-8 xl:pr-8">
             <Kpi
               label={t.goals.detail.requiredReturn}
-              value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+              value={
+                m.requiredReturn !== null
+                  ? formatPercent(m.requiredReturn)
+                  : m.capitalTargetCents !== null &&
+                      goal.linkedValueCents < m.capitalTargetCents
+                    ? "> +30 %"
+                    : "—"
+              }
               valueTone={requiredReturnTone}
               hint={t.goals.detail.requiredReturnHint}
               align="center"
@@ -423,7 +450,8 @@ export default async function GoalDetailPage({
             <div className="rounded-lg border border-border-cw bg-bg-subtle p-3">
               <p className="text-xs text-text-muted">{t.goals.detail.adjustDate}</p>
               <p className="mt-0.5 text-sm font-medium text-text-primary">
-                {goal.targetDate ? goal.targetDate.toLocaleDateString(locale) : "—"}
+                {realisticDate ??
+                  (goal.targetDate ? goal.targetDate.toLocaleDateString(locale) : "—")}
               </p>
             </div>
             <div className="rounded-lg border border-border-cw bg-bg-subtle p-3">
@@ -490,7 +518,12 @@ export default async function GoalDetailPage({
           <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-text-muted">
             <span>
               {t.goals.detail.requiredReturn} :{" "}
-              {m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+              {m.requiredReturn !== null
+                ? formatPercent(m.requiredReturn)
+                : m.capitalTargetCents !== null &&
+                    goal.linkedValueCents < m.capitalTargetCents
+                  ? "> +30 %"
+                  : "—"}
             </span>
             <span>
               {t.goals.detail.pastReturn} :{" "}
