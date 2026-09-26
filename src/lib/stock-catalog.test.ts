@@ -16,8 +16,10 @@ describe("STOCK_CATALOG", () => {
     expect(isins).toContain("US67066G1040");
     expect(isins).toContain("FR0000121014");
   });
-  it("n'expose que des actions cotées (pas SpaceX)", () => {
-    expect(STOCK_CATALOG.find((s) => s.ticker === "SPCX")).toBeUndefined();
+  it("inclut SpaceX (SPCX) cotée depuis son IPO", () => {
+    expect(STOCK_CATALOG.find((s) => s.ticker === "SPCX")?.isin).toBe(
+      "US84615Q1031",
+    );
   });
 });
 
