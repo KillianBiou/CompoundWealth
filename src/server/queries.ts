@@ -357,3 +357,310 @@ export const getEnvelopeClipboardData = cache(async (): Promise<
     };
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/*                                  Buts                                       */
+/* -------------------------------------------------------------------------- */
+
+import {
+  buildGoalMonthlySeries,
+  computeGoalMetrics,
+  type GoalType,
+  type GoalMetrics,
+} from "@/lib/goals/progress";
+import { aggregateSeries } from "@/lib/portfolio/series";
+import {
+  DEFAULT_EQUITY_RETURN,
+  historicalCagr,
+} from "@/lib/analysis/scanners";
+
+export interface GoalEnvelopeSummary {
+  id: string;
+  name: string;
+  type: "PEA" | "CTO" | "LIVRET_A" | "PRIV";
+  broker: string | null;
+  /** valeur actuelle — STRICTEMENT identique à EnvelopeSummary.valueCents */
+  valueCents: number;
+  /** série de valorisation (interpolation plate) */
+  series: { date: Date; valueCents: number }[];
+  /** DCA mensuel actif en centimes (préfill de contribution) */
+  dcaMonthlyCents: number;
+  closedAt: Date | null;
+  /** noms des AUTRES buts partageant cette enveloppe (avertissement multi-lien) */
+  sharedGoalNames: string[];
+  /** série cumulée investie (rendement passé Modified Dietz) */
+  investedSeries: { date: Date; valueCents: number }[];
+}
+
+export interface GoalSummary {
+  id: string;
+  type: GoalType;
+  name: string;
+  icon: string;
+  targetAmountCents: number | null;
+  targetRentCents: number | null;
+  targetMonths: number | null;
+  targetDate: Date | null;
+  withdrawalRate: number | null;
+  monthlyExpensesCents: number | null;
+  monthlyContributionCents: number | null;
+  createdAt: Date;
+  envelopes: GoalEnvelopeSummary[];
+  /** valeur actuelle des enveloppes liées ouvertes */
+  linkedValueCents: number;
+  /** contribution mensuelle totale (déclarée + DCA des enveloppes liées) */
+  effectiveMonthlyContributionCents: number;
+  metrics: GoalMetrics;
+  /** rendement passé annualisé des enveloppes liées (null si historique court) */
+  linkedPastReturn: number | null;
+  /** hypothèse de rendement utilisée pour les projections (moyenne bourse) */
+  expectedReturn: number;
+  /** rendement livret pondéré (matelas : hypothèse de la projection dorée) */
+  cashReturn: number | null;
+  /** série mensuelle de la métrique du but */
+  monthlySeries: { date: Date; valueCents: number; metric: number }[];
+  /** série agrégée des enveloppes liées (graphique valeur) */
+  linkedSeries: { date: Date; valueCents: number }[];
+}
+
+/** Catégories d'affichage de la liste des buts. */
+export const GOAL_CATEGORY_ORDER: Record<GoalType, number> = {
+  SAFETY_NET: 0,
+  FIRE: 1,
+  RETIREMENT: 2,
+  DOWN_PAYMENT: 3,
+  CUSTOM_LIFEVENT: 4,
+  CUSTOM: 5,
+};
+
+export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
+  const userId = await requireUserId();
+  const goals = await prisma.goal.findMany({
+    where: { userId },
+    include: {
+      envelopes: {
+        where: { closedAt: null },
+        include: {
+          positions: {
+            select: {
+              investedCents: true,
+              boughtAt: true,
+              valuations: { orderBy: { date: "asc" } },
+              investments: { orderBy: { date: "asc" } },
+            },
+          },
+          deposits: { orderBy: { date: "asc" } },
+          dcaPlans: { include: { lines: true } },
+          goals: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (goals.length === 0) return [];
+
+  // rendement attendu : moyenne long terme de la bourse mondiale — une seule
+  // hypothèse prudente pour les projections, indépendante du passé récent
+  const expectedReturn = DEFAULT_EQUITY_RETURN;
+
+  return goals.map((goal) => {
+    const now = new Date();
+    const envelopes: GoalEnvelopeSummary[] = goal.envelopes.map((e) => {
+      // même chaîne de valorisation que getEnvelopeSummaries — invariant strict
+      const positionsValue = e.positions.reduce(
+        (s, p) =>
+          s +
+          currentValueCents(p.valuations, p.investedCents ?? 0),
+        0,
+      );
+      const valuations = buildEnvelopeValuations(e.positions);
+      const isLivret = e.type === "LIVRET_A";
+      const livretRate = e.interestRate ?? LIVRET_A_RATE;
+      const livretSeries = isLivret
+        ? buildLivretBalanceSeries(
+            e.deposits.map((d) => ({ date: d.date, amountCents: d.amountCents })),
+            livretRate,
+          )
+        : [];
+      const nowTime = now.getTime();
+      const livretPoint = isLivret
+        ? [...livretSeries].reverse().find((p) => p.date.getTime() <= nowTime) ??
+          livretSeries[0] ??
+          null
+        : null;
+      const valueCents = isLivret
+        ? (livretPoint?.balanceCents ?? 0)
+        : valuations.length > 0
+          ? valuations[valuations.length - 1].valueCents
+          : positionsValue;
+      const series = isLivret
+        ? livretSeries
+            .filter((p) => p.date.getTime() <= nowTime)
+            .map((p) => ({ date: p.date, valueCents: p.balanceCents }))
+        : valuations;
+      const dcaMonthly = e.dcaPlans
+        .filter((p) => p.active)
+        .reduce((s, p) => s + p.lines.reduce((ls, l) => ls + l.maxAmountCents, 0), 0);
+      // série investie (pour le rendement passé Modified Dietz) : dépôts livret
+      // ou versements réels des positions — même source que EnvelopeSummary
+      const investedSeries = isLivret
+        ? buildLivretBalanceSeries(
+            e.deposits.map((d) => ({ date: d.date, amountCents: d.amountCents })),
+            0,
+          )
+            .filter((p) => p.date.getTime() <= nowTime)
+            .map((p) => ({ date: p.date, valueCents: p.depositedCents }))
+        : buildEnvelopeInvestedSeries(e.positions);
+      return {
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        broker: e.broker,
+        valueCents,
+        series,
+        dcaMonthlyCents: dcaMonthly,
+        closedAt: e.closedAt,
+        sharedGoalNames: e.goals
+          .filter((g) => g.id !== goal.id)
+          .map((g) => g.name),
+        investedSeries,
+      };
+    });
+
+    const linkedValueCents = envelopes.reduce((s, e) => s + e.valueCents, 0);
+    const dcaTotal = envelopes.reduce((s, e) => s + e.dcaMonthlyCents, 0);
+    const contribution = (goal.monthlyContributionCents ?? 0) + dcaTotal;
+
+    // matelas : rendement des enveloppes liquides (livret) pour le remplissage projeté
+    const cashValueTotal = envelopes.reduce((s, e) => s + e.valueCents, 0);
+    const cashReturn =
+      goal.type === "SAFETY_NET" && cashValueTotal > 0
+        ? goal.envelopes.reduce(
+            (s, raw) =>
+              s +
+              (raw.type === "LIVRET_A" ? raw.interestRate ?? LIVRET_A_RATE : 0) *
+                (envelopes.find((e) => e.id === raw.id)?.valueCents ?? 0),
+            0,
+          ) / cashValueTotal
+        : null;
+    const metricsCashReturn = cashReturn ?? 0;
+
+    const metrics = computeGoalMetrics({
+      type: goal.type,
+      linkedValueCents,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      withdrawalRate: goal.withdrawalRate,
+      monthlyContributionCents: contribution,
+      targetDate: goal.targetDate,
+      createdAt: goal.createdAt,
+      expectedReturn,
+      cashReturn: metricsCashReturn,
+      now,
+    });
+
+    const linkedSeries = aggregateSeries(envelopes.map((e) => e.series));
+
+    // rendement passé annualisé des SEULES enveloppes liées à ce but,
+    // neutralisé des versements (Modified Dietz) — pondération implicite par
+    // le capital de chaque enveloppe et son évolution via les versements
+    const linkedInvestedSeries = aggregateSeries(
+      envelopes.map((e) => e.investedSeries),
+    );
+    const linkedPastReturn = historicalCagr(linkedSeries, linkedInvestedSeries, now);
+
+    const monthlySeries = buildGoalMonthlySeries({
+      type: goal.type,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      withdrawalRate: goal.withdrawalRate,
+      createdAt: goal.createdAt,
+      series: linkedSeries,
+      now,
+    });
+
+    return {
+      id: goal.id,
+      type: goal.type,
+      name: goal.name,
+      icon: goal.icon,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      targetDate: goal.targetDate,
+      withdrawalRate: goal.withdrawalRate,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      monthlyContributionCents: goal.monthlyContributionCents,
+      createdAt: goal.createdAt,
+      envelopes,
+      linkedValueCents,
+      effectiveMonthlyContributionCents: contribution,
+      metrics,
+      linkedPastReturn,
+      expectedReturn,
+      cashReturn,
+      monthlySeries,
+      linkedSeries,
+    };
+  });
+});
+
+/** Un seul but par id (détail). */
+export const getGoal = cache(async (goalId: string): Promise<GoalSummary | null> => {
+  const summaries = await getGoalSummaries();
+  return summaries.find((g) => g.id === goalId) ?? null;
+});
+
+/** Enveloppes disponibles pour lier à un but : ouvertes, non clôturées. */
+export const getLinkableEnvelopes = cache(async () => {
+  const userId = await requireUserId();
+  const envelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      broker: true,
+      closedAt: true,
+      goals: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return envelopes.map((e) => ({
+    id: e.id,
+    name: e.name,
+    type: e.type as "PEA" | "CTO" | "LIVRET_A" | "PRIV",
+    broker: e.broker,
+    closedAt: e.closedAt,
+    goalIds: e.goals.map((g) => g.id),
+    goalNames: e.goals.map((g) => g.name),
+  }));
+});
+
+/**
+ * Hypothèse de rendement pour les projections de buts : moyenne long terme
+ * de la bourse mondiale (8 %/an). PAS le rendement passé du portefeuille —
+ * un historique court et porté par le DCA gonflerait toutes les projections.
+ */
+export const getGoalExpectedReturn = cache(async (): Promise<number> => {
+  return DEFAULT_EQUITY_RETURN;
+});
+
+/** Statut combiné pour la carte dashboard (léger, sans séries). */
+export const getGoalsCombinedStatus = cache(
+  async (): Promise<{ total: number; onTrack: number; needsAttention: number }> => {
+    const summaries = await getGoalSummaries();
+    const needsAttention = summaries.filter((g) =>
+      ["compromised", "underfunded", "late", "alert"].includes(g.metrics.status),
+    ).length;
+    return {
+      total: summaries.length,
+      onTrack: summaries.length - needsAttention,
+      needsAttention,
+    };
+  },
+);
