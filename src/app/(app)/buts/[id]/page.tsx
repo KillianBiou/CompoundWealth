@@ -262,71 +262,83 @@ export default async function GoalDetailPage({
         ) : null}
       </Card>
 
-      {/* KPIs */}
-      <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <Kpi
-          label={t.goals.detail.contribution}
-          value={formatEurCents(goal.effectiveMonthlyContributionCents)}
-          hint={t.goals.detail.contributionHint}
-        />
-        {goal.type === "SAFETY_NET" ? (
-          /* matelas : pas de rendement requis — le remplissage au DCA actuel */
+      {/* KPIs — une seule bande, trois groupes logiques :
+          effort · rendements · échéance */}
+      <Card className="flex flex-col gap-6 xl:flex-row xl:items-center xl:gap-0 xl:divide-x xl:divide-border-cw">
+        {/* groupe 1 : effort d'épargne */}
+        <div className="grid shrink-0 grid-cols-2 gap-6 sm:grid-cols-1 xl:pr-8">
           <Kpi
-            label={t.goals.detail.monthsToFill}
+            label={t.goals.detail.contribution}
+            value={formatEurCents(goal.effectiveMonthlyContributionCents)}
+            hint={t.goals.detail.contributionHint}
+          />
+        </div>
+        {/* groupe 2 : rendements — requis vs hypothèse vs passé */}
+        <div className="grid grid-cols-1 gap-6 border-t border-border-cw pt-6 sm:grid-cols-3 xl:flex-1 xl:border-t-0 xl:pt-0 xl:pl-8 xl:pr-8">
+          {goal.type === "SAFETY_NET" ? (
+            /* matelas : pas de rendement requis — le remplissage au DCA actuel */
+            <Kpi
+              label={t.goals.detail.monthsToFill}
+              value={
+                m.monthsToFill !== null
+                  ? `${m.monthsToFill} ${t.goals.detail.monthsUnit}`
+                  : "—"
+              }
+              hint={t.goals.detail.monthsToFillHint}
+            />
+          ) : (
+            <Kpi
+              label={t.goals.detail.requiredReturn}
+              value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+            />
+          )}
+          {/*
+            Rendement moyen de la bourse : hypothèse long terme des projections.
+            PAS UNE PROMESSE — c'est la moyenne historique du marché actions.
+          */}
+          <Kpi
+            label={t.goals.detail.expectedReturn}
+            value={formatPercent(expectedReturn)}
+            hint={t.goals.detail.expectedReturnHint}
+          />
+          {/*
+            Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
+            pondérées par leur capital (et son évolution via les DCA/versements).
+            LE PASSÉ NE PRÉSAGE PAS DU FUTUR.
+          */}
+          <Kpi
+            label={t.goals.detail.pastReturn}
             value={
-              m.monthsToFill !== null
-                ? `${m.monthsToFill} ${t.goals.detail.monthsUnit}`
+              goal.linkedPastReturn !== null
+                ? formatPercent(goal.linkedPastReturn)
                 : "—"
             }
-            hint={t.goals.detail.monthsToFillHint}
+            hint={t.goals.detail.pastReturnHint}
           />
-        ) : (
-          <Kpi
-            label={t.goals.detail.requiredReturn}
-            value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
-          />
-        )}
-        {/*
-          Rendement moyen de la bourse : hypothèse long terme des projections.
-          PAS UNE PROMESSE — c'est la moyenne historique du marché actions.
-        */}
-        <Kpi
-          label={t.goals.detail.expectedReturn}
-          value={formatPercent(expectedReturn)}
-          hint={t.goals.detail.expectedReturnHint}
-        />
-        {/*
-          Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
-          pondérées par leur capital (et son évolution via les DCA/versements).
-          LE PASSÉ NE PRÉSAGE PAS DU FUTUR.
-        */}
-        <Kpi
-          label={t.goals.detail.pastReturn}
-          value={
-            goal.linkedPastReturn !== null
-              ? formatPercent(goal.linkedPastReturn)
-              : "—"
-          }
-          hint={t.goals.detail.pastReturnHint}
-        />
-        {m.requiredMonthlySavingsAtReturnCents !== null ? (
-          <Kpi
-            label={t.goals.detail.requiredSavingsAtReturn}
-            value={formatEurCents(m.requiredMonthlySavingsAtReturnCents)}
-            hint={t.goals.detail.requiredSavingsHint}
-          />
-        ) : m.monthsToFill !== null && goal.type !== "SAFETY_NET" ? (
-          <Kpi
-            label={t.goals.detail.monthsToFill}
-            value={`${m.monthsToFill} ${t.goals.detail.monthsUnit}`}
-            hint={t.goals.detail.monthsToFillHint}
-          />
-        ) : (
-          <Kpi
-            label={t.goals.detail.monthsLeft}
-            value={monthsLeft !== null ? String(monthsLeft) : "—"}
-          />
-        )}
+        </div>
+        {/* groupe 3 : échéance — remplissage ou mois restants (buts datés) */}
+        {goal.type !== "SAFETY_NET" ? (
+          <div className="grid shrink-0 grid-cols-1 gap-6 border-t border-border-cw pt-6 xl:border-t-0 xl:pt-0 xl:pl-8">
+            {m.requiredMonthlySavingsAtReturnCents !== null ? (
+              <Kpi
+                label={t.goals.detail.requiredSavingsAtReturn}
+                value={formatEurCents(m.requiredMonthlySavingsAtReturnCents)}
+                hint={t.goals.detail.requiredSavingsHint}
+              />
+            ) : m.monthsToFill !== null ? (
+              <Kpi
+                label={t.goals.detail.monthsToFill}
+                value={`${m.monthsToFill} ${t.goals.detail.monthsUnit}`}
+                hint={t.goals.detail.monthsToFillHint}
+              />
+            ) : (
+              <Kpi
+                label={t.goals.detail.monthsLeft}
+                value={monthsLeft !== null ? String(monthsLeft) : "—"}
+              />
+            )}
+          </div>
+        ) : null}
       </Card>
 
       {/* leviers d'ajustement : si le but est compromis/sous-financé/en retard */}
