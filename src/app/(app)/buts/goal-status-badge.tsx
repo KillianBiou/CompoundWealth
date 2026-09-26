@@ -3,7 +3,7 @@
 import type { GoalStatus } from "@/lib/goals/progress";
 import { Badge } from "@/components/ui";
 import { useI18n } from "@/i18n/provider";
-import { statusTone } from "./goal-card";
+import { statusTone } from "@/lib/goals/progress";
 
 export { statusTone };
 

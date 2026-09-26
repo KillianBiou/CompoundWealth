@@ -225,6 +225,32 @@ export function projectCapital(
   return Math.round(value);
 }
 
+/** Vrai si le statut demande une attention (regroupement à revoir»). */
+export function needsAttention(status: GoalStatus): boolean {
+  return ["compromised", "underfunded", "late", "alert"].includes(status);
+}
+
+/** Ton sémantique du badge de statut — les tons existants de l'app. */
+export function statusTone(
+  status: GoalStatus,
+): "positive" | "negative" | "warning" | "neutral" | "accent" {
+  switch (status) {
+    case "achieved":
+    case "onTrack":
+      return "positive";
+    case "alert":
+    case "late":
+      return "negative";
+    case "compromised":
+    case "underfunded":
+      return "warning";
+    case "surplus":
+      return "accent";
+    case "overfunded":
+      return "neutral";
+  }
+}
+
 /** Calcule toutes les métriques et le statut d'un but. */
 export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
   const now = input.now ?? new Date();

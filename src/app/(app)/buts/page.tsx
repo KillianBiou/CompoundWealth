@@ -3,7 +3,8 @@ import { getGoalSummaries } from "@/server/queries";
 import type { GoalType } from "@/lib/goals/progress";
 import { ButtonLink, Card } from "@/components/ui";
 import { getDictionary, getLocaleFromCookies } from "@/i18n/server";
-import { GoalCard, needsAttention } from "./goal-card";
+import { needsAttention } from "@/lib/goals/progress";
+import { GoalCard } from "./goal-card";
 
 function categoryKey(type: GoalType): GoalType {
   // FIRE et RETIREMENT partagent la catégorie « Indépendance & retraite »,

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { GoalSummary } from "@/server/queries";
-import type { GoalStatus } from "@/lib/goals/progress";
 import { formatEurCents } from "@/lib/money";
 import { Card } from "@/components/ui";
 import { cn } from "@/components/cn";
@@ -11,31 +10,8 @@ import { GoalStatusBadge } from "./goal-status-badge";
 
 
 
-/** Vrai si le statut demande une attention (regroupement "à revoir"). */
-export function needsAttention(status: GoalStatus): boolean {
-  return ["compromised", "underfunded", "late", "alert"].includes(status);
-}
-
-/** Badge de statut d'un but — sémantique des tons existants. */
-export function statusTone(status: GoalStatus): "positive" | "negative" | "warning" | "neutral" | "accent" {
-  switch (status) {
-    case "achieved":
-    case "onTrack":
-      return "positive";
-    case "alert":
-    case "late":
-      return "negative";
-    case "compromised":
-    case "underfunded":
-      return "warning";
-    case "surplus":
-      return "accent";
-    case "overfunded":
-      return "neutral";
-  }
-}
-
 export { GoalStatusBadge };
+export { needsAttention, statusTone } from "@/lib/goals/progress";
 
 /**
  * Carte de résumé d'un but : le but et l'actuel en évidence, la métrique
