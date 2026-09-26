@@ -12,6 +12,16 @@ function categoryKey(type: GoalType): GoalType {
   return type;
 }
 
+/** Ordre d'affichage des catégories : les buts sécuritaires d'abord. */
+const CATEGORY_DISPLAY_ORDER: Record<GoalType, number> = {
+  SAFETY_NET: 0,
+  FIRE: 1,
+  RETIREMENT: 2,
+  DOWN_PAYMENT: 3,
+  CUSTOM_LIFEVENT: 4,
+  CUSTOM: 5,
+};
+
 export default async function GoalsPage() {
   const goals = await getGoalSummaries();
   const t = getDictionary(await getLocaleFromCookies());
@@ -26,6 +36,17 @@ export default async function GoalsPage() {
     list.push(goal);
     grouped.set(key, list);
   }
+  // une section par catégorie, buts sécuritaires en premier,
+  // puis un but par ligne (grille pleine largeur)
+  const orderedGroups = [...grouped.entries()].sort((a, b) => {
+    const orderOf = (label: string) => {
+      const type = (Object.keys(CATEGORY_DISPLAY_ORDER) as GoalType[]).find(
+        (k) => t.goals.categories[k] === label,
+      );
+      return type ? CATEGORY_DISPLAY_ORDER[type] : 99;
+    };
+    return orderOf(a[0]) - orderOf(b[0]);
+  });
 
   if (goals.length === 0) {
     return (
@@ -73,12 +94,12 @@ export default async function GoalsPage() {
         </ButtonLink>
       </div>
 
-      {[...grouped.entries()].map(([category, categoryGoals]) => (
+      {orderedGroups.map(([category, categoryGoals]) => (
         <section key={category} className="space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-wide text-text-muted">
             {category}
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             {categoryGoals.map((goal) => (
               <GoalCard key={goal.id} goal={goal} />
             ))}

@@ -248,6 +248,41 @@ describe("machine à statuts", () => {
     expect(m.status).toBe("late");
   });
 
+  it("FIRE : au rythme actuel le but dépasse la date cible → late, pas onTrack", () => {
+    // rente 16 000 €/mois à 4 % → capital 4,8 M€ ; 25 184,95 € actuels,
+    // 1 500 €/mois, échéance dans ~23 ans : la projection à 8 % reste
+    // très loin de la cible → « Sur la bonne voie » serait faux
+    const m = computeGoalMetrics({
+      type: "FIRE",
+      linkedValueCents: 2_518_495,
+      targetRentCents: 1_600_000,
+      withdrawalRate: 0.04,
+      monthlyContributionCents: 150_000,
+      createdAt: new Date(2026, 8, 26),
+      targetDate: new Date(2050, 0, 1),
+      expectedReturn: 0.08,
+      now: new Date(2026, 8, 26),
+    });
+    expect(m.status).toBe("late");
+  });
+
+  it("FIRE : projection qui tient la date cible → onTrack", () => {
+    // 450 000 € actuels + 3 000 €/mois à 8 % pendant ~23 ans
+    // → ~5,05 M€ ≥ capital cible 4,8 M€
+    const m = computeGoalMetrics({
+      type: "FIRE",
+      linkedValueCents: 45_000_000,
+      targetRentCents: 1_600_000,
+      withdrawalRate: 0.04,
+      monthlyContributionCents: 300_000,
+      createdAt: new Date(2026, 8, 26),
+      targetDate: new Date(2050, 0, 1),
+      expectedReturn: 0.08,
+      now: new Date(2026, 8, 26),
+    });
+    expect(["onTrack", "surplus"]).toContain(m.status);
+  });
+
   it("rendement requis > seuil réaliste → compromis", () => {
     // 100 000 € actuels, cible 1 M€ dans 10 ans, sans contribution :
     // r = 10^(1/10)−1 ≈ 25,9 % ≫ réaliste → compromis

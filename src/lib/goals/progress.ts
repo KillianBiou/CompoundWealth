@@ -391,10 +391,29 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
         : null;
     const progress =
       capitalTarget && capitalTarget > 0 ? linkedValueCents / capitalTarget : 0;
+    const fireExpected = input.expectedReturn ?? null;
+    // au rythme actuel (contribution + rendement attendu), le but sera-t-il
+    // rempli AVANT la date cible ? Sinon « sur la bonne voie » serait faux.
+    const projectedAtTarget =
+      capitalTarget !== null &&
+      targetDate &&
+      targetDate.getTime() > now.getTime()
+        ? projectCapital(
+            linkedValueCents,
+            contribution,
+            fireExpected ?? 0,
+            yearsLeft,
+          )
+        : null;
+    const missedDeadline =
+      projectedAtTarget !== null && capitalTarget !== null
+        ? projectedAtTarget < capitalTarget
+        : false;
     let status: GoalStatus;
     if (capitalTarget === null) status = "onTrack";
     else if (progress >= OVERFUNDED_FACTOR) status = "overfunded";
     else if (progress >= 1) status = "achieved";
+    else if (missedDeadline) status = "late";
     else if (progress < trajectory) status = "underfunded";
     else status = "onTrack";
     if (targetDate && targetDate.getTime() < now.getTime() && progress < 1) {
@@ -409,7 +428,6 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
             contribution,
           )
         : null;
-    const fireExpected = input.expectedReturn ?? null;
     return {
       progress,
       displayProgress: Math.min(1, Math.max(0, progress)),

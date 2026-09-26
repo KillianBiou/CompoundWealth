@@ -412,6 +412,14 @@ export default async function GoalDetailPage({
             metricMode={safetyAmountMode ? "progress" : goal.type === "FIRE" ? "rent" : goal.type === "SAFETY_NET" ? "months" : "progress"}
             locale={locale}
             capitalAvailable={goal.linkedSeries.length > 0}
+            targetDate={goal.targetDate ? goal.targetDate.getTime() : null}
+            targetMissed={
+              m.status === "late" &&
+              progressProjectionPoints.length > 0 &&
+              goal.targetDate !== null &&
+              progressProjectionPoints[progressProjectionPoints.length - 1].date >
+                goal.targetDate.getTime()
+            }
           />
         ) : (
           <p className="text-sm text-text-muted">{t.goals.card.noEnvelopes}</p>

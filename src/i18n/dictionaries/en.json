@@ -946,7 +946,7 @@
       "overfunded": "Your progress far exceeds the target (×1.5): the surplus can feed other goals.",
       "achieved": "Your current value meets or exceeds the target. Well done!",
       "underfunded": "Your progress is below the required trajectory: increasing your contribution can help.",
-      "late": "The target date has passed and the goal is not reached — needs a review.",
+      "late": "At the current pace (contribution + expected return), the goal won't be reached by the target date — save more, push the deadline or rethink the target.",
       "alert": "Less than 3 months of expenses covered: safety net alert zone."
     },
     "combined": "{on} on track · {attention} need attention",
