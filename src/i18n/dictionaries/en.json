@@ -1071,18 +1071,21 @@
       "capitalLabel": "Capital",
       "feasibility": {
         "comfortable": "Comfortable goal",
-        "achievable": "Realistic and achievable goal",
+        "achievable": "Achievable goal",
+        "achievableWithPast": "Barely achievable goal — encouraging past performance",
         "demanding": "Demanding goal",
         "hard": "Very difficult goal",
         "extreme": "Nearly impossible goal"
       },
       "feasibilityExplain": {
-        "comfortable": "The required return is well covered by your envelopes' return: wide safety margin.",
-        "achievable": "The required return is covered by your linked envelopes' return: a realistic goal.",
-        "demanding": "The required return exceeds your envelopes' past return: doable, but it will take more time or more savings.",
-        "hard": "The required return is significantly above your envelopes' return: very difficult, even with good envelopes.",
-        "extreme": "The required return far exceeds what your envelopes achieve: nearly impossible — rethink the target, the deadline or the contribution."
-      }
+        "comfortable": "The required return is well below the market average: wide safety margin, achievable even with mediocre returns.",
+        "achievable": "The required return is within the stock market average (~8%/yr): achievable at the market's average pace.",
+        "achievableWithPast": "The required return exceeds the market average, but your linked envelopes have done better in the past. Possible IF that performance continues — nothing guarantees it.",
+        "demanding": "The required return exceeds even your own past performance: you would need to durably beat your own track record.",
+        "hard": "The required return is significantly above the market average: very difficult, even with good envelopes.",
+        "extreme": "The required return far exceeds what the market does on average: nearly impossible — rethink the target, the deadline or the contribution."
+      },
+      "shortHorizonWarning": "Short horizon (< 5 yrs): a single market crash could make you miss the goal — the long-term average won't have time to smooth it out."
     },
     "combinedGoTo": "View my goals"
   }

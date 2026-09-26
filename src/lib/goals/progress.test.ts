@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeGoalMetrics,
   goalFeasibility,
+  isShortHorizonConcern,
   monthsToFillGoal,
   isCapitalizedGoal,
   monthsBetween,
@@ -632,42 +633,66 @@ describe("monthsToFillGoal", () => {
   });
 });
 
-describe("goalFeasibility", () => {
+describe("goalFeasibility — grille de scénarios", () => {
   it("pas de rendement requis (matelas, ou épargne seule suffit) → confortable", () => {
     expect(goalFeasibility(null, 0.06, 0.08)).toBe("comfortable");
     expect(goalFeasibility(0, 0.06, 0.08)).toBe("comfortable");
   });
 
-  it("3 % requis contre 6 % réels → confortable (large marge)", () => {
+  it("requis ≤ moitié de la moyenne bourse → confortable", () => {
     expect(goalFeasibility(0.03, 0.06, 0.08)).toBe("comfortable");
+    expect(goalFeasibility(0.04, null, 0.08)).toBe("comfortable");
   });
 
-  it("requis = rendement réel → réaliste et atteignable", () => {
+  it("requis ≤ moyenne bourse (8 %) → atteignable", () => {
     expect(goalFeasibility(0.06, 0.06, 0.08)).toBe("achievable");
-    expect(goalFeasibility(0.055, 0.06, 0.08)).toBe("achievable");
+    expect(goalFeasibility(0.079, null, 0.08)).toBe("achievable");
   });
 
-  it("requis entre 1× et 1,5× le rendement réel → difficile", () => {
-    expect(goalFeasibility(0.08, 0.06, 0.08)).toBe("demanding");
-    expect(goalFeasibility(0.09, 0.06, 0.08)).toBe("demanding");
+  it("requis > 8 % mais ≤ passé (ex. 9,57 % requis vs 15,91 % passés) → atteignable avec le passé", () => {
+    expect(goalFeasibility(0.0957, 0.1591, 0.08)).toBe("achievableWithPast");
+    expect(goalFeasibility(0.15, 0.1591, 0.08)).toBe("achievableWithPast");
   });
 
-  it("requis entre 1,5× et 2× → très difficile", () => {
-    expect(goalFeasibility(0.1, 0.06, 0.08)).toBe("hard");
-    expect(goalFeasibility(0.12, 0.06, 0.08)).toBe("hard");
+  it("requis > passé mais ≤ 1,25 × passé → exigeant (battre son propre historique)", () => {
+    expect(goalFeasibility(0.17, 0.1591, 0.08)).toBe("demanding");
+    expect(goalFeasibility(0.198, 0.1591, 0.08)).toBe("demanding");
   });
 
-  it("25 % requis contre 12 % réels → quasiment impossible", () => {
+  it("requis > 1,25 × passé mais ≤ 2 × moyenne bourse → très difficile", () => {
+    // passé décevant (4 %) : requis 10 % est au-delà du passé × 1,25
+    // mais sous 16 % (2 × 8 %)
+    expect(goalFeasibility(0.1, 0.04, 0.08)).toBe("hard");
+    expect(goalFeasibility(0.16, null, 0.08)).toBe("hard");
+  });
+
+  it("requis > 2 × moyenne bourse → quasiment impossible", () => {
     expect(goalFeasibility(0.25, 0.12, 0.08)).toBe("extreme");
+    expect(goalFeasibility(0.19, 0.04, 0.08)).toBe("extreme");
   });
 
-  it("passé indisponible → comparaison à la moyenne bourse", () => {
+  it("passé indisponible → comparaison à la moyenne bourse seule", () => {
     expect(goalFeasibility(0.05, null, 0.08)).toBe("achievable");
     expect(goalFeasibility(0.13, null, 0.08)).toBe("hard");
   });
 
   it("rendement réel nul ou négatif avec référence nulle → null", () => {
     expect(goalFeasibility(0.05, null, 0)).toBeNull();
+  });
+});
+
+describe("isShortHorizonConcern", () => {
+  it("horizon < 5 ans sur un niveau atteignable → sensible aux crashes", () => {
+    expect(isShortHorizonConcern("achievable", 3)).toBe(true);
+    expect(isShortHorizonConcern("achievableWithPast", 4.5)).toBe(true);
+  });
+
+  it("horizon long, niveau hors risque, ou null → pas d'avertissement", () => {
+    expect(isShortHorizonConcern("achievable", 10)).toBe(false);
+    expect(isShortHorizonConcern("extreme", 2)).toBe(false);
+    expect(isShortHorizonConcern("comfortable", 2)).toBe(false);
+    expect(isShortHorizonConcern(null, 2)).toBe(false);
+    expect(isShortHorizonConcern("achievable", null)).toBe(false);
   });
 });
 
