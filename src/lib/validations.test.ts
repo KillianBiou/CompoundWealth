@@ -126,9 +126,17 @@ describe("createDcaSchema", () => {
   });
   it("rejette un ISIN hors catalog", () => {
     expect(
-      createDcaSchema.safeParse({ ...base, lines: [{ isin: "US0378331005", maxAmountEur: 100 }] })
+      createDcaSchema.safeParse({ ...base, lines: [{ isin: "ZZ0000000000", maxAmountEur: 100 }] })
         .success,
     ).toBe(false);
+  });
+  it("accepte une action du catalogue (NVIDIA)", () => {
+    expect(
+      createDcaSchema.safeParse({
+        ...base,
+        lines: [{ isin: "US67066G1040", maxAmountEur: 100 }],
+      }).success,
+    ).toBe(true);
   });
   it("rejette les doublons de titre avec l'index de la ligne", () => {
     const result = createDcaSchema.safeParse({

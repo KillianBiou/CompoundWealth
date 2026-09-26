@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useActionState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { createDcaAction, type ActionState } from "@/server/actions";
-import { getEtfByIsin, searchEtfCatalog, type EtfCatalogEntry } from "@/lib/etf-catalog";
+import { getSecurityByIsin, searchSecurities, type SecurityCatalogEntry } from "@/lib/stock-catalog";
 import { DCA_FREQUENCY_LABELS, nextDateForDay, type DcaFrequency } from "@/lib/dca";
 import { Badge, Button, Input, Modal, Select } from "@/components/ui";
 import { cn } from "@/components/cn";
@@ -17,6 +17,9 @@ interface LineDraft {
   name: string;
   maxAmountEur: string;
 }
+
+/** ETF ou action — une ligne DCA est identifiée par son ISIN. */
+type SecurityDraft = SecurityCatalogEntry;
 
 export function DcaCreateDialog({
   envelopeId,
@@ -46,11 +49,11 @@ export function DcaCreateDialog({
   useActionToast(state, closeAfterSuccess);
 
   const results = useMemo(
-    () => (pendingAdd ? searchEtfCatalog(query).slice(0, 8) : []),
+    () => (pendingAdd ? searchSecurities(query).slice(0, 8) : []),
     [query, pendingAdd],
   );
 
-  const addLine = (etf: EtfCatalogEntry) => {
+  const addLine = (etf: SecurityDraft) => {
     setLines((prev) =>
       prev.some((l) => l.isin === etf.isin)
         ? prev
@@ -250,26 +253,30 @@ export function DcaCreateDialog({
                         aria-label={t.envelopes.dca.resultsLabel}
                         className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border-cw bg-bg-elevated shadow-lg"
                       >
-                        {results.map((etf) => (
-                          <li key={etf.isin}>
+                        {results.map((security) => (
+                          <li key={security.isin}>
                             <button
                               type="button"
                               role="option"
                               aria-selected={false}
-                              onClick={() => addLine(etf)}
+                              onClick={() => addLine(security)}
                               className="w-full px-3 py-2 text-left transition-colors hover:bg-bg-subtle"
                             >
                               <span className="flex items-center gap-2">
-                                <span className="font-medium text-text-primary">{etf.ticker}</span>
-                                <span className="text-xs text-text-muted">{etf.indexCategory}</span>
+                                <span className="font-medium text-text-primary">{security.ticker}</span>
+                                <span className="text-xs text-text-muted">{security.category}</span>
                               </span>
                               <span className="block truncate text-xs text-text-secondary">
-                                {etf.name} · {etf.isin}
+                                {security.name} · {security.isin}
                               </span>
                             </button>
                           </li>
                         ))}
                       </ul>
+                    ) : query.trim().length > 0 ? (
+                      <p className="absolute z-10 mt-1 w-full rounded-lg border border-border-cw bg-bg-elevated px-3 py-2 text-xs text-text-muted">
+                        {t.envelopes.dca.noResults}
+                      </p>
                     ) : null}
                   </>
                 ) : (
@@ -296,8 +303,8 @@ export function DcaCreateDialog({
                       key={s.isin}
                       type="button"
                       onClick={() => {
-                        const etf = getEtfByIsin(s.isin);
-                        if (etf) addLine(etf);
+                        const security = getSecurityByIsin(s.isin);
+                        if (security) addLine(security);
                       }}
                       className="flex items-center gap-2 rounded-full border border-border-cw bg-bg-subtle px-3 py-1 text-xs text-text-muted transition-colors hover:border-accent-500/50 hover:text-text-secondary"
                     >
@@ -335,8 +342,8 @@ export function DcaCreateDialog({
             updateAmount={updateAmount}
             suggestions={visibleSuggestions}
             onSuggestion={(s) => {
-              const etf = getEtfByIsin(s.isin);
-              if (etf) addLine(etf);
+              const security = getSecurityByIsin(s.isin);
+              if (security) addLine(security);
             }}
           />
         )}
@@ -407,8 +414,8 @@ function SingleModeFields({
   setQuery: (v: string) => void;
   pendingAdd: boolean;
   setPendingAdd: (v: boolean) => void;
-  results: EtfCatalogEntry[];
-  onPick: (etf: EtfCatalogEntry) => void;
+  results: SecurityCatalogEntry[];
+  onPick: (etf: SecurityCatalogEntry) => void;
   frequency: DcaFrequency;
   setFrequency: (v: DcaFrequency) => void;
   startDay: string;
@@ -464,29 +471,33 @@ function SingleModeFields({
                 aria-label={t.envelopes.dca.resultsLabel}
                 className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border-cw bg-bg-elevated shadow-lg"
               >
-                {results.map((etf) => (
-                  <li key={etf.isin}>
+                {results.map((security) => (
+                  <li key={security.isin}>
                     <button
                       type="button"
                       role="option"
                       aria-selected={false}
                       onClick={() => {
-                        onPick(etf);
+                        onPick(security);
                         setQuery("");
                       }}
                       className="w-full px-3 py-2 text-left transition-colors hover:bg-bg-subtle"
                     >
                       <span className="flex items-center gap-2">
-                        <span className="font-medium text-text-primary">{etf.ticker}</span>
-                        <span className="text-xs text-text-muted">{etf.indexCategory}</span>
+                        <span className="font-medium text-text-primary">{security.ticker}</span>
+                        <span className="text-xs text-text-muted">{security.category}</span>
                       </span>
                       <span className="block truncate text-xs text-text-secondary">
-                        {etf.name} · {etf.isin}
+                        {security.name} · {security.isin}
                       </span>
                     </button>
                   </li>
                 ))}
               </ul>
+            ) : pendingAdd && query.trim().length > 0 ? (
+              <p className="absolute z-10 mt-1 w-full rounded-lg border border-border-cw bg-bg-elevated px-3 py-2 text-xs text-text-muted">
+                {t.envelopes.dca.noResults}
+              </p>
             ) : null}
           </div>
         )}

@@ -1,5 +1,5 @@
 "use client";
-import { getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
+import { getSecurityByIsin, getSecurityBySymbol } from "@/lib/stock-catalog";
 import {
   estimateSpendCents,
   nextOccurrence,
@@ -43,7 +43,7 @@ export function referencePriceCents(
 ): number | null {
   for (const position of positions) {
     if (!position.symbol) continue;
-    const catalogEntry = getEtfByTicker(position.symbol);
+    const catalogEntry = getSecurityBySymbol(position.symbol);
     if (!catalogEntry || catalogEntry.isin !== isin) continue;
     if (position.valuations.length > 0 && position.quantity && position.quantity > 0) {
       const last = position.valuations[position.valuations.length - 1].valueCents;
@@ -96,7 +96,7 @@ export function DcaSection({
 
   const rows: DcaTableRow[] = plans.flatMap((plan) =>
     plan.lines.map((line) => {
-      const etf = getEtfByIsin(line.isin);
+      const etf = getSecurityByIsin(line.isin);
       const priceCents = referencePriceCents(line.isin, positions);
       const estimate =
         line.active && plan.active
@@ -167,7 +167,7 @@ function buildSlices(
   for (const plan of plans) {
     for (const line of plan.lines) {
       if (!plan.active || !line.active) continue;
-      const etf = getEtfByIsin(line.isin);
+      const etf = getSecurityByIsin(line.isin);
       const priceCents = referencePriceCents(line.isin, positions);
       const estimate = estimateSpendCents(line.maxAmountCents, priceCents, envelopeType);
       const yearSummary = windowSummaries(
@@ -209,7 +209,7 @@ function buildSuggestions(
   const seen = new Set<string>();
   for (const position of positions) {
     if (!position.symbol) continue;
-    const etf = getEtfByTicker(position.symbol);
+    const etf = getSecurityBySymbol(position.symbol);
     if (!etf || seen.has(etf.isin)) continue;
     seen.add(etf.isin);
     suggestions.push({ isin: etf.isin, ticker: etf.ticker, name: etf.name });

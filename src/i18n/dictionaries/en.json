@@ -378,9 +378,9 @@
       "maxAmountFor": "Max amount for {ticker}",
       "remove": "Remove {ticker}",
       "addSecurity": "Add a security",
-      "suggestions": "Suggestions — ETFs from your envelope",
+      "suggestions": "Suggestions — securities in your envelope",
       "searchPlaceholder": "Name, ticker or ISIN…",
-      "resultsLabel": "Matching ETFs",
+      "resultsLabel": "Matching securities (ETFs and stocks)",
       "confirm": "Confirm",
       "creating": "Creating…",
       "titlesCount": "{count} security{s}",
@@ -425,7 +425,8 @@
           "treemap": "Treemap"
         },
         "estimate": "≈ {amount} · {count} share{s}"
-      }
+      },
+      "noResults": "No security found for this search."
     },
     "dcaFrequency": {
       "BIWEEKLY": "2 weeks",
