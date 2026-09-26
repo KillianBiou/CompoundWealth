@@ -365,7 +365,6 @@ export const getEnvelopeClipboardData = cache(async (): Promise<
 import {
   buildGoalMonthlySeries,
   computeGoalMetrics,
-  type GoalStatus,
   type GoalType,
   type GoalMetrics,
 } from "@/lib/goals/progress";
@@ -573,10 +572,20 @@ export const getLinkableEnvelopes = cache(async () => {
   const userId = await requireUserId();
   const envelopes = await prisma.envelope.findMany({
     where: { userId, closedAt: null },
-    select: { id: true, name: true, type: true, broker: true, goalId: true },
+    select: { id: true, name: true, type: true, broker: true, goalId: true, closedAt: true },
     orderBy: { createdAt: "asc" },
   });
   return envelopes;
+});
+
+/** Rendement attendu du portefeuille (historique si assez de données, sinon défaut actions). */
+export const getGoalExpectedReturn = cache(async (): Promise<number> => {
+  const summaries = await getEnvelopeSummaries();
+  const equityEnvelopes = summaries.filter((e) => e.type !== "LIVRET_A");
+  const wealthSeries = aggregateSeries(equityEnvelopes.map((e) => e.series));
+  const investedSeriesAgg = aggregateSeries(equityEnvelopes.map((e) => e.investedSeries));
+  const historicalReturn = historicalCagr(wealthSeries, investedSeriesAgg);
+  return historicalReturn ?? DEFAULT_EQUITY_RETURN;
 });
 
 /** Statut combiné pour la carte dashboard (léger, sans séries). */
