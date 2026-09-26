@@ -681,6 +681,13 @@ export const STOCK_CATALOG: StockCatalogEntry[] = [
     sector: "Healthcare",
     currency: "CHF",
   },
+  {
+    ticker: "SPCX",
+    isin: "US84615Q1031",
+    name: "SpaceX",
+    sector: "Industrials",
+    currency: "USD",
+  },
 ];
 
 function normalize(value: string): string {
