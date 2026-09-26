@@ -6,6 +6,7 @@ import {
 } from "@/lib/portfolio/series";
 import { buildLivretBalanceSeries, LIVRET_A_RATE } from "@/lib/livret";
 import { computeGoalMetrics } from "@/lib/goals/progress";
+import { historicalCagr } from "@/lib/analysis/scanners";
 
 /* Fixture mixte : PEA (positions avec valuations) + LIVRET_A (dépôts quinzaine) + PRIV.
  * Test 9 de la spec BUTS §6.2 : égalité stricte dashboard ↔ but sur les trois types. */
@@ -148,5 +149,34 @@ describe("smoke buts — précision des enveloppes liées (spec §6.2)", () => {
     const lastWith = withClosed[withClosed.length - 1].valueCents;
     const lastWithout = withoutClosed[withoutClosed.length - 1].valueCents;
     expect(lastWith - lastWithout).toBe(220_000); // la clôturée pèse son dernier solde
+  });
+});
+
+describe("smoke buts — rendement passé des enveloppes liées", () => {
+  it("test 13 : linkedPastReturn agrège SEULEMENT les enveloppes liées, pondérées par capital", () => {
+    // enveloppe liée : 10k→12k sur ~1 an (CAGR ~20 %) ; enveloppe NON liée : flat
+    const linkedSeries = [
+      { date: new Date("2024-01-31"), valueCents: 1_000_000 },
+      { date: new Date("2025-06-30"), valueCents: 1_220_000 },
+    ];
+    const linkedInvested = [
+      { date: new Date("2024-01-31"), valueCents: 1_000_000 },
+      { date: new Date("2025-06-30"), valueCents: 1_000_000 },
+    ];
+    const onlyLinked = historicalCagr(
+      aggregateSeries([linkedSeries]),
+      aggregateSeries([linkedInvested]),
+      NOW,
+    );
+    const withForeign = historicalCagr(
+      aggregateSeries([linkedSeries, [{ date: new Date("2024-01-31"), valueCents: 5_000_000 }]]),
+      aggregateSeries([linkedInvested, [{ date: new Date("2024-01-31"), valueCents: 5_000_000 }]]),
+      NOW,
+    );
+    expect(onlyLinked).not.toBeNull();
+    // sans la pondération par enveloppes liées, une grosse enveloppe étrangère
+    // écraserait le rendement du but
+    expect(onlyLinked!).toBeGreaterThan(0.12);
+    expect(withForeign!).toBeLessThan(onlyLinked!);
   });
 });

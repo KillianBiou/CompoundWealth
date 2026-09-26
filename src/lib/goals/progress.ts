@@ -173,6 +173,42 @@ export function requiredAnnualReturn(
 }
 
 /**
+ * Niveau de faisabilité du but, en comparant le rendement annuel requis
+ * au rendement que les enveloppes liées font réellement (passé annualisé,
+ * neutralisé des versements) :
+ * - "comfortable" : requis ≤ 50 % du rendement réel → large marge ;
+ * - "achievable"  : requis ≤ rendement réel → objectif réaliste et atteignable ;
+ * - "demanding"   : requis ≤ 1,5 × rendement réel → difficile mais envisageable
+ *   si le rendement passé se maintient ;
+ * - "hard"        : requis ≤ 2 × rendement réel → très difficile ;
+ * - "extreme"     : au-delà — quasiment impossible, même avec de bonnes
+ *   enveloppes (ex. 25 % requis contre 12 % réels).
+ * referenceReturn sert de comparaison quand le passé est indisponible
+ * (historique trop court) : on retombe sur la moyenne bourse.
+ */
+export type GoalFeasibility =
+  | "comfortable"
+  | "achievable"
+  | "demanding"
+  | "hard"
+  | "extreme";
+
+export function goalFeasibility(
+  requiredReturn: number | null,
+  portfolioPastReturn: number | null,
+  referenceReturn: number = EXPECTED_EQUITY_RETURN,
+): GoalFeasibility | null {
+  if (requiredReturn === null || requiredReturn <= 0) return "comfortable";
+  const benchmark = portfolioPastReturn ?? referenceReturn;
+  if (benchmark <= 0) return null;
+  if (requiredReturn <= benchmark * 0.5) return "comfortable";
+  if (requiredReturn <= benchmark) return "achievable";
+  if (requiredReturn <= benchmark * 1.5) return "demanding";
+  if (requiredReturn <= benchmark * 2) return "hard";
+  return "extreme";
+}
+
+/**
  * Épargne mensuelle nécessaire pour atteindre la cible à la date, au rendement
  * donné — inversion de la même formule que requiredAnnualReturn :
  *   cible = valeur×(1+r)^n + m×12×[((1+r)^n − 1)/r]  →  m

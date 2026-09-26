@@ -388,6 +388,8 @@ export interface GoalEnvelopeSummary {
   closedAt: Date | null;
   /** noms des AUTRES buts partageant cette enveloppe (avertissement multi-lien) */
   sharedGoalNames: string[];
+  /** série cumulée investie (rendement passé Modified Dietz) */
+  investedSeries: { date: Date; valueCents: number }[];
 }
 
 export interface GoalSummary {
@@ -409,6 +411,10 @@ export interface GoalSummary {
   /** contribution mensuelle totale (déclarée + DCA des enveloppes liées) */
   effectiveMonthlyContributionCents: number;
   metrics: GoalMetrics;
+  /** rendement passé annualisé des enveloppes liées (null si historique court) */
+  linkedPastReturn: number | null;
+  /** hypothèse de rendement utilisée pour les projections (moyenne bourse) */
+  expectedReturn: number;
   /** série mensuelle de la métrique du but */
   monthlySeries: { date: Date; valueCents: number; metric: number }[];
   /** série agrégée des enveloppes liées (graphique valeur) */
@@ -451,12 +457,9 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
   });
   if (goals.length === 0) return [];
 
-  // rendement attendu du portefeuille global (historique si assez de données)
-  const summaries = await getEnvelopeSummaries();
-  const wealthSeries = aggregateSeries(summaries.map((e) => e.series));
-  const investedSeriesAgg = aggregateSeries(summaries.map((e) => e.investedSeries));
-  const historicalReturn = historicalCagr(wealthSeries, investedSeriesAgg);
-  const expectedReturn = historicalReturn ?? DEFAULT_EQUITY_RETURN;
+  // rendement attendu : moyenne long terme de la bourse mondiale — une seule
+  // hypothèse prudente pour les projections, indépendante du passé récent
+  const expectedReturn = DEFAULT_EQUITY_RETURN;
 
   return goals.map((goal) => {
     const now = new Date();
@@ -496,6 +499,16 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
       const dcaMonthly = e.dcaPlans
         .filter((p) => p.active)
         .reduce((s, p) => s + p.lines.reduce((ls, l) => ls + l.maxAmountCents, 0), 0);
+      // série investie (pour le rendement passé Modified Dietz) : dépôts livret
+      // ou versements réels des positions — même source que EnvelopeSummary
+      const investedSeries = isLivret
+        ? buildLivretBalanceSeries(
+            e.deposits.map((d) => ({ date: d.date, amountCents: d.amountCents })),
+            0,
+          )
+            .filter((p) => p.date.getTime() <= nowTime)
+            .map((p) => ({ date: p.date, valueCents: p.depositedCents }))
+        : buildEnvelopeInvestedSeries(e.positions);
       return {
         id: e.id,
         name: e.name,
@@ -508,6 +521,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
         sharedGoalNames: e.goals
           .filter((g) => g.id !== goal.id)
           .map((g) => g.name),
+        investedSeries,
       };
     });
 
@@ -546,6 +560,14 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
 
     const linkedSeries = aggregateSeries(envelopes.map((e) => e.series));
 
+    // rendement passé annualisé des SEULES enveloppes liées à ce but,
+    // neutralisé des versements (Modified Dietz) — pondération implicite par
+    // le capital de chaque enveloppe et son évolution via les versements
+    const linkedInvestedSeries = aggregateSeries(
+      envelopes.map((e) => e.investedSeries),
+    );
+    const linkedPastReturn = historicalCagr(linkedSeries, linkedInvestedSeries, now);
+
     const monthlySeries = buildGoalMonthlySeries({
       type: goal.type,
       targetAmountCents: goal.targetAmountCents,
@@ -575,6 +597,8 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
       linkedValueCents,
       effectiveMonthlyContributionCents: contribution,
       metrics,
+      linkedPastReturn,
+      expectedReturn,
       monthlySeries,
       linkedSeries,
     };
@@ -613,14 +637,13 @@ export const getLinkableEnvelopes = cache(async () => {
   }));
 });
 
-/** Rendement attendu du portefeuille (historique si assez de données, sinon défaut actions). */
+/**
+ * Hypothèse de rendement pour les projections de buts : moyenne long terme
+ * de la bourse mondiale (8 %/an). PAS le rendement passé du portefeuille —
+ * un historique court et porté par le DCA gonflerait toutes les projections.
+ */
 export const getGoalExpectedReturn = cache(async (): Promise<number> => {
-  const summaries = await getEnvelopeSummaries();
-  const equityEnvelopes = summaries.filter((e) => e.type !== "LIVRET_A");
-  const wealthSeries = aggregateSeries(equityEnvelopes.map((e) => e.series));
-  const investedSeriesAgg = aggregateSeries(equityEnvelopes.map((e) => e.investedSeries));
-  const historicalReturn = historicalCagr(wealthSeries, investedSeriesAgg);
-  return historicalReturn ?? DEFAULT_EQUITY_RETURN;
+  return DEFAULT_EQUITY_RETURN;
 });
 
 /** Statut combiné pour la carte dashboard (léger, sans séries). */
