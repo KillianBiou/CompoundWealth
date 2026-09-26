@@ -800,12 +800,18 @@ function PerformancePanel({
           })}
         </div>
         <p className="text-xs text-text-muted">
-          {report.periodStart !== null
-            ? t.analyse.performance.periodFrom.replace(
-                "{start}",
-                report.periodStart.toLocaleDateString("fr-FR"),
-              )
-            : t.analyse.performance.periodAllHint}
+          {(report.periodStart !== null
+            ? t.analyse.performance.periodFrom
+            : t.analyse.performance.periodAllHint
+          )
+            .replace(
+              "{start}",
+              report.periodStart?.toLocaleDateString("fr-FR") ?? "",
+            )
+            .replace(
+              "{end}",
+              report.observationDate.toLocaleDateString("fr-FR"),
+            )}
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4">

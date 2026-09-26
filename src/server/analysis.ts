@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { prisma } from "./db";
 import { requireUserId } from "./auth";
-import { currentValueCents } from "@/lib/portfolio/series";
+import { currentValueCents, valueAt } from "@/lib/portfolio/series";
 import { ETF_CATALOG, getEtfByIsin, getEtfByTicker } from "@/lib/etf-catalog";
 import { fetchMarketHistory } from "@/lib/market/quotes";
 import { isUSStock } from "@/lib/analysis/exposure-catalog";
@@ -35,6 +35,7 @@ import {
   positionCashFlows,
   toUtcMidnight,
 } from "@/lib/analysis/performance";
+import { worldGrowthFromPoints } from "@/lib/analysis/world-growth";
 import { buildLivretBalanceSeries, LIVRET_A_RATE } from "@/lib/livret";
 
 /* -------------------------------------------------------------------------- */
@@ -189,64 +190,6 @@ export function getActionDetailsBySymbol(): Record<string, ActionDetail> {
 }
 
 /**
- * Croissance réelle du Monde sur une période, à partir d'un historique de
- * cours déjà récupéré (un seul appel Yahoo pour toutes les périodes).
- * Échec gracieux : null si l'historique ne couvre pas la période.
- */
-function worldGrowthFromPoints(
-  flows: { date: Date; amountCents: number }[],
-  points: { date: Date; closeCents: number }[],
-  periodStart: Date | null,
-): PerformanceReport["worldGrowth"] {
-  const startDate = periodStart ?? points[0]?.date ?? null;
-  if (startDate === null) return null;
-  const periodPoints = points.filter(
-    (p) => p.date.getTime() >= startDate.getTime(),
-  );
-  if (periodPoints.length < 2) return null;
-  const start = periodPoints[0];
-  const end = periodPoints[periodPoints.length - 1];
-  const cumulative = (end.closeCents - start.closeCents) / start.closeCents;
-  const days = Math.round(
-    (end.date.getTime() - start.date.getTime()) / (24 * 3600 * 1000),
-  );
-  const years = days / 365;
-  const annualized =
-    years > 1 && cumulative > -1
-      ? Math.pow(1 + cumulative, 1 / years) - 1
-      : null;
-  // « marche d'escalier » DCA au cours réel du Monde : chaque versement
-  // achète au cours du jour (premier cours ≥ sa date), la valeur finale est
-  // la somme des parts au dernier cours — c'est CE qu'un ETF Monde simple
-  // aurait réellement donné avec vos propres versements.
-  let shares = 0;
-  let cursor = 0;
-  for (const point of periodPoints) {
-    while (
-      cursor < flows.length &&
-      flows[cursor].date.getTime() <= point.date.getTime()
-    ) {
-      shares += flows[cursor].amountCents / point.closeCents;
-      cursor += 1;
-    }
-  }
-  // versements postérieurs au dernier cours disponible : au dernier cours
-  while (cursor < flows.length) {
-    shares += flows[cursor].amountCents / end.closeCents;
-    cursor += 1;
-  }
-  const referenceValueCents = Math.round(shares * end.closeCents);
-  return {
-    cumulative,
-    annualized,
-    startDate: start.date,
-    endDate: end.date,
-    referenceValueCents,
-    deltaCents: 0,
-  };
-}
-
-/**
  * Rapport de performance (XIRR / TWR) pour chaque période du sélecteur
  * (1 an par défaut, 3 ans, 5 ans, toute la vie du portefeuille) : flux
  * externes de toutes les enveloppes (versements des positions + dépôts du
@@ -306,8 +249,6 @@ export const getPerformanceReports = cache(
       return { "1y": null, "3y": null, "5y": null, all: null };
     }
     const firstFlowDate = allFlows[0].date;
-    const totalValue =
-      positions.reduce((s, p) => s + p.valueCents, 0) + livretBalance;
 
     // un seul appel Yahoo pour toutes les périodes : l'historique complet
     // du premier flux à aujourd'hui
@@ -355,18 +296,28 @@ export const getPerformanceReports = cache(
             return sum + (point ? point.balanceCents : 0);
           }, 0)
         : 0;
-      // croissance réelle du Monde sur la période, même historique de cours
+      // croissance réelle du Monde sur la période, même historique de cours ;
+      // le capital déjà présent au cutoff (mêmes valorisations que le reste du
+      // rapport) est racheté en parts de World au cours du cutoff — même
+      // périmètre que le XIRR de la sous-période, sinon le verdict « 1y »
+      // contredirait le verdict « all »
       const periodWorldFlows = periodStart
         ? allFlows.filter((f) => f.date.getTime() > periodStart.getTime())
         : allFlows;
+      const positionsStartValueCents = periodStart
+        ? positions.reduce(
+            (sum, p) => sum + valueAt(p.valuations ?? [], periodStart),
+            0,
+          )
+        : 0;
+      const worldStartValueCents =
+        positionsStartValueCents + livretStartValueCents;
       const worldGrowth = worldGrowthFromPoints(
         periodWorldFlows,
         worldPoints,
         periodStart,
+        worldStartValueCents,
       );
-      if (worldGrowth) {
-        worldGrowth.deltaCents = totalValue - worldGrowth.referenceValueCents;
-      }
       reports[key] = buildPerformanceReport({
         positions,
         livretFlows,

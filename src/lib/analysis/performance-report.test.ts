@@ -359,4 +359,31 @@ describe("buildPerformanceReport", () => {
     });
     expect(report.worldGrowth?.cumulative).toBeCloseTo(0.12, 6);
   });
+
+  it("worldGrowth.deltaCents est toujours valeur du portefeuille − valeur de la référence", () => {
+    // l'écart affiché « vs ETF Monde réel » est un invariant : il ne doit
+    // jamais être recalculé ailleurs (c'est ce qui a produit 753,84 € à
+    // côté d'un export JSON à 690,30 €)
+    const report = buildPerformanceReport({
+      positions: [makePosition()],
+      livretFlows: [],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      worldGrowth: {
+        cumulative: 0.12,
+        annualized: null,
+        startDate: new Date("2024-01-15"),
+        endDate: new Date("2025-01-15"),
+        referenceValueCents: 112_000,
+        // volontairement faux : le report doit l'écraser
+        deltaCents: 123_456,
+      },
+      now: NOW,
+    });
+    expect(report.worldGrowth?.deltaCents).toBe(
+      report.total.valueCents - 112_000,
+    );
+    expect(report.observationDate).toEqual(new Date("2025-01-15T00:00:00.000Z"));
+  });
 });
