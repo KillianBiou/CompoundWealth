@@ -105,6 +105,13 @@ export default async function GoalDetailPage({
     expectedReturn,
   );
   const shortHorizon = isShortHorizonConcern(feasibility, yearsLeft);
+  // couleur du KPI « rendement requis » : même grille que l'encadré
+  const requiredReturnTone: "positive" | "warning" | "negative" =
+    feasibility === "comfortable" || feasibility === "achievable"
+      ? "positive"
+      : feasibility === "achievableWithPast" || feasibility === "demanding"
+        ? "warning"
+        : "negative";
   const feasibilityTone: Record<string, string> = {
     comfortable: "border-positive/30 bg-positive/10",
     achievable: "border-positive/30 bg-positive/10",
@@ -274,6 +281,7 @@ export default async function GoalDetailPage({
             label={t.goals.detail.contribution}
             value={formatEurCents(goal.effectiveMonthlyContributionCents)}
             hint={t.goals.detail.contributionHint}
+            align="center"
           />
         </div>
         {/* groupe 2 : rendements — requis vs hypothèse vs passé */}
@@ -288,11 +296,15 @@ export default async function GoalDetailPage({
                   : "—"
               }
               hint={t.goals.detail.monthsToFillHint}
+              align="center"
             />
           ) : (
             <Kpi
               label={t.goals.detail.requiredReturn}
               value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+              valueTone={requiredReturnTone}
+              hint={t.goals.detail.requiredReturnHint}
+              align="center"
             />
           )}
           {/*
@@ -303,6 +315,7 @@ export default async function GoalDetailPage({
             label={t.goals.detail.expectedReturn}
             value={formatPercent(expectedReturn)}
             hint={t.goals.detail.expectedReturnHint}
+            align="center"
           />
           {/*
             Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
@@ -317,6 +330,7 @@ export default async function GoalDetailPage({
                 : "—"
             }
             hint={t.goals.detail.pastReturnHint}
+            align="center"
           />
         </div>
         {/* groupe 3 : échéance — remplissage ou mois restants (buts datés) */}
@@ -327,17 +341,20 @@ export default async function GoalDetailPage({
                 label={t.goals.detail.requiredSavingsAtReturn}
                 value={formatEurCents(m.requiredMonthlySavingsAtReturnCents)}
                 hint={t.goals.detail.requiredSavingsHint}
+                align="center"
               />
             ) : m.monthsToFill !== null ? (
               <Kpi
                 label={t.goals.detail.monthsToFill}
                 value={`${m.monthsToFill} ${t.goals.detail.monthsUnit}`}
                 hint={t.goals.detail.monthsToFillHint}
+                align="center"
               />
             ) : (
               <Kpi
                 label={t.goals.detail.monthsLeft}
                 value={monthsLeft !== null ? String(monthsLeft) : "—"}
+                align="center"
               />
             )}
           </div>
