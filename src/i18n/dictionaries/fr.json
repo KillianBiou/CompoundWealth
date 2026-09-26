@@ -378,9 +378,9 @@
       "maxAmountFor": "Montant max pour {ticker}",
       "remove": "Retirer {ticker}",
       "addSecurity": "Ajouter un titre",
-      "suggestions": "Suggestions — ETF de votre enveloppe",
+      "suggestions": "Suggestions — titres de votre enveloppe",
       "searchPlaceholder": "Nom, ticker ou ISIN…",
-      "resultsLabel": "ETF correspondants",
+      "resultsLabel": "Titres correspondants (ETF et actions)",
       "confirm": "Confirmer",
       "creating": "Création…",
       "titlesCount": "{count} titre{s}",
@@ -425,7 +425,8 @@
           "treemap": "Treemap"
         },
         "estimate": "≈ {amount} · {count} part{s}"
-      }
+      },
+      "noResults": "Aucun titre trouvé pour cette recherche."
     },
     "dcaFrequency": {
       "BIWEEKLY": "2 semaines",

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eurosToCents } from "@/lib/money";
 import { getEtfByIsin } from "@/lib/etf-catalog";
+import { getSecurityByIsin } from "@/lib/stock-catalog";
 import {
   LIVRET_A_DEFAULT_INFLATION,
   LIVRET_A_DEPOSIT_CAP_CENTS,
@@ -549,10 +550,10 @@ export async function createDcaAction(
       active: true,
       lines: {
         create: lines.map((line) => {
-          const etf = getEtfByIsin(line.isin)!;
+          const security = getSecurityByIsin(line.isin)!;
           return {
-            isin: etf.isin,
-            name: `${etf.ticker} — ${etf.name}`,
+            isin: security.isin,
+            name: `${security.ticker} — ${security.name}`,
             maxAmountCents: eurosToCents(line.maxAmountEur),
             active: true,
           };

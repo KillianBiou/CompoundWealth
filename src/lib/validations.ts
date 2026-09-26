@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getEtfByIsin } from "./etf-catalog";
+import { getSecurityByIsin } from "./stock-catalog";
 
 export const signupSchema = z.object({
   email: z.email("Adresse email invalide"),
@@ -112,7 +113,7 @@ export const dcaLineSchema = z.object({
   isin: z
     .string()
     .trim()
-    .refine((v) => getEtfByIsin(v) !== null, "Choisissez un ETF dans la liste"),
+    .refine((v) => getSecurityByIsin(v) !== null, "Choisissez un titre dans la liste"),
   maxAmountEur: z.coerce
     .number()
     .positive("Le montant doit être supérieur à 0")
