@@ -11,6 +11,7 @@ import {
 import { buildEnvelopeValuations, valueAt } from "@/lib/portfolio/series";
 import type { AnalysisPosition } from "./scanners";
 import type { PerformancePeriodKey } from "./performance-periods";
+import type { WorldGrowth } from "./world-growth";
 
 export type { PerformancePeriodKey } from "./performance-periods";
 
@@ -64,20 +65,11 @@ export interface PerformanceReport {
   /** référence « mêmes versements au taux actions monde » avec gains et écart */
   worldReference: ReferenceStrategy | null;
   /** croissance réelle du MSCI World sur la même période (via Yahoo), null si indisponible */
-  worldGrowth: {
-    /** TWR du MSCI World sur la période (fraction) */
-    cumulative: number;
-    /** annualisé si période > 1 an, sinon null */
-    annualized: number | null;
-    /** premier point de cours utilisé (Date ISO) */
-    startDate: Date;
-    /** dernier point de cours utilisé (Date ISO) */
-    endDate: Date;
-    /** valeur finale théorique des mêmes versements placés sur le MSCI World réel (la marche d'escalier DCA au cours réel), centimes */
-    referenceValueCents: number;
-    /** écart du portefeuille réel vs cette marche d'escalier World réelle, centimes */
-    deltaCents: number;
-  } | null;
+  worldGrowth: WorldGrowth | null;
+  /** date d'observation de la valeur finale du total (dernière valorisation
+   *  connue) — c'est elle qui clôture la période ; les métriques et le delta
+   *  de chaque référence sont calculés à cette date, pas « maintenant » */
+  observationDate: Date;
   /** clé de la période analysée ("1y", "3y", "5y", "all") */
   period: PerformancePeriodKey;
   /** date de début effective de la période analysée (premier flux ou cutoff), null = toute la vie */
@@ -169,7 +161,7 @@ export function buildPerformanceReport(params: {
   /** rendement historique actions monde (fraction) */
   worldEquityRate: number;
   /** croissance réelle du MSCI World sur la même période, si disponible */
-  worldGrowth?: PerformanceReport["worldGrowth"];
+  worldGrowth?: WorldGrowth | null;
   /** clé de la période analysée ("1y", "3y", "5y", "all") */
   period?: PerformancePeriodKey;
   /** cutoff de la sous-période (null = toute la vie du portefeuille) */
@@ -360,6 +352,14 @@ export function buildPerformanceReport(params: {
       )
     : null;
 
+  // invariant du contre-factuel World réel : l'écart affiché est TOUJOURS
+  // valeur du portefeuille − valeur de la référence, calculé ici une seule
+  // fois (jamais recalculé côté UI) et au même périmètre que totalValue
+  const worldGrowth = params.worldGrowth ?? null;
+  if (worldGrowth !== null) {
+    worldGrowth.deltaCents = totalValue - worldGrowth.referenceValueCents;
+  }
+
   return {
     total: totalLevel,
     envelopes: envelopeLevels.sort((a, b) => b.valueCents - a.valueCents),
@@ -368,7 +368,8 @@ export function buildPerformanceReport(params: {
     worldEquityRate,
     savingsReference,
     worldReference,
-    worldGrowth: params.worldGrowth ?? null,
+    worldGrowth,
+    observationDate: totalObservation,
     period,
     periodStart,
   };

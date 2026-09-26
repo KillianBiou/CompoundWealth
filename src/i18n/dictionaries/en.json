@@ -666,8 +666,8 @@
       "period3y": "3 years",
       "period5y": "5 years",
       "periodAll": "All time",
-      "periodFrom": "Analyzed period: from {start} to today",
-      "periodAllHint": "Analyzed period: the portfolio's whole life"
+      "periodFrom": "Analyzed period: from {start} to {end}",
+      "periodAllHint": "Analyzed period: the portfolio's whole life, up to {end}"
     },
     "diversification": {
       "score": "Score",

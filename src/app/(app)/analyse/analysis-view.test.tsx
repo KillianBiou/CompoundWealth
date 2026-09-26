@@ -311,6 +311,7 @@ const performance: PerformanceReport = {
   },
   period: "1y",
   periodStart: new Date("2024-01-15T00:00:00Z"),
+  observationDate: new Date("2025-01-15T00:00:00Z"),
 };
 
 const performanceAll: PerformanceReport = {
@@ -535,13 +536,19 @@ describe("AnalysisPageView", () => {
   it("le sélecteur de période bascule la performance analysée (1 an par défaut, toute la durée)", () => {
     renderView();
     fireEvent.click(screen.getByText("Performance"));
-    // par défaut : 12 derniers mois, XIRR +8,20 % du rapport « 1y »
-    expect(screen.getByText("Période analysée : du 15/01/2024 à aujourd'hui")).toBeInTheDocument();
+    // par défaut : 12 derniers mois, XIRR +8,20 % du rapport « 1y » ; la
+    // période se clôture à la date d'observation (dernière valorisation),
+    // pas « aujourd'hui » — sinon un export JSON d'hier paraît contradictoire
+    expect(
+      screen.getByText("Période analysée : du 15/01/2024 au 15/01/2025"),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("+8,2 %").length).toBeGreaterThan(0);
     // bascule vers toute la durée : XIRR +6,10 % du rapport « all »
     fireEvent.click(screen.getByRole("button", { name: "Toute la durée" }));
     expect(
-      screen.getByText("Période analysée : toute la vie du portefeuille"),
+      screen.getByText(
+        "Période analysée : toute la vie du portefeuille, jusqu'au 15/01/2025",
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("+6,1 %").length).toBeGreaterThan(0);
     // période indisponible (3 ans) : bouton désactivé
