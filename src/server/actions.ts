@@ -18,6 +18,7 @@ import {
   createDcaSchema,
   createLivretDcaSchema,
   envelopeSchema,
+  goalSchema,
   livretDepositSchema,
   livretSettingsSchema,
   loginSchema,
@@ -27,6 +28,7 @@ import {
   depositsSchema,
   preferencesSchema,
 } from "@/lib/validations";
+import type { Envelope, EnvelopeType } from "@prisma/client";
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
 import { createSession, destroySession, getSession } from "./session";
@@ -1292,4 +1294,198 @@ export async function fetchActionPriceHistoryAction(
       price: p.closeCents / 100,
     }));
   return { ok: true, points };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  Buts                                       */
+/* -------------------------------------------------------------------------- */
+
+import { checkGoalEnvelopes, type LinkableEnvelope } from "@/lib/goals/linking";
+
+async function validateGoalEnvelopes(
+  userId: string,
+  goalType: "SAFETY_NET" | "FIRE" | "RETIREMENT" | "DOWN_PAYMENT" | "CUSTOM_LIFEVENT" | "CUSTOM",
+  envelopeIds: string[],
+  excludeGoalId?: string,
+): Promise<{ errors?: Record<string, string[]> }> {
+  const envelopes: LinkableEnvelope[] = await prisma.envelope.findMany({
+    where: { id: { in: envelopeIds }, userId },
+    select: { id: true, name: true, type: true, closedAt: true, goalId: true },
+  });
+  const error = checkGoalEnvelopes(goalType, envelopes, envelopeIds, excludeGoalId);
+  if (error) return { errors: { envelopeIds: [error] } };
+  return {};
+}
+
+export async function createGoalAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const raw = {
+    type: str(formData, "type"),
+    name: str(formData, "name"),
+    icon: str(formData, "icon"),
+    targetAmountEur: str(formData, "targetAmountEur"),
+    targetRentEur: str(formData, "targetRentEur"),
+    targetMonths: str(formData, "targetMonths"),
+    targetDate: str(formData, "targetDate"),
+    withdrawalRate: str(formData, "withdrawalRate"),
+    monthlyExpensesEur: str(formData, "monthlyExpensesEur"),
+    monthlyContributionEur: str(formData, "monthlyContributionEur"),
+    envelopeIds: formData.getAll("envelopeIds").map(String),
+  };
+  const parsed = goalSchema.safeParse({
+    ...raw,
+    ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
+    ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
+    ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
+    ...(raw.targetDate !== "" ? { targetDate: raw.targetDate } : {}),
+    ...(raw.withdrawalRate !== "" ? { withdrawalRate: raw.withdrawalRate } : {}),
+    ...(raw.monthlyExpensesEur !== "" ? { monthlyExpensesEur: raw.monthlyExpensesEur } : {}),
+    ...(raw.monthlyContributionEur !== ""
+      ? { monthlyContributionEur: raw.monthlyContributionEur }
+      : {}),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const data = parsed.data;
+
+  if (data.type === "SAFETY_NET") {
+    const existing = await prisma.goal.findFirst({
+      where: { userId: session.userId, type: "SAFETY_NET" },
+      select: { id: true },
+    });
+    if (existing) {
+      return {
+        errors: { form: ["Un matelas de sécurité existe déjà — un seul par compte"] },
+      };
+    }
+  }
+
+  const check = await validateGoalEnvelopes(session.userId, data.type, data.envelopeIds);
+  if (check.errors) return { errors: check.errors };
+
+  const goal = await prisma.goal.create({
+    data: {
+      userId: session.userId,
+      type: data.type,
+      name: data.name,
+      icon: data.icon || "target",
+      targetAmountCents: data.targetAmountEur ? eurosToCents(data.targetAmountEur) : null,
+      targetRentCents: data.targetRentEur ? eurosToCents(data.targetRentEur) : null,
+      targetMonths: data.targetMonths ?? null,
+      targetDate: data.targetDate ? new Date(data.targetDate) : null,
+      withdrawalRate: data.withdrawalRate ?? null,
+      monthlyExpensesCents: data.monthlyExpensesEur
+        ? eurosToCents(data.monthlyExpensesEur)
+        : null,
+      monthlyContributionCents: data.monthlyContributionEur
+        ? eurosToCents(data.monthlyContributionEur)
+        : null,
+    },
+  });
+  await prisma.envelope.updateMany({
+    where: { id: { in: data.envelopeIds }, userId: session.userId },
+    data: { goalId: goal.id },
+  });
+  revalidatePath("/buts");
+  revalidatePath("/dashboard");
+  redirect(`/buts/${goal.id}`);
+}
+
+export async function updateGoalAction(
+  _state: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await getSession();
+  if (!session) return { message: "Session expirée" };
+
+  const goalId = str(formData, "goalId");
+  const goal = await prisma.goal.findFirst({
+    where: { id: goalId, userId: session.userId },
+  });
+  if (!goal) return { message: "But introuvable" };
+
+  const raw = {
+    type: goal.type,
+    name: str(formData, "name"),
+    icon: str(formData, "icon"),
+    targetAmountEur: str(formData, "targetAmountEur"),
+    targetRentEur: str(formData, "targetRentEur"),
+    targetMonths: str(formData, "targetMonths"),
+    targetDate: str(formData, "targetDate"),
+    withdrawalRate: str(formData, "withdrawalRate"),
+    monthlyExpensesEur: str(formData, "monthlyExpensesEur"),
+    monthlyContributionEur: str(formData, "monthlyContributionEur"),
+    envelopeIds: formData.getAll("envelopeIds").map(String),
+  };
+  const parsed = goalSchema.safeParse({
+    ...raw,
+    ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
+    ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
+    ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
+    ...(raw.targetDate !== "" ? { targetDate: raw.targetDate } : {}),
+    ...(raw.withdrawalRate !== "" ? { withdrawalRate: raw.withdrawalRate } : {}),
+    ...(raw.monthlyExpensesEur !== "" ? { monthlyExpensesEur: raw.monthlyExpensesEur } : {}),
+    ...(raw.monthlyContributionEur !== ""
+      ? { monthlyContributionEur: raw.monthlyContributionEur }
+      : {}),
+  });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const data = parsed.data;
+
+  const check = await validateGoalEnvelopes(
+    session.userId,
+    data.type,
+    data.envelopeIds,
+    goal.id,
+  );
+  if (check.errors) return { errors: check.errors };
+
+  await prisma.goal.update({
+    where: { id: goal.id },
+    data: {
+      name: data.name,
+      icon: data.icon || "target",
+      targetAmountCents: data.targetAmountEur ? eurosToCents(data.targetAmountEur) : null,
+      targetRentCents: data.targetRentEur ? eurosToCents(data.targetRentEur) : null,
+      targetMonths: data.targetMonths ?? null,
+      targetDate: data.targetDate ? new Date(data.targetDate) : null,
+      withdrawalRate: data.withdrawalRate ?? null,
+      monthlyExpensesCents: data.monthlyExpensesEur
+        ? eurosToCents(data.monthlyExpensesEur)
+        : null,
+      monthlyContributionCents: data.monthlyContributionEur
+        ? eurosToCents(data.monthlyContributionEur)
+        : null,
+    },
+  });
+  // détache les enveloppes retirées, attache les nouvelles
+  await prisma.envelope.updateMany({
+    where: { goalId: goal.id, id: { notIn: data.envelopeIds } },
+    data: { goalId: null },
+  });
+  await prisma.envelope.updateMany({
+    where: { id: { in: data.envelopeIds }, userId: session.userId },
+    data: { goalId: goal.id },
+  });
+  revalidatePath("/buts");
+  revalidatePath(`/buts/${goal.id}`);
+  revalidatePath("/dashboard");
+  redirect(`/buts/${goal.id}`);
+}
+
+export async function deleteGoalAction(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  const goalId = String(formData.get("goalId") ?? "");
+  // SetNull sur la relation : les enveloppes redeviennent non allouées
+  await prisma.goal.deleteMany({
+    where: { id: goalId, userId: session.userId },
+  });
+  revalidatePath("/buts");
+  revalidatePath("/dashboard");
+  redirect("/buts");
 }
