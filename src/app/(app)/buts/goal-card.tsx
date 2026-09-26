@@ -2,26 +2,14 @@
 
 import Link from "next/link";
 import type { GoalSummary } from "@/server/queries";
-import type { GoalStatus, GoalType } from "@/lib/goals/progress";
-import { formatEurCents, formatPercent } from "@/lib/money";
-import { Badge, Card } from "@/components/ui";
+import type { GoalStatus } from "@/lib/goals/progress";
+import { formatEurCents } from "@/lib/money";
+import { Card } from "@/components/ui";
 import { cn } from "@/components/cn";
 import { useI18n } from "@/i18n/provider";
 import { GoalStatusBadge } from "./goal-status-badge";
 
-/** Icônes par type de but (clé i18n des modèles). */
-const GOAL_ICONS: Record<GoalType, string> = {
-  SAFETY_NET: "SAFETY_NET",
-  FIRE: "FIRE",
-  RETIREMENT: "RETIREMENT",
-  DOWN_PAYMENT: "DOWN_PAYMENT",
-  CUSTOM_LIFEVENT: "CUSTOM",
-  CUSTOM: "CUSTOM",
-};
 
-function goalTemplateKey(type: GoalType): string {
-  return GOAL_ICONS[type];
-}
 
 /** Vrai si le statut demande une attention (regroupement "à revoir"). */
 export function needsAttention(status: GoalStatus): boolean {

@@ -28,7 +28,6 @@ import {
   depositsSchema,
   preferencesSchema,
 } from "@/lib/validations";
-import type { Envelope, EnvelopeType } from "@prisma/client";
 import { prisma } from "./db";
 import { hashPassword, verifyPassword } from "./auth";
 import { createSession, destroySession, getSession } from "./session";
