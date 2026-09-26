@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeGoalMetrics,
+  goalFeasibility,
   monthsToFillGoal,
   isCapitalizedGoal,
   monthsBetween,
@@ -593,6 +594,45 @@ describe("monthsToFillGoal", () => {
     const flat = monthsToFillGoal(0, 2_000_000, 50_000, 0)!;
     const grown = monthsToFillGoal(0, 2_000_000, 50_000, 0.06)!;
     expect(grown!).toBeLessThan(flat!);
+  });
+});
+
+describe("goalFeasibility", () => {
+  it("pas de rendement requis (matelas, ou épargne seule suffit) → confortable", () => {
+    expect(goalFeasibility(null, 0.06, 0.08)).toBe("comfortable");
+    expect(goalFeasibility(0, 0.06, 0.08)).toBe("comfortable");
+  });
+
+  it("3 % requis contre 6 % réels → confortable (large marge)", () => {
+    expect(goalFeasibility(0.03, 0.06, 0.08)).toBe("comfortable");
+  });
+
+  it("requis = rendement réel → réaliste et atteignable", () => {
+    expect(goalFeasibility(0.06, 0.06, 0.08)).toBe("achievable");
+    expect(goalFeasibility(0.055, 0.06, 0.08)).toBe("achievable");
+  });
+
+  it("requis entre 1× et 1,5× le rendement réel → difficile", () => {
+    expect(goalFeasibility(0.08, 0.06, 0.08)).toBe("demanding");
+    expect(goalFeasibility(0.09, 0.06, 0.08)).toBe("demanding");
+  });
+
+  it("requis entre 1,5× et 2× → très difficile", () => {
+    expect(goalFeasibility(0.1, 0.06, 0.08)).toBe("hard");
+    expect(goalFeasibility(0.12, 0.06, 0.08)).toBe("hard");
+  });
+
+  it("25 % requis contre 12 % réels → quasiment impossible", () => {
+    expect(goalFeasibility(0.25, 0.12, 0.08)).toBe("extreme");
+  });
+
+  it("passé indisponible → comparaison à la moyenne bourse", () => {
+    expect(goalFeasibility(0.05, null, 0.08)).toBe("achievable");
+    expect(goalFeasibility(0.13, null, 0.08)).toBe("hard");
+  });
+
+  it("rendement réel nul ou négatif avec référence nulle → null", () => {
+    expect(goalFeasibility(0.05, null, 0)).toBeNull();
   });
 });
 

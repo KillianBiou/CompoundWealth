@@ -1064,7 +1064,25 @@
       "monthsToFill": "Estimated fill time",
       "monthsToFillHint": "Months needed to reach the target at the current monthly contribution, expected return included.",
       "monthsUnit": "months",
-      "envelopeShared": "Shared with {count} other goal(s)"
+      "envelopeShared": "Shared with {count} other goal(s)",
+      "expectedReturnHint": "Average annual stock market return. NOT A PROMISE.",
+      "pastReturn": "Past annualized return",
+      "pastReturnHint": "Performance of the selected envelopes, annualized. PAST PERFORMANCE DOES NOT PREDICT THE FUTURE.",
+      "capitalLabel": "Capital",
+      "feasibility": {
+        "comfortable": "Comfortable goal",
+        "achievable": "Realistic and achievable goal",
+        "demanding": "Demanding goal",
+        "hard": "Very difficult goal",
+        "extreme": "Nearly impossible goal"
+      },
+      "feasibilityExplain": {
+        "comfortable": "The required return is well covered by your envelopes' return: wide safety margin.",
+        "achievable": "The required return is covered by your linked envelopes' return: a realistic goal.",
+        "demanding": "The required return exceeds your envelopes' past return: doable, but it will take more time or more savings.",
+        "hard": "The required return is significantly above your envelopes' return: very difficult, even with good envelopes.",
+        "extreme": "The required return far exceeds what your envelopes achieve: nearly impossible — rethink the target, the deadline or the contribution."
+      }
     },
     "combinedGoTo": "View my goals"
   }

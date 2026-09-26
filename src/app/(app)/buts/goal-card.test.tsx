@@ -36,10 +36,13 @@ function makeGoal(overrides: Partial<GoalSummary> = {}): GoalSummary {
         dcaMonthlyCents: 10_000,
         closedAt: null,
         sharedGoalNames: [],
+        investedSeries: [],
       },
     ],
     linkedValueCents: 1_820_000,
     effectiveMonthlyContributionCents: 60_000,
+    linkedPastReturn: null,
+    expectedReturn: 0.08,
     metrics: {
       progress: 1_820_000 / 6_000_000,
       displayProgress: 1_820_000 / 6_000_000,

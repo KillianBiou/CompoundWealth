@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser, getGoal, getGoalExpectedReturn } from "@/server/queries";
 import {
+  goalFeasibility,
   isCapitalizedGoal,
   monthsBetween,
   monthsToFillGoal,
@@ -12,10 +13,10 @@ import {
 } from "@/lib/goals/progress";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, ButtonLink, Card, Kpi } from "@/components/ui";
+import { cn } from "@/components/cn";
 import { HintLabel } from "@/app/(app)/analyse/hint-label";
 import { GoalStatusBadge } from "../goal-status-badge";
 import { GoalProgressChart } from "./goal-progress-chart";
-import { GoalValueChart } from "./goal-value-chart";
 import { GoalProjectionChart } from "./goal-projection-chart";
 import { getDictionary, getLocaleFromCookies } from "@/i18n/server";
 
@@ -96,10 +97,25 @@ export default async function GoalDetailPage({
       : null;
   const needsAdjust = ["compromised", "underfunded", "late"].includes(m.status);
 
+  // faisabilité du but : rendement requis vs rendement passé des enveloppes liées
+  const feasibility = goalFeasibility(
+    goal.type === "SAFETY_NET" ? null : m.requiredReturn,
+    goal.linkedPastReturn,
+    expectedReturn,
+  );
+  const feasibilityTone: Record<string, string> = {
+    comfortable: "border-positive/30 bg-positive/10",
+    achievable: "border-positive/30 bg-positive/10",
+    demanding: "border-warning/30 bg-warning/10",
+    hard: "border-warning/30 bg-warning/10",
+    extreme: "border-negative/30 bg-negative/10",
+  };
+
   // graphique 1 : évolution de la métrique du but par mois + trajectoire requise
   const progressPoints = goal.monthlySeries.map((p) => ({
     date: p.date.getTime(),
     metric: p.metric,
+    valueCents: p.valueCents,
     trajectory: requiredTrajectoryAt(goal.createdAt, goal.targetDate, p.date),
   }));
 
@@ -121,7 +137,13 @@ export default async function GoalDetailPage({
     );
     if (months === null) return [];
     const monthlyRate = Math.pow(1 + expectedReturn, 1 / 12) - 1;
-    const points: { date: number; metric: number; projected: number; trajectory: number }[] = [];
+    const points: {
+      date: number;
+      metric: number;
+      projected: number;
+      projectedValueCents: number;
+      trajectory: number;
+    }[] = [];
     // point de jonction : la valeur actuelle reprise comme premier point projeté
     let value = goal.linkedValueCents;
     for (let i = 0; i <= months; i += 1) {
@@ -142,19 +164,13 @@ export default async function GoalDetailPage({
           date: at.getTime(),
           metric: i === 0 ? metric : null as unknown as number,
           projected: metric,
+          projectedValueCents: value,
           trajectory: requiredTrajectoryAt(goal.createdAt, goal.targetDate, at),
         });
       }
     }
     return points;
   })();
-
-  // graphique 2 : valeur agrégée des enveloppes liées
-  const valuePoints = goal.linkedSeries.map((p) => ({
-    date: p.date.getTime(),
-    value: p.valueCents / 100,
-    invested: null as number | null,
-  }));
 
   // graphique 3 : projection jusqu'à la date cible (buts capitalisés)
   const projectionPoints =
@@ -268,9 +284,31 @@ export default async function GoalDetailPage({
           <Kpi
             label={t.goals.detail.requiredReturn}
             value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
-            sub={`${t.goals.detail.expectedReturn} : ${formatPercent(expectedReturn)}`}
           />
         )}
+        {/*
+          Rendement moyen de la bourse : hypothèse long terme des projections.
+          PAS UNE PROMESSE — c'est la moyenne historique du marché actions.
+        */}
+        <Kpi
+          label={t.goals.detail.expectedReturn}
+          value={formatPercent(expectedReturn)}
+          hint={t.goals.detail.expectedReturnHint}
+        />
+        {/*
+          Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
+          pondérées par leur capital (et son évolution via les DCA/versements).
+          LE PASSÉ NE PRÉSAGE PAS DU FUTUR.
+        */}
+        <Kpi
+          label={t.goals.detail.pastReturn}
+          value={
+            goal.linkedPastReturn !== null
+              ? formatPercent(goal.linkedPastReturn)
+              : "—"
+          }
+          hint={t.goals.detail.pastReturnHint}
+        />
         {m.requiredMonthlySavingsAtReturnCents !== null ? (
           <Kpi
             label={t.goals.detail.requiredSavingsAtReturn}
@@ -320,7 +358,36 @@ export default async function GoalDetailPage({
         </Card>
       ) : null}
 
-      {/* graphique 1 : évolution du but par mois */}
+      {/* estimation du but : niveau de difficulté coloré (spec §3.3.6) */}
+      {feasibility !== null ? (
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border p-4",
+            feasibilityTone[feasibility],
+          )}
+        >
+          <span className="font-heading text-sm font-semibold">
+            {t.goals.detail.feasibility[feasibility]}
+          </span>
+          <span className="text-sm text-text-secondary">
+            {t.goals.detail.feasibilityExplain[feasibility]}
+          </span>
+          <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-text-muted">
+            <span>
+              {t.goals.detail.requiredReturn} :{" "}
+              {m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
+            </span>
+            <span>
+              {t.goals.detail.pastReturn} :{" "}
+              {goal.linkedPastReturn !== null
+                ? formatPercent(goal.linkedPastReturn)
+                : formatPercent(expectedReturn)}
+            </span>
+          </span>
+        </div>
+      ) : null}
+
+      {/* graphique 1 : évolution du but par mois — métrique ou capital */}
       <Card>
         <div className="mb-4">
           <HintLabel uppercase hint={t.goals.detail.chartProgressHint}>
@@ -330,24 +397,10 @@ export default async function GoalDetailPage({
         {progressPoints.length > 0 ? (
           <GoalProgressChart
             points={[...progressPoints, ...progressProjectionPoints]}
-            type={goal.type}
-            metricMode={safetyAmountMode ? "progress" : "months"}
+            metricMode={safetyAmountMode ? "progress" : goal.type === "FIRE" ? "rent" : goal.type === "SAFETY_NET" ? "months" : "progress"}
             locale={locale}
+            capitalAvailable={goal.linkedSeries.length > 0}
           />
-        ) : (
-          <p className="text-sm text-text-muted">{t.goals.card.noEnvelopes}</p>
-        )}
-      </Card>
-
-      {/* graphique 2 : valeur des enveloppes liées */}
-      <Card>
-        <div className="mb-4">
-          <HintLabel uppercase hint={t.goals.detail.chartValueHint}>
-            {t.goals.detail.chartValue}
-          </HintLabel>
-        </div>
-        {valuePoints.length > 0 ? (
-          <GoalValueChart points={valuePoints} locale={locale} />
         ) : (
           <p className="text-sm text-text-muted">{t.goals.card.noEnvelopes}</p>
         )}

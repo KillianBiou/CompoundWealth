@@ -1064,7 +1064,25 @@
       "monthsToFill": "Remplissage estimé",
       "monthsToFillHint": "Mois nécessaires pour atteindre la cible à la contribution mensuelle actuelle, rendement attendu compris.",
       "monthsUnit": "mois",
-      "envelopeShared": "Partagée avec {count} autre(s) but(s)"
+      "envelopeShared": "Partagée avec {count} autre(s) but(s)",
+      "expectedReturnHint": "Rendement moyen annuel de la bourse. PAS UNE PROMESSE.",
+      "pastReturn": "Rendement passé annualisé",
+      "pastReturnHint": "Performance des enveloppes choisies, annualisée. LE PASSÉ NE PRÉSAGE PAS DU FUTUR.",
+      "capitalLabel": "Capital",
+      "feasibility": {
+        "comfortable": "Objectif confortable",
+        "achievable": "Objectif réaliste et atteignable",
+        "demanding": "Objectif difficile",
+        "hard": "Objectif très difficile",
+        "extreme": "Objectif quasiment impossible"
+      },
+      "feasibilityExplain": {
+        "comfortable": "Le rendement requis est bien couvert par le rendement de vos enveloppes : large marge de sécurité.",
+        "achievable": "Le rendement requis est couvert par le rendement de vos enveloppes liées : objectif réaliste.",
+        "demanding": "Le rendement requis dépasse le rendement passé de vos enveloppes : envisageable, mais il faudra soit plus de temps, soit plus d'effort d'épargne.",
+        "hard": "Le rendement requis est nettement supérieur au rendement de vos enveloppes : très difficile, même avec de bonnes enveloppes.",
+        "extreme": "Le rendement requis dépasse très largement ce que vos enveloppes font : quasiment impossible — repensez la cible, l'échéance ou la contribution."
+      }
     },
     "combinedGoTo": "Voir mes buts"
   }
