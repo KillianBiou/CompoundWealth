@@ -1,5 +1,5 @@
 import { screen, fireEvent } from "@testing-library/react";
-import { renderWithI18n } from "../../../../tests/test-utils";
+import { renderWithToast } from "../../../../tests/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { AnalysisPageView } from "./analysis-view";
 import type {
@@ -8,6 +8,10 @@ import type {
   IncomeAnalysisResult,
   SimulatorDefaults,
 } from "@/lib/analysis/scanners";
+import type {
+  PerformancePeriodKey,
+  PerformanceReport,
+} from "@/lib/analysis/performance-report";
 
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
@@ -206,8 +210,138 @@ const simulatorDefaults: SimulatorDefaults = {
   returnSource: "historique",
 };
 
+const performance: PerformanceReport = {
+  total: {
+    id: "total",
+    name: "total",
+    envelopeType: null,
+    metrics: {
+      xirr: 0.082,
+      twrAnnualized: 0.071,
+      twrCumulative: 0.095,
+      simpleReturn: 0.075,
+      gainCents: 781_00,
+      contributedCents: 10_450_00,
+      years: 1.17,
+    },
+    valueCents: 11_231_00,
+    contributedCents: 10_450_00,
+    startValueCents: 0,
+    flows: [],
+  },
+  envelopes: [
+    {
+      id: "env-1",
+      name: "PEA Trade Republic",
+      envelopeType: "PEA",
+      metrics: {
+        xirr: 0.09,
+        twrAnnualized: 0.08,
+        twrCumulative: 0.1,
+        simpleReturn: 0.07,
+        gainCents: 600_00,
+        contributedCents: 9_000_00,
+        years: 1.2,
+      },
+      valueCents: 9_600_00,
+      contributedCents: 9_000_00,
+      startValueCents: 0,
+      flows: [],
+    },
+    {
+      id: "env-2",
+      name: "CTO Trade Republic",
+      envelopeType: "CTO",
+      metrics: {
+        xirr: 0.05,
+        twrAnnualized: 0.04,
+        twrCumulative: 0.06,
+        simpleReturn: 0.04,
+        gainCents: 181_00,
+        contributedCents: 1_450_00,
+        years: 1.1,
+      },
+      valueCents: 1_631_00,
+      contributedCents: 1_450_00,
+      startValueCents: 0,
+      flows: [],
+    },
+  ],
+  positions: [
+    {
+      id: "pos-1",
+      name: "MSCI World Swap PEA",
+      envelopeType: "PEA",
+      metrics: {
+        xirr: 0.09,
+        twrAnnualized: 0.08,
+        twrCumulative: 0.1,
+        simpleReturn: 0.07,
+        gainCents: 600_00,
+        contributedCents: 9_000_00,
+        years: 1.2,
+      },
+      valueCents: 9_600_00,
+      contributedCents: 9_000_00,
+      startValueCents: 0,
+      flows: [],
+    },
+  ],
+  savingsRate: 0.017,
+  worldEquityRate: 0.08,
+  savingsReference: {
+    rate: 0.017,
+    valueCents: 10_600_00,
+    gainCents: 150_00,
+    deltaCents: 631_00,
+  },
+  worldReference: {
+    rate: 0.08,
+    valueCents: 11_100_00,
+    gainCents: 650_00,
+    deltaCents: 131_00,
+  },
+  worldGrowth: {
+    cumulative: 0.11,
+    annualized: 0.11,
+    startDate: new Date("2024-01-15T00:00:00Z"),
+    endDate: new Date("2025-01-15T00:00:00Z"),
+    referenceValueCents: 11_300_00,
+    deltaCents: -207_00,
+  },
+  period: "1y",
+  periodStart: new Date("2024-01-15T00:00:00Z"),
+  observationDate: new Date("2025-01-15T00:00:00Z"),
+};
+
+const performanceAll: PerformanceReport = {
+  ...performance,
+  period: "all",
+  periodStart: null,
+  total: {
+    ...performance.total,
+    metrics: {
+      xirr: 0.061,
+      twrAnnualized: 0.055,
+      twrCumulative: 0.14,
+      simpleReturn: 0.105,
+      gainCents: 1_096_00,
+      contributedCents: 10_450_00,
+      years: 2.1,
+    },
+    valueCents: 11_546_00,
+  },
+};
+
+const performanceByPeriod: Record<PerformancePeriodKey, PerformanceReport | null> = {
+  "1y": performance,
+  "3y": null,
+  "5y": null,
+  all: performanceAll,
+};
+
 function renderView() {
-  return renderWithI18n(
+  return renderWithToast(
     <AnalysisPageView
       fees={fees}
       income={income}
@@ -216,6 +350,7 @@ function renderView() {
       countries={countries}
       economies={economies}
       simulatorDefaults={simulatorDefaults}
+      performanceByPeriod={performanceByPeriod}
       etfDetails={{
         [fees.lines[0].isin ?? "IE0002XZSHO1"]: {
           isin: fees.lines[0].isin ?? "IE0002XZSHO1",
@@ -318,7 +453,7 @@ describe("AnalysisPageView", () => {
     expect(screen.getByText("Dividendes & intérêts")).toBeInTheDocument();
     expect(screen.getByText("Exposition")).toBeInTheDocument();
     expect(screen.getByText("Simulateur de patrimoine")).toBeInTheDocument();
-    expect(screen.getByText("Abonnements")).toBeInTheDocument();
+    expect(screen.getByText("Performance")).toBeInTheDocument();
   });
 
   it("le badge frais reflète le taux (0,31 % → Faible)", () => {
@@ -341,12 +476,85 @@ describe("AnalysisPageView", () => {
     expect(screen.queryByText("Scanner de frais")).not.toBeInTheDocument();
   });
 
-  it("la carte Abonnements est un placeholder désactivé", () => {
+  it("la carte Performance affiche le XIRR et ouvre le panneau détaillé", () => {
     renderView();
-    const card = screen.getByText("Abonnements").closest("button");
-    expect(card).not.toBeNull();
-    expect(card).toBeDisabled();
-    expect(card!.textContent?.match(/bientôt/i)).toBeTruthy();
+    fireEvent.click(screen.getByText("Performance"));
+    expect(screen.getByText("Analyse de la performance")).toBeInTheDocument();
+    // KPI XIRR et TWR globaux
+    expect(screen.getAllByText(/XIRR/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Verdict")).toBeInTheDocument();
+    expect(screen.getByText(/Par enveloppe/)).toBeInTheDocument();
+    expect(screen.getByText(/Par actif/)).toBeInTheDocument();
+    // le tableau enveloppes est visible par défaut
+    expect(screen.getByText("PEA Trade Republic")).toBeInTheDocument();
+  });
+
+  it("les cartes de référence affichent le vrai gain de chaque référence, jamais l'écart du portefeuille", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    // gain de la référence livret : 150 € (référence − contribué)
+    expect(screen.getByText(/gain de la référence : \+150,00 €/)).toBeInTheDocument();
+    // la carte Monde affiche la référence RÉELLE quand le World réel est
+    // disponible (même référence que le verdict, pas le taux constant)
+    expect(screen.getByText(/ETF actions Monde réel/)).toBeInTheDocument();
+    // la carte Monde réelle : valeur 11 300 €, gain +850 €, écart −207 €,
+    // toutes dans le même bloc carte (textes coupés par les interpolations)
+    const worldCard = screen.getByText(/ETF actions Monde réel/).closest("div")!;
+    expect(worldCard).toHaveTextContent("11 300,00 €");
+    expect(worldCard).toHaveTextContent("gain de la référence : +850,00 €");
+    expect(worldCard).toHaveTextContent(
+      "Votre portefeuille fait 207,00 € de moins bien que cette référence",
+    );
+    // la carte livret reste la référence à taux constant
+    expect(
+      screen.getByText(/Votre portefeuille fait 631,00 € de mieux que cette référence/),
+    ).toBeInTheDocument();
+    // jamais l'ancien libellé ambigu « vs votre portefeuille »
+    expect(screen.queryByText(/vs votre portefeuille/)).not.toBeInTheDocument();
+  });
+
+  it("le verdict est jugé sur le MSCI World réel et l'explique", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    expect(screen.getByText(/Verdict/)).toBeInTheDocument();
+    // le verdict mentionne la référence réelle et l'écart en une phrase
+    const verdictBlock = screen.getByText(/Verdict/).closest("div")!;
+    expect(verdictBlock).toHaveTextContent("Jugé sur le MSCI World réel");
+    expect(verdictBlock).toHaveTextContent("11 300,00 €");
+    expect(verdictBlock).toHaveTextContent("207,00 €");
+    // delta négatif : le World réel fait mieux que le portefeuille
+    expect(verdictBlock).toHaveTextContent("de moins que votre portefeuille");
+  });
+  it("le panneau performance bascule vers le détail par actif", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    fireEvent.click(screen.getByText(/Par actif/));
+    expect(screen.getByText("MSCI World Swap PEA")).toBeInTheDocument();
+    expect(screen.queryByText("PEA Trade Republic")).not.toBeInTheDocument();
+  });
+
+  it("le sélecteur de période bascule la performance analysée (1 an par défaut, toute la durée)", () => {
+    renderView();
+    fireEvent.click(screen.getByText("Performance"));
+    // par défaut : 12 derniers mois, XIRR +8,20 % du rapport « 1y » ; la
+    // période se clôture à la date d'observation (dernière valorisation),
+    // pas « aujourd'hui » — sinon un export JSON d'hier paraît contradictoire
+    expect(
+      screen.getByText("Période analysée : du 15/01/2024 au 15/01/2025"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("+8,2 %").length).toBeGreaterThan(0);
+    // bascule vers toute la durée : XIRR +6,10 % du rapport « all »
+    fireEvent.click(screen.getByRole("button", { name: "Toute la durée" }));
+    expect(
+      screen.getByText(
+        "Période analysée : toute la vie du portefeuille, jusqu'au 15/01/2025",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("+6,1 %").length).toBeGreaterThan(0);
+    // période indisponible (3 ans) : bouton désactivé
+    expect(
+      screen.getByRole("button", { name: "3 ans" }),
+    ).toBeDisabled();
   });
 
   it("le panneau exposition affiche les onglets sectoriel et géographique", () => {

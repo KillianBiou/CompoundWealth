@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  Activity,
   Coins,
   Globe2,
   LineChart as LineIcon,
@@ -52,6 +53,15 @@ import type {
   IncomeLine,
   ScoreCriterionResult,
 } from "@/lib/analysis/scanners";
+import type {
+  PerformanceLevel,
+  PerformanceReport,
+} from "@/lib/analysis/performance-report";
+import {
+  defaultPerformancePeriod,
+  PERFORMANCE_PERIODS,
+  type PerformancePeriodKey,
+} from "@/lib/analysis/performance-periods";
 
 const CATEGORY_COLORS = [
   "#e84545",
@@ -73,7 +83,7 @@ type PanelId =
   | "revenus"
   | "exposition"
   | "simulateur"
-  | "abonnements"
+  | "performance"
   | "etf"
   | "action";
 
@@ -586,6 +596,460 @@ function DiversificationPanel({
         ) : null}
       </div>
       <p className="text-xs text-text-muted">{t.analyse.diversification.disclaimer}</p>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                    Panneau performance (XIRR / TWR / niveaux)               */
+/* -------------------------------------------------------------------------- */
+
+function formatSignedPercent(ratio: number | null): string {
+  if (ratio === null) return "—";
+  // rendu signé en une passe : formatPercent ajouterait un « + » que ce
+  // préfixe doublerait en « ++10,49 % » (ou « −+2,48 % » pour les pertes)
+  const formatted = new Intl.NumberFormat("fr-FR", {
+    style: "percent",
+    maximumFractionDigits: 2,
+  }).format(Math.abs(ratio));
+  return `${ratio >= 0 ? "+" : "−"}${formatted}`;
+}
+
+/** Libellé court de période pour la carte (1 an, 3 ans, 5 ans, toute la période). */
+function periodShortLabel(
+  period: PerformancePeriodKey,
+  t: Dictionary,
+): string {
+  return period === "1y"
+    ? t.analyse.performance.period1y
+    : period === "3y"
+      ? t.analyse.performance.period3y
+      : period === "5y"
+        ? t.analyse.performance.period5y
+        : t.analyse.performance.periodAll;
+}
+
+function performanceBadge(xirrValue: number | null) {
+  if (xirrValue === null) return <Badge tone="neutral">—</Badge>;
+  if (xirrValue >= 0.05) return <Badge tone="positive">{formatPercent(xirrValue)}</Badge>;
+  if (xirrValue >= 0) return <Badge tone="warning">{formatPercent(xirrValue)}</Badge>;
+  return <Badge tone="negative">{formatPercent(xirrValue)}</Badge>;
+}
+
+type VerdictTone = "positive" | "warning" | "negative" | "neutral";
+
+/**
+ * Verdict sur la valeur finale du portefeuille, dans l'ordre du juge le plus
+ * exigeant au plus laxiste : (1) la marche d'escalier DCA au cours RÉEL du
+ * MSCI World sur vos propres versements — le vrai contre-factuel « un ETF
+ * Monde simple aurait donné ça » ; (2) la référence à taux constant 8 %/an
+ * ; (3) le livret. Bat le World réel → positive ; bat les références à
+ * taux constant mais pas le World réel → warning ; sous le livret →
+ * negative.
+ */
+function verdictTone(
+  valueCents: number,
+  realWorldValueCents: number | null,
+  worldRefValueCents: number | null,
+  savingsRefValueCents: number | null,
+): VerdictTone {
+  if (savingsRefValueCents === null && worldRefValueCents === null && realWorldValueCents === null) {
+    return "neutral";
+  }
+  if (realWorldValueCents !== null) {
+    if (valueCents >= realWorldValueCents) return "positive";
+    if (
+      savingsRefValueCents !== null &&
+      valueCents >= savingsRefValueCents
+    ) {
+      return "warning";
+    }
+    return "negative";
+  }
+  if (worldRefValueCents !== null && valueCents >= worldRefValueCents) return "positive";
+  if (savingsRefValueCents !== null && valueCents >= savingsRefValueCents) return "warning";
+  if (savingsRefValueCents !== null) return "negative";
+  return "neutral";
+}
+
+function signedEur(cents: number): string {
+  return `${cents >= 0 ? "+" : "−"}${formatEurCents(Math.abs(cents))}`;
+}
+
+function PerformancePanel({
+  reports,
+  initialPeriod,
+}: {
+  reports: Record<PerformancePeriodKey, PerformanceReport | null>;
+  initialPeriod: PerformancePeriodKey;
+}) {
+  const { t } = useI18n();
+  const [detailTab, setDetailTab] = useState<"envelopes" | "assets">("envelopes");
+  const [period, setPeriod] = useState<PerformancePeriodKey>(initialPeriod);
+  const report = reports[period] ?? reports.all;
+  if (report === null) {
+    return (
+      <p className="text-sm text-text-muted">{t.analyse.performance.emptyLevels}</p>
+    );
+  }
+  const periodLabels: Record<PerformancePeriodKey, string> = {
+    "1y": t.analyse.performance.period1y,
+    "3y": t.analyse.performance.period3y,
+    "5y": t.analyse.performance.period5y,
+    all: t.analyse.performance.periodAll,
+  };
+  const total = report.total;
+  const metrics = total.metrics;
+  const xirrValue = metrics?.xirr ?? null;
+  const twrValue = metrics?.twrAnnualized ?? metrics?.twrCumulative ?? null;
+  const simpleValue = metrics?.simpleReturn ?? null;
+  const savingsRef = report.savingsReference;
+  const worldRef = report.worldReference;
+  const verdict = verdictTone(
+    total.valueCents,
+    report.worldGrowth?.referenceValueCents ?? null,
+    worldRef?.valueCents ?? null,
+    savingsRef?.valueCents ?? null,
+  );
+  const verdictText =
+    verdict === "positive"
+      ? t.analyse.performance.verdictPositive
+      : verdict === "warning"
+        ? t.analyse.performance.verdictWarning
+        : verdict === "negative"
+          ? t.analyse.performance.verdictNegative
+          : t.analyse.performance.verdictNeutral;
+  const levels = detailTab === "envelopes" ? report.envelopes : report.positions;
+
+  const levelsTable = (rows: PerformanceLevel[]) => (
+    <div className="overflow-x-auto rounded-lg border border-border-cw">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border-cw bg-bg-subtle/50 text-left text-xs text-text-secondary">
+            <th className="px-3 py-2 font-medium">{t.analyse.performance.colName}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colValue}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colContributed}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colXirr}</th>
+            <th className="px-3 py-2 text-right font-medium">{t.analyse.performance.colTwr}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((level) => {
+            const m = level.metrics;
+            return (
+              <tr key={level.id} className="border-b border-border-cw/50 last:border-0 hover:bg-bg-subtle/30">
+                <td className="px-3 py-2 text-text-primary">{level.name}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatEurCents(level.valueCents)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatEurCents(level.contributedCents)}
+                </td>
+                <td
+                  className={cn(
+                    "px-3 py-2 text-right font-semibold tabular-nums",
+                    (m?.xirr ?? 0) >= 0 ? "text-positive" : "text-negative",
+                  )}
+                >
+                  {formatSignedPercent(m?.xirr ?? null)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-text-secondary">
+                  {formatSignedPercent(
+                    m?.twrAnnualized ?? m?.twrCumulative ?? null,
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-3 py-6 text-center text-text-muted">
+                {t.analyse.performance.emptyLevels}
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <div className="mb-2 flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/30 p-1">
+          {PERFORMANCE_PERIODS.map(({ key }) => {
+            const available = reports[key] !== null;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!available}
+                onClick={() => setPeriod(key)}
+                className={cn(
+                  "flex flex-1 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                  period === key
+                    ? "bg-accent-500/15 text-accent-500"
+                    : available
+                      ? "text-text-secondary hover:text-text-primary"
+                      : "cursor-not-allowed text-text-muted/50",
+                )}
+              >
+                {periodLabels[key]}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-text-muted">
+          {(report.periodStart !== null
+            ? t.analyse.performance.periodFrom
+            : t.analyse.performance.periodAllHint
+          )
+            .replace(
+              "{start}",
+              report.periodStart?.toLocaleDateString("fr-FR") ?? "",
+            )
+            .replace(
+              "{end}",
+              report.observationDate.toLocaleDateString("fr-FR"),
+            )}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Kpi
+          label={t.analyse.performance.xirrLabel}
+          value={formatSignedPercent(xirrValue)}
+          sub={t.analyse.performance.xirrSub}
+          hint={t.analyse.performance.xirrHint}
+          scoreTone={
+            xirrValue === null
+              ? undefined
+              : xirrValue >= 0.05
+                ? "positive"
+                : xirrValue >= 0
+                  ? "warning"
+                  : "negative"
+          }
+        />
+        <Kpi
+          label={t.analyse.performance.twrLabel}
+          value={formatSignedPercent(twrValue)}
+          sub={
+            metrics?.twrCumulative != null
+              ? t.analyse.performance.twrSub.replace(
+                  "{cumulative}",
+                  formatSignedPercent(metrics.twrCumulative),
+                )
+              : undefined
+          }
+          hint={t.analyse.performance.twrHint}
+        />
+      </div>
+
+      {simpleValue !== null ? (
+        <div className="rounded-lg border border-border-cw bg-bg-subtle/40 p-4">
+          <p className="text-sm text-text-secondary">
+            {t.analyse.performance.simpleCompare
+              .replace("{simple}", formatSignedPercent(simpleValue))
+              .replace("{xirr}", formatSignedPercent(xirrValue))}
+          </p>
+          <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.simpleWhy}</p>
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-text-secondary">{t.analyse.performance.referencesTitle}</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-info/25 bg-info/5 p-3">
+            <p className="text-xs font-medium text-text-secondary">
+              {t.analyse.performance.refSavings.replace("{rate}", formatPercent(report.savingsRate))}
+            </p>
+            <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
+              {savingsRef !== null ? formatEurCents(savingsRef.valueCents) : "—"}
+            </p>
+            {savingsRef !== null ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain
+                  .replace("{gain}", signedEur(savingsRef.gainCents))}
+              </p>
+            ) : null}
+            {savingsRef !== null ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  savingsRef.deltaCents >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {savingsRef.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(savingsRef.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(savingsRef.deltaCents)),
+                    )}
+              </p>
+            ) : null}
+          </div>
+          <div className="rounded-lg border border-accent-500/25 bg-accent-500/5 p-3">
+            <p className="text-xs font-medium text-text-secondary">
+              {report.worldGrowth
+                ? t.analyse.performance.refWorldReal
+                    .replace("{cumulative}", formatSignedPercent(report.worldGrowth.cumulative))
+                    .replace(
+                      "{annualized}",
+                      report.worldGrowth.annualized !== null
+                        ? formatSignedPercent(report.worldGrowth.annualized)
+                        : t.analyse.performance.worldGrowthNa,
+                    )
+                : t.analyse.performance.refWorld.replace("{rate}", formatPercent(report.worldEquityRate))}
+            </p>
+            <p className="mt-1 font-heading text-xl font-semibold tabular-nums text-text-primary">
+              {report.worldGrowth
+                ? formatEurCents(report.worldGrowth.referenceValueCents)
+                : worldRef !== null
+                  ? formatEurCents(worldRef.valueCents)
+                  : "—"}
+            </p>
+            {report.worldGrowth ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain.replace(
+                  "{gain}",
+                  signedEur(
+                    report.worldGrowth.referenceValueCents -
+                      total.contributedCents -
+                      total.startValueCents,
+                  ),
+                )}
+              </p>
+            ) : worldRef !== null ? (
+              <p className="mt-0.5 text-xs tabular-nums text-text-secondary">
+                {t.analyse.performance.refGain
+                  .replace("{gain}", signedEur(worldRef.gainCents))}
+              </p>
+            ) : null}
+            {report.worldGrowth ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  report.worldGrowth.deltaCents >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {report.worldGrowth.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+                    )}
+              </p>
+            ) : worldRef !== null ? (
+              <p
+                className={cn(
+                  "mt-0.5 text-xs tabular-nums",
+                  worldRef.deltaCents >= 0 ? "text-positive" : "text-negative",
+                )}
+              >
+                {worldRef.deltaCents >= 0
+                  ? t.analyse.performance.aheadReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(worldRef.deltaCents)),
+                    )
+                  : t.analyse.performance.behindReference.replace(
+                      "{delta}",
+                      formatEurCents(Math.abs(worldRef.deltaCents)),
+                    )}
+              </p>
+            ) : null}
+            {report.worldGrowth ? (
+              <p className="mt-1 text-xs text-text-muted">
+                {t.analyse.performance.worldGrowthHint
+                  .replace("{start}", report.worldGrowth.startDate.toLocaleDateString("fr-FR"))
+                  .replace("{end}", report.worldGrowth.endDate.toLocaleDateString("fr-FR"))}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <p className="text-xs text-text-muted">{t.analyse.performance.referencesHint}</p>
+      </div>
+
+      <div
+        className={cn(
+          "rounded-lg border p-4",
+          verdict === "positive" && "border-positive/25 bg-positive/5",
+          verdict === "warning" && "border-warning/25 bg-warning/5",
+          verdict === "negative" && "border-negative/25 bg-negative/5",
+          verdict === "neutral" && "border-border-cw bg-bg-subtle/40",
+        )}
+      >
+        <p className="text-sm font-medium text-text-secondary">
+          {t.analyse.performance.verdictTitle}
+        </p>
+        <p
+          className={cn(
+            "mt-1 text-sm",
+            verdict === "positive" && "text-positive",
+            verdict === "warning" && "text-warning",
+            verdict === "negative" && "text-negative",
+            verdict === "neutral" && "text-text-secondary",
+          )}
+        >
+          {verdictText}
+        </p>
+        <p className="mt-1 text-xs text-text-muted">{t.analyse.performance.verdictHint}</p>
+        {report.worldGrowth ? (
+          <p className="mt-2 text-xs text-text-muted">
+            {t.analyse.performance.verdictWorldReal
+              .replace("{value}", formatEurCents(report.worldGrowth.referenceValueCents))
+              .replace(
+                "{delta}",
+                formatEurCents(Math.abs(report.worldGrowth.deltaCents)),
+              )
+              .replace(
+                "{direction}",
+                report.worldGrowth.deltaCents >= 0
+                  ? t.analyse.performance.verdictWorldAhead
+                  : t.analyse.performance.verdictWorldBehind,
+              )}
+          </p>
+        ) : null}
+      </div>
+
+      <div>
+        <div className="mb-2 flex gap-1 rounded-lg border border-border-cw bg-bg-subtle/30 p-1">
+          <button
+            type="button"
+            onClick={() => setDetailTab("envelopes")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              detailTab === "envelopes"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            <Wallet className="h-4 w-4" aria-hidden />
+            {t.analyse.performance.tabEnvelopes}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailTab("assets")}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+              detailTab === "assets"
+                ? "bg-accent-500/15 text-accent-500"
+                : "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            <PieIcon className="h-4 w-4" aria-hidden />
+            {t.analyse.performance.tabAssets}
+          </button>
+        </div>
+        {levelsTable(levels)}
+      </div>
+
+      <p className="text-xs text-text-muted">{t.analyse.performance.disclaimer}</p>
     </div>
   );
 }
@@ -1285,6 +1749,7 @@ export function AnalysisPageView({
   countries,
   economies,
   simulatorDefaults,
+  performanceByPeriod,
   etfDetails,
   actionDetails,
 }: {
@@ -1298,12 +1763,19 @@ export function AnalysisPageView({
   economies: DiversificationResult;
   sectors: DiversificationResult;
   simulatorDefaults: SimulatorDefaults;
+  /** rapports de performance XIRR / TWR par période (1 an par défaut, 3 ans, 5 ans, tout) */
+  performanceByPeriod: Record<PerformancePeriodKey, PerformanceReport | null>;
   /** détails CSV par ISIN, pour le panneau latéral ETF */
   etfDetails: Record<string, EtfDetail>;
   /** détails CSV des actions, par symbole Yahoo ou ISIN */
   actionDetails: Record<string, ActionDetail>;
 }) {
   const { t } = useI18n();
+  const performancePeriod = useMemo(
+    () => defaultPerformancePeriod(performanceByPeriod),
+    [performanceByPeriod],
+  );
+  const performance = performanceByPeriod[performancePeriod] ?? null;
   const [openPanel, setOpenPanel] = useState<PanelId | null>(null);
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionDetail | null>(null);
@@ -1394,10 +1866,10 @@ export function AnalysisPageView({
       subtitle: t.analyse.panels.simulateur.subtitle,
       icon: <TrendingUp className="h-5 w-5" aria-hidden />,
     },
-    abonnements: {
-      title: t.analyse.panels.abonnements.title,
-      subtitle: t.analyse.panels.abonnements.subtitle,
-      icon: <Wallet className="h-5 w-5" aria-hidden />,
+    performance: {
+      title: t.analyse.panels.performance.title,
+      subtitle: t.analyse.panels.performance.subtitle,
+      icon: <Activity className="h-5 w-5" aria-hidden />,
     },
     etf: {
       title:
@@ -1421,6 +1893,45 @@ export function AnalysisPageView({
   };
 
   const loss20 = fees.projectedLossCents.find((p) => p.horizonYears === 20);
+
+  // texte copié depuis le panneau ouvert : un résumé structuré selon le scanner
+  const panelCopyText = useMemo<string | undefined>(() => {
+    if (openPanel === "etf" && selectedIsin && etfDetails[selectedIsin]) {
+      return JSON.stringify(etfDetails[selectedIsin], null, 2);
+    }
+    if (openPanel === "action" && selectedAction) {
+      return JSON.stringify(selectedAction, null, 2);
+    }
+    if (openPanel === "frais") return JSON.stringify(fees, null, 2);
+    if (openPanel === "revenus") return JSON.stringify(income, null, 2);
+    if (openPanel === "exposition") {
+      return JSON.stringify({ sectors, regions, countries, economies }, null, 2);
+    }
+    if (openPanel === "simulateur") {
+      return JSON.stringify(
+        { defaults: simulatorDefaults, params: simParams },
+        null,
+        2,
+      );
+    }
+    if (openPanel === "performance")
+      return JSON.stringify(performanceByPeriod, null, 2);
+    return undefined;
+  }, [
+    openPanel,
+    selectedIsin,
+    selectedAction,
+    etfDetails,
+    fees,
+    income,
+    sectors,
+    regions,
+    countries,
+    economies,
+    simulatorDefaults,
+    simParams,
+    performanceByPeriod,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -1471,16 +1982,47 @@ export function AnalysisPageView({
           disabled={income.lines.length === 0 && income.excludedLines.length === 0}
         />
         <ScannerCard
-          id="abonnements"
-          title={t.analyse.cards.subscriptions.title}
-          icon={<Wallet className="h-5 w-5" aria-hidden />}
-          gradient="bg-gradient-to-br from-transparent to-transparent"
-          badge={<Badge tone="neutral">{t.analyse.cards.subscriptions.badge}</Badge>}
-          kpi={t.analyse.cards.subscriptions.kpi}
-          kpiLabel={t.analyse.cards.subscriptions.kpiLabel}
-          detail={t.analyse.cards.subscriptions.detail}
+          id="performance"
+          title={t.analyse.cards.performance.title}
+          icon={<Activity className="h-5 w-5" aria-hidden />}
+          gradient="bg-gradient-to-br from-info/10 via-transparent to-positive/10"
+          badge={performanceBadge(performance?.total.metrics?.xirr ?? null)}
+          kpi={formatSignedPercent(performance?.total.metrics?.xirr ?? null)}
+          kpiLabel={
+            performancePeriod === "1y"
+              ? t.analyse.cards.performance.kpiLabel1y
+              : t.analyse.cards.performance.kpiLabel.replace(
+                  "{period}",
+                  periodShortLabel(performancePeriod, t),
+                )
+          }
+          detail={
+            <>
+              {t.analyse.cards.performance.detailLine1.replace(
+                "{gain}",
+                performance?.total.metrics?.gainCents != null
+                  ? formatEurCents(performance.total.metrics.gainCents)
+                  : "—",
+              )}
+              <br />
+              {t.analyse.cards.performance.detailLine2.replace(
+                "{twr}",
+                // période ≤ 1 an : le Modified Dietz annualisé n'est pas défini,
+                // on affiche le cumulé (plus honnête qu'un annualisé court)
+                formatSignedPercent(
+                  performance?.total.metrics?.twrAnnualized ??
+                    performance?.total.metrics?.twrCumulative ??
+                    null,
+                ),
+              )}
+            </>
+          }
           onClick={open}
-          comingSoon
+          disabled={
+            performance === null ||
+            (performance.total.metrics?.xirr === null &&
+              performance.total.metrics?.twrCumulative === null)
+          }
         />
         <ExposureCard
           sectors={sectors}
@@ -1515,7 +2057,9 @@ export function AnalysisPageView({
         title={openPanel !== null ? panels[openPanel].title : ""}
         subtitle={openPanel !== null ? panels[openPanel].subtitle : undefined}
         icon={openPanel !== null ? panels[openPanel].icon : undefined}
-      >
+        copyText={panelCopyText}
+        copyLabel={t.common.copyDetail}
+     >
         {openPanel === "frais" ? (
           <FeePanel fees={fees} onSelectLine={openPosition} />
         ) : null}
@@ -1546,10 +2090,11 @@ export function AnalysisPageView({
             priceHistory={priceHistory}
           />
         ) : null}
-        {openPanel === "abonnements" ? (
-          <p className="py-8 text-center text-sm text-text-muted">
-            {t.analyse.panels.abonnements.body}
-          </p>
+        {openPanel === "performance" ? (
+          <PerformancePanel
+            reports={performanceByPeriod}
+            initialPeriod={performancePeriod}
+          />
         ) : null}
       </SidePanel>
     </div>

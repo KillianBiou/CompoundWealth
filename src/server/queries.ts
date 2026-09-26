@@ -242,3 +242,118 @@ export const getCurrentUser = cache(async () => {
     },
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/*                    Données de copie presse-papier                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Enveloppes sérialisables pour la copie presse-papier : tout ce qu'il faut
+ * pour recréer le portefeuille (type, broker, valeurs, positions avec ISIN,
+ * catégorie, investi, valorisation, versements, dépôts livret, DCA actifs).
+ */
+export const getEnvelopeClipboardData = cache(async (): Promise<
+  import("@/lib/clipboard").ClipboardEnvelope[]
+> => {
+  const userId = await requireUserId();
+  const envelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null },
+    include: {
+      positions: {
+        select: {
+          name: true,
+          symbol: true,
+          category: true,
+          quantity: true,
+          investedCents: true,
+          boughtAt: true,
+          valuations: { orderBy: { date: "asc" } },
+          investments: { orderBy: { date: "asc" } },
+        },
+        orderBy: { boughtAt: "asc" },
+      },
+      deposits: { orderBy: { date: "asc" } },
+      dcaPlans: { include: { lines: true }, orderBy: { createdAt: "asc" } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return envelopes.map((e) => {
+    const isinOfPos = (p: (typeof e.positions)[number]) => {
+      const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+      const symbol = p.symbol?.trim().toUpperCase() ?? "";
+      if (ISIN_PATTERN.test(symbol)) return symbol;
+      const fromName = p.name.match(/[A-Z]{2}[A-Z0-9]{9}[0-9]/);
+      return fromName ? fromName[0] : null;
+    };
+    const positionsValue = e.positions.reduce(
+      (s, p) => s + currentValueCents(p.valuations, p.investedCents ?? 0),
+      0,
+    );
+    const valuations = buildEnvelopeValuations(e.positions);
+    const valueCents =
+      e.type === "LIVRET_A"
+        ? (() => {
+            const events = e.deposits.map((dep) => ({
+              date: dep.date,
+              amountCents: dep.amountCents,
+            }));
+            const series = buildLivretBalanceSeries(events, e.interestRate ?? LIVRET_A_RATE);
+            const nowTime = Date.now();
+            const current =
+              [...series].reverse().find((p) => p.date.getTime() <= nowTime) ??
+              series[0] ??
+              null;
+            return current ? current.balanceCents : 0;
+          })()
+        : valuations.length
+          ? valuations[valuations.length - 1].valueCents
+          : positionsValue;
+    const investedCents =
+      e.type === "LIVRET_A"
+        ? e.deposits.reduce((s, dep) => s + dep.amountCents, 0)
+        : e.depositsCents ?? e.positions.reduce((s, p) => s + (p.investedCents ?? 0), 0);
+    return {
+      name: e.name,
+      type: e.type,
+      broker: e.broker,
+      openedAt: e.openedAt,
+      valueCents,
+      investedCents,
+      positions:
+        e.type === "LIVRET_A"
+          ? []
+          : e.positions.map((p) => ({
+              name: p.name,
+              symbol: p.symbol,
+              isin: isinOfPos(p),
+              category: p.category,
+              quantity: p.quantity,
+              investedCents: p.investedCents,
+              currentValueCents: currentValueCents(p.valuations, p.investedCents ?? 0),
+              boughtAt: p.boughtAt,
+              valuationDate: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].date : null,
+              investments: p.investments.map((inv) => ({
+                date: inv.date,
+                amountCents: inv.amountCents,
+              })),
+            })),
+      deposits:
+        e.type === "LIVRET_A"
+          ? e.deposits.map((dep) => ({ date: dep.date, amountCents: dep.amountCents }))
+          : undefined,
+      interestRate: e.type === "LIVRET_A" ? e.interestRate : undefined,
+      dcaLines: e.dcaPlans
+        .filter((plan) => plan.active)
+        .flatMap((plan) =>
+          plan.lines
+            .filter((line) => line.active)
+            .map((line) => ({
+              isin: line.isin,
+              name: line.name,
+              maxAmountCents: line.maxAmountCents,
+              frequency: plan.frequency,
+            })),
+        ),
+    };
+  });
+});

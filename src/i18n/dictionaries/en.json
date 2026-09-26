@@ -7,6 +7,10 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
+    "copySuccess": "\"{label}\" copied to clipboard",
+    "copyFail": "Could not copy \"{label}\"",
+    "copyAria": "Copy to clipboard",
+    "copyDetail": "Detail",
     "currency": "€"
   },
   "nav": {
@@ -152,6 +156,8 @@
     "importSuccess": "Import successful — {names} created",
     "importButton": "Import an export",
     "newButton": "New account",
+    "copyAll": "Copy",
+    "copyAllTitle": "Copy the whole portfolio (Markdown, recreatable)",
     "empty": "No active account. Create a PEA or a CTO to get started.",
     "card": {
       "historyBuilding": "History building…",
@@ -525,12 +531,12 @@
         "detailLine1": "projection: {amount}",
         "detailLine2": "weighted yield {rate}"
       },
-      "subscriptions": {
-        "title": "Subscriptions",
-        "badge": "€0/mo",
-        "kpi": "€0.00",
-        "kpiLabel": "per month",
-        "detail": "Recurring payment detection is coming with card transaction import."
+      "performance": {
+        "title": "Performance",
+        "kpiLabel": "annualized XIRR · {period}",
+        "detailLine1": "Gain: {gain}",
+        "detailLine2": "Annualized TWR: {twr}",
+        "kpiLabel1y": "annualized XIRR · last 12 months"
       },
       "exposure": {
         "title": "Exposure",
@@ -569,10 +575,9 @@
         "title": "Wealth simulator",
         "subtitle": "Interactive projection, financial independence"
       },
-      "abonnements": {
-        "title": "Subscriptions",
-        "subtitle": "Recurring payment detection — coming soon",
-        "body": "The subscription scanner analyses card transactions (MCC) — available once these are imported."
+      "performance": {
+        "title": "Performance analysis",
+        "subtitle": "True XIRR and TWR returns, compared to reference strategies"
       },
       "etf": "ETF",
       "action": "Stock",
@@ -616,6 +621,53 @@
       "excludedNoDividend": "No dividend paid",
       "empty": "No position paying a cash dividend — accumulating ETFs (Acc) and non-dividend stocks are excluded.",
       "disclaimer": "Only cash payments are counted. The projection applies the 2025 yield of the reference file to the current value; frequency comes from actual history or the usual quarterly cycle of US stocks. Gross amounts, before flat tax."
+    },
+    "performance": {
+      "xirrLabel": "XIRR",
+      "xirrSub": "annualized money-weighted return",
+      "xirrHint": "XIRR (money-weighted) finds the rate that reconciles all your deposits with the current value: each contribution is only credited for the time it was actually invested. It answers: what did MY money earn?",
+      "twrLabel": "TWR",
+      "twrSub": "{cumulative} cumulative",
+      "twrHint": "Time-weighted return approximated with the Modified Dietz method (the standard approximation without a valuation at every deposit date): each flow is weighted by its time of presence. With a single deposit it is exactly the simple return.",
+      "simpleCompare": "Simple return: {simple} · XIRR: {xirr}",
+      "simpleWhy": "The simple return mixes performance with deposit timing: it understates your performance in a rising market (your money was not invested the whole period) and overstates it in a falling one.",
+      "referencesTitle": "Same deposits, reference strategies",
+      "refSavings": "Savings account ({rate}/yr)",
+      "refWorld": "World equity ETF ({rate}/yr)",
+      "vsReference": "vs your portfolio: {delta}",
+      "referencesHint": "Theoretical final value if the same deposits had been invested at the given annual rate, applied pro rata to each deposit's holding period — the world equities historical average stands in for a basic strategy.",
+      "verdictTitle": "Verdict",
+      "verdictPositive": "Your portfolio beats the references, including the World's real growth over the period: complexity adds return.",
+      "verdictWarning": "Your portfolio beats precautionary savings but underperforms the World's real growth over the period: a simple World ETF would have earned more.",
+      "verdictNegative": "Your portfolio does worse than precautionary savings: complexity costs return.",
+      "verdictNeutral": "Not enough history for a verdict yet.",
+      "verdictHint": "Indicative comparison: XIRR includes the effect of your deposit dates, the reference is a constant rate. If the gap stays negative, simplifying (broad ETF, low fees) is probably better.",
+      "tabEnvelopes": "By envelope",
+      "tabAssets": "By asset",
+      "colName": "Name",
+      "colValue": "Value",
+      "colContributed": "Contributed",
+      "colXirr": "XIRR",
+      "colTwr": "TWR",
+      "emptyLevels": "No data at this level.",
+      "disclaimer": "Annualized XIRR on real cash flows (deposits), Excel Act/365 convention. TWR approximated with Modified Dietz (without intermediate valuations, a single deposit yields exactly the simple return). Minimum period of 30 days. Capitalized dividends are included in the value; cash dividends are not reinvested.",
+      "refGain": "reference gain: {gain}",
+      "worldGrowthLine": "Real MSCI World over the same period: {cumulative} cumulative · {annualized} annualized",
+      "worldGrowthNa": "n/a",
+      "worldGrowthHint": "Actual World ETF growth from {start} to {end}; your own deposits replayed at the actual daily price. This is the real counterfactual: \"what would a simple World ETF have given?\"",
+      "aheadReference": "Your portfolio is {delta} better than this reference",
+      "behindReference": "Your portfolio is {delta} worse than this reference",
+      "worldGrowthValue": "Same deposits on this ETF: {value}",
+      "refWorldReal": "Real World equity ETF ({cumulative} cumulative · {annualized} annualized)",
+      "verdictWorldReal": "Judged against the real MSCI World: your same deposits on a simple World ETF would be worth {value}, that is {delta} {direction}.",
+      "verdictWorldAhead": "better than your portfolio",
+      "verdictWorldBehind": "worse than your portfolio",
+      "period1y": "1 year",
+      "period3y": "3 years",
+      "period5y": "5 years",
+      "periodAll": "All time",
+      "periodFrom": "Analyzed period: from {start} to {end}",
+      "periodAllHint": "Analyzed period: the portfolio's whole life, up to {end}"
     },
     "diversification": {
       "score": "Score",

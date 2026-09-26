@@ -8,6 +8,7 @@ import { SidePanel } from "@/app/(app)/analyse/side-panel";
 import { EtfDetailPanel } from "@/app/(app)/analyse/etf-detail-panel";
 import { ActionDetailPanel } from "@/app/(app)/analyse/action-detail-panel";
 import { fetchActionPriceHistoryAction } from "@/server/actions";
+import { useI18n } from "@/i18n/provider";
 import { PositionsTable, type PositionRow } from "./positions-table";
 
 type PricePoint = { date: string; price: number };
@@ -30,6 +31,7 @@ export function PositionsTableWithPanel({
   /** détails CSV des actions, par symbole Yahoo ou ISIN */
   actionDetails: Record<string, ActionDetail>;
 }) {
+  const { t } = useI18n();
   const [selectedIsin, setSelectedIsin] = useState<string | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionDetail | null>(null);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
@@ -103,6 +105,14 @@ export function PositionsTableWithPanel({
             <PieIcon className="h-5 w-5" aria-hidden />
           )
         }
+        copyText={
+          selectedAction
+            ? JSON.stringify(selectedAction, null, 2)
+            : selectedIsin !== null
+              ? JSON.stringify(etfDetails[selectedIsin], null, 2)
+              : undefined
+        }
+        copyLabel={t.common.copyDetail}
       >
         {selectedAction ? (
           <ActionDetailPanel action={selectedAction} priceHistory={priceHistory} />

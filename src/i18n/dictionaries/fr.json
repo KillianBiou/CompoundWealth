@@ -7,6 +7,10 @@
     "save": "Enregistrer",
     "delete": "Supprimer",
     "edit": "Modifier",
+    "copySuccess": "« {label} » copié dans le presse-papier",
+    "copyFail": "Impossible de copier « {label} »",
+    "copyAria": "Copier dans le presse-papier",
+    "copyDetail": "Détail",
     "currency": "€"
   },
   "nav": {
@@ -152,6 +156,8 @@
     "importSuccess": "Import réussi — {names} créé{s}",
     "importButton": "Importer un export",
     "newButton": "Nouvelle enveloppe",
+    "copyAll": "Copier",
+    "copyAllTitle": "Copier tout le portefeuille (Markdown, recréable)",
     "empty": "Aucune enveloppe active. Créez un PEA ou un CTO pour commencer.",
     "card": {
       "historyBuilding": "Historique en construction…",
@@ -525,12 +531,12 @@
         "detailLine1": "projection : {amount}",
         "detailLine2": "yield pondéré {rate}"
       },
-      "subscriptions": {
-        "title": "Abonnements",
-        "badge": "0 €/mois",
-        "kpi": "0,00 €",
-        "kpiLabel": "par mois",
-        "detail": "La détection des paiements récurrents arrive avec l'import des transactions carte."
+      "performance": {
+        "title": "Performance",
+        "kpiLabel": "XIRR annualisé · {period}",
+        "detailLine1": "Gain : {gain}",
+        "detailLine2": "TWR annualisé : {twr}",
+        "kpiLabel1y": "XIRR annualisé · 12 derniers mois"
       },
       "exposure": {
         "title": "Exposition",
@@ -569,10 +575,9 @@
         "title": "Simulateur de patrimoine",
         "subtitle": "Projection interactive, indépendance financière"
       },
-      "abonnements": {
-        "title": "Abonnements",
-        "subtitle": "Détection des paiements récurrents — bientôt",
-        "body": "Le scanner d'abonnements analyse les transactions carte (MCC) — disponible dès l'import de ces opérations."
+      "performance": {
+        "title": "Analyse de la performance",
+        "subtitle": "Rendement réel XIRR et TWR, comparé aux stratégies de référence"
       },
       "etf": "ETF",
       "action": "Action",
@@ -616,6 +621,53 @@
       "excludedNoDividend": "Aucun dividende versé",
       "empty": "Aucune position versant un dividende en cash — les ETF capitalisants (Acc) et les valeurs sans dividende sont exclus.",
       "disclaimer": "Seuls les versements en cash sont comptés. La projection applique le yield 2025 du fichier de référence à la valeur actuelle ; la fréquence vient de l'historique réel ou du cycle trimestriel usuel des actions US. Montants bruts, avant flat tax."
+    },
+    "performance": {
+      "xirrLabel": "XIRR",
+      "xirrSub": "rendement annualisé pondéré par l'argent",
+      "xirrHint": "Le XIRR (money-weighted) calcule le taux qui réconcilie tous vos versements avec la valeur actuelle : chaque dépôt n'est crédité que du temps réellement passé sur le marché. C'est la réponse à « qu'a gagné MON argent ? »",
+      "twrLabel": "TWR",
+      "twrSub": "cumulé {cumulative}",
+      "twrHint": "Rendement pondéré par le temps, approché par la méthode Modified Dietz (l'approximation standard quand on n'a pas de valorisation à chaque date de versement) : chaque flux est pondéré par son temps de présence. Avec un versement unique, il est exactement le rendement simple.",
+      "simpleCompare": "Rendement simple : {simple} · XIRR : {xirr}",
+      "simpleWhy": "Le rendement simple mélange performance et calendrier des versements : il sous-estime votre performance en marché haussier (votre argent n'était pas investi toute la période) et la surestime en marché baissier.",
+      "referencesTitle": "Mêmes versements, stratégies de référence",
+      "refSavings": "Livret de précaution ({rate}/an)",
+      "refWorld": "ETF actions Monde ({rate}/an)",
+      "vsReference": "vs votre portefeuille : {delta}",
+      "referencesHint": "Valeur finale théorique si les mêmes versements avaient été placés au taux annuel indiqué, appliqué au prorata de la durée de détention de chaque versement — le rendement moyen historique des actions mondiales sert de référence « stratégie basique ».",
+      "verdictTitle": "Verdict",
+      "verdictPositive": "Votre portefeuille bat les références, y compris la croissance réelle du Monde sur la période : la complexité ajoute du rendement.",
+      "verdictWarning": "Votre portefeuille bat l'épargne de précaution mais fait moins bien que la croissance réelle du Monde sur la période : un ETF Monde simple aurait rapporté plus.",
+      "verdictNegative": "Votre portefeuille fait moins bien que l'épargne de précaution : la complexité coûte du rendement.",
+      "verdictNeutral": "Pas encore assez d'historique pour tirer un verdict.",
+      "verdictHint": "Comparaison indicative : le XIRR inclut l'effet de vos dates de versement, la référence est un taux constant. Si l'écart est durablement négatif, simplifier (ETF large, frais bas) est probablement meilleur.",
+      "tabEnvelopes": "Par enveloppe",
+      "tabAssets": "Par actif",
+      "colName": "Nom",
+      "colValue": "Valeur",
+      "colContributed": "Versé",
+      "colXirr": "XIRR",
+      "colTwr": "TWR",
+      "emptyLevels": "Aucune donnée à ce niveau.",
+      "disclaimer": "XIRR annualisé sur les flux réels (versements et dépôts), convention Excel Act/365. TWR approché par Modified Dietz (sans valorisations intermédiaires, un versement unique donne exactement le rendement simple). Période minimale de 30 jours. Les dividendes capitalisés sont inclus dans la valeur, les dividendes cash ne sont pas réinvestis.",
+      "refGain": "gain de la référence : {gain}",
+      "worldGrowthLine": "MSCI World réel sur la même période : {cumulative} cumulé · {annualized} annualisé",
+      "worldGrowthNa": "n/a",
+      "worldGrowthHint": "Croissance réelle de l'ETF Monde du {start} au {end} ; vos propres versements rejoués au cours réel du jour. C'est le vrai contre-factuel : « qu'aurait donné un simple ETF Monde ? »",
+      "aheadReference": "Votre portefeuille fait {delta} de mieux que cette référence",
+      "behindReference": "Votre portefeuille fait {delta} de moins bien que cette référence",
+      "worldGrowthValue": "Mêmes versements sur cet ETF : {value}",
+      "refWorldReal": "ETF actions Monde réel ({cumulative} cumulé · {annualized} annualisé)",
+      "verdictWorldReal": "Jugé sur le MSCI World réel : vos mêmes versements sur un simple ETF Monde vaudraient {value}, soit {delta} {direction}.",
+      "verdictWorldAhead": "de mieux que votre portefeuille",
+      "verdictWorldBehind": "de moins que votre portefeuille",
+      "period1y": "1 an",
+      "period3y": "3 ans",
+      "period5y": "5 ans",
+      "periodAll": "Toute la durée",
+      "periodFrom": "Période analysée : du {start} au {end}",
+      "periodAllHint": "Période analysée : toute la vie du portefeuille, jusqu'au {end}"
     },
     "diversification": {
       "score": "Score",
