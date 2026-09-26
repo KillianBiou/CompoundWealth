@@ -640,6 +640,12 @@ describe("goalFeasibility — grille de scénarios", () => {
     expect(goalFeasibility(null, 0.06, 0.08)).toBe("comfortable");
     expect(goalFeasibility(0, 0.06, 0.08)).toBe("comfortable");
   });
+  it("cible inatteignable même à 30 %/an (requiredReturn null, unreachable) → quasiment impossible", () => {
+    // ex. 1 082 € + 100 €/mois → 25 000 € en ~3,3 ans : aucun rendement
+    // réaliste ne tient l'échéance — jamais « confortable »
+    expect(goalFeasibility(null, 0.1493, 0.08, true)).toBe("extreme");
+    expect(goalFeasibility(null, null, 0.08, true)).toBe("extreme");
+  });
 
   it("requis ≤ moitié de la moyenne bourse → confortable", () => {
     expect(goalFeasibility(0.03, 0.06, 0.08)).toBe("comfortable");

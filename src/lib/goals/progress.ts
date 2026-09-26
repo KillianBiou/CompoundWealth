@@ -252,7 +252,12 @@ export function goalFeasibility(
   requiredReturn: number | null,
   portfolioPastReturn: number | null,
   referenceReturn: number = EXPECTED_EQUITY_RETURN,
+  unreachable: boolean = false,
 ): GoalFeasibility | null {
+  // cible inatteignable même à 30 %/an avant l'échéance : le rendement
+  // requis est hors de toute plage → pire niveau de la grille, jamais
+  // « confortable » sous prétexte que la valeur est null
+  if (unreachable) return "extreme";
   if (requiredReturn === null || requiredReturn <= 0) return "comfortable";
   if (referenceReturn <= 0) return null;
   if (requiredReturn <= referenceReturn * 0.5) return "comfortable";
