@@ -16,7 +16,11 @@ import {
 import { createGoalAction, updateGoalAction, type ActionState } from "@/server/actions";
 import type { GoalType } from "@/lib/goals/progress";
 import { computeGoalMetrics, DEFAULT_SAFETY_NET_MONTHS, DEFAULT_WITHDRAWAL_RATE } from "@/lib/goals/progress";
-import { checkGoalEnvelopes, type LinkableEnvelope } from "@/lib/goals/linking";
+import {
+  checkGoalEnvelopes,
+  sharedWithOtherGoals,
+  type LinkableEnvelope,
+} from "@/lib/goals/linking";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Button, Card, Field, Input, Select } from "@/components/ui";
 import { cn } from "@/components/cn";
@@ -139,12 +143,7 @@ export function GoalForm({
     return { metrics, linkedValueCents };
   }, [type, selected, targetAmountEur, targetRentEur, targetMonths, monthlyExpensesEur, withdrawalRate, monthlyContributionEur, targetDate, envelopes, expectedReturn]);
 
-  const linkError = checkGoalEnvelopes(
-    type,
-    envelopes,
-    selected,
-    isEdit ? initial.id : undefined,
-  );
+  const linkError = checkGoalEnvelopes(type, envelopes, selected);
 
   const showTemplatePickers = !isEdit;
 
@@ -415,7 +414,7 @@ export function GoalForm({
           ) : (
             envelopes.map((env) => {
               const checked = selected.includes(env.id);
-              const linkedToOther = env.goalId !== null && env.goalId !== initial.id;
+              const shared = sharedWithOtherGoals(env, initial.id);
               return (
                 <label
                   key={env.id}
@@ -424,7 +423,6 @@ export function GoalForm({
                     checked
                       ? "border-accent-500 bg-accent-100/20"
                       : "border-border-cw bg-bg-elevated hover:border-accent-500/40",
-                    linkedToOther && !checked ? "opacity-60" : "",
                   )}
                 >
                   <span className="flex items-center gap-3">
@@ -441,8 +439,8 @@ export function GoalForm({
                       <span className="ml-2 text-xs text-text-muted">{env.type}</span>
                     </span>
                   </span>
-                  {linkedToOther && !checked ? (
-                    <Badge tone="neutral">{t.goals.new.envelopeLinkedToOther}</Badge>
+                  {shared ? (
+                    <Badge tone="warning">{t.goals.new.envelopeLinkedToOther}</Badge>
                   ) : null}
                 </label>
               );

@@ -386,6 +386,8 @@ export interface GoalEnvelopeSummary {
   /** DCA mensuel actif en centimes (préfill de contribution) */
   dcaMonthlyCents: number;
   closedAt: Date | null;
+  /** noms des AUTRES buts partageant cette enveloppe (avertissement multi-lien) */
+  sharedGoalNames: string[];
 }
 
 export interface GoalSummary {
@@ -441,6 +443,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
           },
           deposits: { orderBy: { date: "asc" } },
           dcaPlans: { include: { lines: true } },
+          goals: { select: { id: true, name: true } },
         },
       },
     },
@@ -502,12 +505,28 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
         series,
         dcaMonthlyCents: dcaMonthly,
         closedAt: e.closedAt,
+        sharedGoalNames: e.goals
+          .filter((g) => g.id !== goal.id)
+          .map((g) => g.name),
       };
     });
 
     const linkedValueCents = envelopes.reduce((s, e) => s + e.valueCents, 0);
     const dcaTotal = envelopes.reduce((s, e) => s + e.dcaMonthlyCents, 0);
     const contribution = (goal.monthlyContributionCents ?? 0) + dcaTotal;
+
+    // matelas : rendement des enveloppes liquides (livret) pour le remplissage projeté
+    const cashValueTotal = envelopes.reduce((s, e) => s + e.valueCents, 0);
+    const cashReturn =
+      goal.type === "SAFETY_NET" && cashValueTotal > 0
+        ? goal.envelopes.reduce(
+            (s, raw) =>
+              s +
+              (raw.type === "LIVRET_A" ? raw.interestRate ?? LIVRET_A_RATE : 0) *
+                (envelopes.find((e) => e.id === raw.id)?.valueCents ?? 0),
+            0,
+          ) / cashValueTotal
+        : null;
 
     const metrics = computeGoalMetrics({
       type: goal.type,
@@ -521,6 +540,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
       targetDate: goal.targetDate,
       createdAt: goal.createdAt,
       expectedReturn,
+      cashReturn,
       now,
     });
 
@@ -572,10 +592,25 @@ export const getLinkableEnvelopes = cache(async () => {
   const userId = await requireUserId();
   const envelopes = await prisma.envelope.findMany({
     where: { userId, closedAt: null },
-    select: { id: true, name: true, type: true, broker: true, goalId: true, closedAt: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      broker: true,
+      closedAt: true,
+      goals: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: "asc" },
   });
-  return envelopes;
+  return envelopes.map((e) => ({
+    id: e.id,
+    name: e.name,
+    type: e.type as "PEA" | "CTO" | "LIVRET_A" | "PRIV",
+    broker: e.broker,
+    closedAt: e.closedAt,
+    goalIds: e.goals.map((g) => g.id),
+    goalNames: e.goals.map((g) => g.name),
+  }));
 });
 
 /** Rendement attendu du portefeuille (historique si assez de données, sinon défaut actions). */

@@ -5,6 +5,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,9 +22,11 @@ export interface GoalProgressPointView {
   metric: number;
   /** trajectoire théorique requise à cette date [0,1] */
   trajectory: number;
+  /** projection future de la métrique (DCA + rendement attendu), même unité ; null = réel */
+  projected?: number | null;
 }
 
-/** Série de progression du but : métrique par mois + trajectoire requise. */
+/** Série de progression du but : réel (corail) + projection dorée jusqu'au but atteint. */
 export function GoalProgressChart({
   points,
   type,
@@ -54,8 +57,29 @@ export function GoalProgressChart({
   const data = points.map((p) => ({
     date: p.date,
     metric: isPercent ? p.metric * 100 : p.metric,
+    projected: p.projected !== undefined && p.projected !== null
+      ? (isPercent ? p.projected * 100 : p.projected)
+      : null,
     trajectory: p.trajectory * 100,
   }));
+
+  // point de jonction réel → projection (dernier point réel, à aujourd'hui)
+  const lastReal = [...points].reverse().find((p) => p.projected === undefined || p.projected === null);
+  const joinPoint = lastReal
+    ? {
+        date: lastReal.date,
+        value: isPercent ? lastReal.metric * 100 : lastReal.metric,
+      }
+    : null;
+  // point d'atteinte du but (fin de projection)
+  const reachPoint = (() => {
+    const last = points[points.length - 1];
+    if (!last || last.projected === undefined || last.projected === null) return null;
+    return {
+      date: last.date,
+      value: isPercent ? last.projected * 100 : last.projected,
+    };
+  })();
 
   const fmt = (v: number) =>
     isPercent
@@ -87,6 +111,13 @@ export function GoalProgressChart({
           <Tooltip
             content={({ active, payload, label }) => {
               if (!active || !payload || payload.length === 0) return null;
+              const point = payload[0].payload as {
+                metric: number;
+                projected: number | null;
+                trajectory: number;
+              };
+              const value = point.projected !== null ? point.projected : point.metric;
+              const isProjected = point.projected !== null && point.metric === null;
               return (
                 <div className="rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs shadow-lg">
                   <p className="font-medium text-text-primary">
@@ -94,16 +125,26 @@ export function GoalProgressChart({
                       month: "long",
                       year: "numeric",
                     })}
+                    {isProjected ? ` · ${t.goals.detail.projectionLabel}` : ""}
                   </p>
-                  {payload.map((entry) => (
-                    <p key={entry.name as string} className="text-text-secondary">
-                      {entry.name === "metric" ? metricLabel : t.goals.detail.trajectoryLabel}
-                      {" : "}
-                      <span className="font-medium tabular-nums text-text-primary">
-                        {fmt(entry.value as number)}
-                      </span>
-                    </p>
-                  ))}
+                  <p className="text-text-secondary">
+                    {metricLabel} :{" "}
+                    <span
+                      className={
+                        isProjected
+                          ? "font-medium tabular-nums text-[var(--gold)]"
+                          : "font-medium tabular-nums text-text-primary"
+                      }
+                    >
+                      {fmt(value)}
+                    </span>
+                  </p>
+                  <p className="text-text-secondary">
+                    {t.goals.detail.trajectoryLabel} :{" "}
+                    <span className="font-medium tabular-nums text-text-primary">
+                      {isPercent ? `${point.trajectory.toFixed(0)} %` : fmt(point.trajectory)}
+                    </span>
+                  </p>
                 </div>
               );
             }}
@@ -111,7 +152,11 @@ export function GoalProgressChart({
           <Legend
             formatter={(value) => (
               <span className="text-xs text-text-secondary">
-                {value === "metric" ? metricLabel : t.goals.detail.trajectoryLabel}
+                {value === "metric"
+                  ? metricLabel
+                  : value === "projected"
+                    ? t.goals.detail.projectionLabel
+                    : t.goals.detail.trajectoryLabel}
               </span>
             )}
           />
@@ -122,6 +167,18 @@ export function GoalProgressChart({
             stroke="var(--accent-500)"
             strokeWidth={2}
             dot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="projected"
+            name="projected"
+            stroke="var(--gold)"
+            strokeWidth={2}
+            strokeDasharray="5 3"
+            dot={false}
+            connectNulls
             isAnimationActive={false}
           />
           <Line
@@ -134,6 +191,26 @@ export function GoalProgressChart({
             dot={false}
             isAnimationActive={false}
           />
+          {reachPoint ? (
+            <ReferenceDot
+              x={reachPoint.date}
+              y={reachPoint.value}
+              r={5}
+              fill="var(--gold)"
+              stroke="var(--bg-elevated)"
+              strokeWidth={2}
+            />
+          ) : null}
+          {joinPoint ? (
+            <ReferenceDot
+              x={joinPoint.date}
+              y={joinPoint.value}
+              r={3}
+              fill="var(--accent-500)"
+              stroke="var(--bg-elevated)"
+              strokeWidth={2}
+            />
+          ) : null}
         </LineChart>
       </ResponsiveContainer>
     </div>

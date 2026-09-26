@@ -1059,7 +1059,12 @@
       "valueLabel": "Valeur",
       "metricMonths": "mois de couverture",
       "metricRent": "rente mensuelle",
-      "metricProgress": "progression"
+      "metricProgress": "progression",
+      "projectionLabel": "Projection (DCA + rendement attendu)",
+      "monthsToFill": "Remplissage estimé",
+      "monthsToFillHint": "Mois nécessaires pour atteindre la cible à la contribution mensuelle actuelle, rendement attendu compris.",
+      "monthsUnit": "mois",
+      "envelopeShared": "Partagée avec {count} autre(s) but(s)"
     },
     "combinedGoTo": "Voir mes buts"
   }

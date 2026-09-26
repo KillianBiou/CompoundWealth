@@ -1305,13 +1305,26 @@ async function validateGoalEnvelopes(
   userId: string,
   goalType: "SAFETY_NET" | "FIRE" | "RETIREMENT" | "DOWN_PAYMENT" | "CUSTOM_LIFEVENT" | "CUSTOM",
   envelopeIds: string[],
-  excludeGoalId?: string,
 ): Promise<{ errors?: Record<string, string[]> }> {
   const envelopes: LinkableEnvelope[] = await prisma.envelope.findMany({
     where: { id: { in: envelopeIds }, userId },
-    select: { id: true, name: true, type: true, closedAt: true, goalId: true },
-  });
-  const error = checkGoalEnvelopes(goalType, envelopes, envelopeIds, excludeGoalId);
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      closedAt: true,
+      goals: { select: { id: true } },
+    },
+  }).then((rows) =>
+    rows.map((e) => ({
+      id: e.id,
+      name: e.name,
+      type: e.type as LinkableEnvelope["type"],
+      closedAt: e.closedAt,
+      goalIds: e.goals.map((g) => g.id),
+    })),
+  );
+  const error = checkGoalEnvelopes(goalType, envelopes, envelopeIds);
   if (error) return { errors: { envelopeIds: [error] } };
   return {};
 }
@@ -1390,11 +1403,10 @@ export async function createGoalAction(
       monthlyContributionCents: data.monthlyContributionEur
         ? eurosToCents(data.monthlyContributionEur)
         : null,
+      envelopes: {
+        connect: data.envelopeIds.map((id) => ({ id })),
+      },
     },
-  });
-  await prisma.envelope.updateMany({
-    where: { id: { in: data.envelopeIds }, userId: session.userId },
-    data: { goalId: goal.id },
   });
   revalidatePath("/buts");
   revalidatePath("/dashboard");
@@ -1453,7 +1465,6 @@ export async function updateGoalAction(
     session.userId,
     data.type,
     data.envelopeIds,
-    goal.id,
   );
   if (check.errors) return { errors: check.errors };
 
@@ -1475,15 +1486,29 @@ export async function updateGoalAction(
         : null,
     },
   });
-  // détache les enveloppes retirées, attache les nouvelles
-  await prisma.envelope.updateMany({
-    where: { goalId: goal.id, id: { notIn: data.envelopeIds } },
-    data: { goalId: null },
+  // détache les enveloppes retirées, attache les nouvelles (m-n)
+  const goalWithLinks = await prisma.goal.findFirst({
+    where: { id: goal.id },
+    select: { envelopes: { select: { id: true } } },
   });
-  await prisma.envelope.updateMany({
-    where: { id: { in: data.envelopeIds }, userId: session.userId },
-    data: { goalId: goal.id },
-  });
+  const currentIds = goalWithLinks?.envelopes.map((e) => e.id) ?? [];
+  const toDetach = currentIds.filter((id) => !data.envelopeIds.includes(id));
+  const toAttach = data.envelopeIds.filter((id) => !currentIds.includes(id));
+  if (toDetach.length > 0 || toAttach.length > 0) {
+    await prisma.goal.update({
+      where: { id: goal.id },
+      data: {
+        envelopes: {
+          ...(toDetach.length > 0
+            ? { disconnect: toDetach.map((id) => ({ id })) }
+            : {}),
+          ...(toAttach.length > 0
+            ? { connect: toAttach.map((id) => ({ id })) }
+            : {}),
+        },
+      },
+    });
+  }
   revalidatePath("/buts");
   revalidatePath(`/buts/${goal.id}`);
   revalidatePath("/dashboard");

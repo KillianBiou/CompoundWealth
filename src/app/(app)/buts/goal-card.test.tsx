@@ -35,6 +35,7 @@ function makeGoal(overrides: Partial<GoalSummary> = {}): GoalSummary {
         series: [],
         dcaMonthlyCents: 10_000,
         closedAt: null,
+        sharedGoalNames: [],
       },
     ],
     linkedValueCents: 1_820_000,
@@ -50,6 +51,7 @@ function makeGoal(overrides: Partial<GoalSummary> = {}): GoalSummary {
       realisticReturn: 0.06,
       requiredMonthlySavingsCents: 100_000,
       requiredMonthlySavingsAtReturnCents: 80_000,
+      monthsToFill: null,
       status: "underfunded",
     },
     monthlySeries: [],
@@ -97,6 +99,7 @@ describe("GoalCard", () => {
         realisticReturn: null,
         requiredMonthlySavingsCents: 300_000,
         requiredMonthlySavingsAtReturnCents: null,
+      monthsToFill: null,
         status: "onTrack",
       },
     });
@@ -118,6 +121,7 @@ describe("GoalCard", () => {
         realisticReturn: null,
         requiredMonthlySavingsCents: 0,
         requiredMonthlySavingsAtReturnCents: null,
+      monthsToFill: null,
         status: "overfunded",
       },
     });
@@ -146,6 +150,7 @@ describe("GoalCard", () => {
         realisticReturn: null,
         requiredMonthlySavingsCents: 100_000,
         requiredMonthlySavingsAtReturnCents: null,
+      monthsToFill: null,
         status: "onTrack",
       },
     });
@@ -158,7 +163,7 @@ describe("GoalCard", () => {
 
 describe("statusTone / needsAttention", () => {
   it("sémantique des tons : atteint/bonne voie = positive, alerte/retard = negative", () => {
-    expect(statusTone("achieved")).toBe("positive");
+    expect(statusTone("achieved")).toBe("gold");
     expect(statusTone("onTrack")).toBe("positive");
     expect(statusTone("alert")).toBe("negative");
     expect(statusTone("late")).toBe("negative");

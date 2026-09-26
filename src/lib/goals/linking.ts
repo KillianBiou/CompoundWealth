@@ -15,22 +15,22 @@ export interface LinkableEnvelope {
   name: string;
   type: EnvelopeType;
   closedAt: Date | null;
-  goalId: string | null;
+  /** ids des buts liés à cette enveloppe (une enveloppe peut être partagée) */
+  goalIds: string[];
 }
 
 /**
  * Vérifie qu'un ensemble d'enveloppes peut être lié à un but :
  * - toutes présentes, ouvertes (non clôturées) ;
- * - matelas de sécurité : uniquement LIVRET_A / PRIV (disponible, sans risque) ;
- * - aucune déjà liée à un AUTRE but (anti double comptage : une enveloppe
- *   appartient à au plus un but).
+ * - matelas de sécurité : uniquement LIVRET_A / PRIV (disponible, sans risque).
+ * Une enveloppe PEUT être liée à plusieurs buts — le partage est signalé
+ * dans le formulaire et le détail du but (sharedWithOtherGoals).
  * Retourne null si OK, sinon un message d'erreur explicite (français).
  */
 export function checkGoalEnvelopes(
   goalType: GoalType,
   envelopes: LinkableEnvelope[],
   requestedIds: string[],
-  currentGoalId?: string,
 ): string | null {
   if (requestedIds.length === 0) {
     return "Lie au moins une enveloppe à ce but";
@@ -53,11 +53,22 @@ export function checkGoalEnvelopes(
       return `Le matelas de sécurité n'accepte que des enveloppes sans risque (Livret A, non coté) : ${invalid.map((e) => e.name).join(", ")} ne convient pas`;
     }
   }
-  const alreadyLinked = linked.filter(
-    (e) => e.goalId !== null && e.goalId !== (currentGoalId ?? undefined),
-  );
-  if (alreadyLinked.length > 0) {
-    return `Enveloppe déjà liée à un autre but : ${alreadyLinked.map((e) => e.name).join(", ")}`;
-  }
   return null;
+}
+
+/** Une enveloppe est-elle partagée avec au moins un autre but que celui-ci ? */
+export function sharedWithOtherGoals(
+  envelope: LinkableEnvelope,
+  currentGoalId?: string,
+): boolean {
+  return envelope.goalIds.some((id) => id !== currentGoalId);
+}
+
+/** Noms des autres buts partageant cette enveloppe (pour l'avertissement du détail). */
+export function otherGoalNames(
+  envelope: LinkableEnvelope & { goalNames?: string[] },
+  currentGoalId?: string,
+): string[] {
+  const names = envelope.goalNames ?? [];
+  return names.filter((_, i) => envelope.goalIds[i] !== currentGoalId);
 }

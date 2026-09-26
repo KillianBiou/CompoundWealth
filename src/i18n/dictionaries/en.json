@@ -1059,7 +1059,12 @@
       "valueLabel": "Value",
       "metricMonths": "coverage months",
       "metricRent": "monthly annuity",
-      "metricProgress": "progress"
+      "metricProgress": "progress",
+      "projectionLabel": "Projection (DCA + expected return)",
+      "monthsToFill": "Estimated fill time",
+      "monthsToFillHint": "Months needed to reach the target at the current monthly contribution, expected return included.",
+      "monthsUnit": "months",
+      "envelopeShared": "Shared with {count} other goal(s)"
     },
     "combinedGoTo": "View my goals"
   }

@@ -36,15 +36,13 @@ model Envelope {
   lastPriceRefreshAt DateTime?
   interestRate  Float?
   inflationRate Float?
-  goalId        String?
-  goal          Goal?            @relation(fields: [goalId], references: [id], onDelete: SetNull)
   positions   Position[]
   valuations  EnvelopeValuation[]
   dcaPlans    DcaPlan[]
   deposits    EnvelopeDeposit[]
+  goals       Goal[]      @relation("GoalEnvelopes")
 
   @@index([userId])
-  @@index([goalId])
 }
 
 enum GoalType {
@@ -73,7 +71,7 @@ model Goal {
   monthlyContributionCents Int?
 
   createdAt DateTime @default(now())
-  envelopes Envelope[]
+  envelopes Envelope[] @relation("GoalEnvelopes")
 
   @@index([userId])
 }
