@@ -147,15 +147,22 @@ export interface KpiScoreLine {
 export function Kpi({
   label,
   value,
+  valueTone,
+  valueClassName,
   sub,
   subTone,
   hint,
   scoreLines,
   scoreTotal,
   scoreTone,
+  align = "left",
 }: {
   label: string;
   value: string;
+  /** couleur directe de la valeur (ex. rendement requis vs attendu) */
+  valueTone?: "positive" | "negative" | "warning" | "gold";
+  /** classes additionnelles pour la valeur (ex. rétrécir un long pourcentage) */
+  valueClassName?: string;
   sub?: string;
   subTone?: "positive" | "negative";
   /** explication au survol de l'icône (bulle comme les fiches ETF) */
@@ -166,14 +173,21 @@ export function Kpi({
   scoreTotal?: string;
   /** couleur du total selon le score */
   scoreTone?: "positive" | "negative" | "warning";
+  /** alignement du bloc (bandes de KPIs centrées) */
+  align?: "left" | "center";
 }) {
   const [open, setOpen] = useState(false);
   const hasTooltip = Boolean(hint || (scoreLines && scoreTotal));
   const deltaColor = (tone: KpiScoreLine["tone"]) =>
     tone === "positive" ? "text-positive" : tone === "warning" ? "text-warning" : "text-negative";
   return (
-    <div className="relative">
-      <p className="flex items-center gap-1 text-xs font-medium tracking-wide text-text-secondary uppercase">
+    <div className={cn("relative min-w-0", align === "center" && "text-center")}>
+      <p
+        className={cn(
+          "flex items-center gap-1 text-xs font-medium tracking-wide text-text-secondary uppercase",
+          align === "center" && "justify-center",
+        )}
+      >
         {label}
         {hasTooltip ? (
           <HelpCircle
@@ -190,10 +204,19 @@ export function Kpi({
       <p
         className={cn(
           "mt-1 font-heading text-2xl font-semibold tabular-nums",
+          // valeur longue (ex. +161,71 %) : on rétrécit pour ne pas déborder
+          // sur le KPI voisin de la bande
+          value.length >= 8 && "text-xl",
+          value.length >= 11 && "text-lg",
           scoreTone === "positive" && "text-positive",
           scoreTone === "warning" && "text-warning",
           scoreTone === "negative" && "text-negative",
           !scoreTone && "text-text-primary",
+          valueTone === "positive" && "!text-positive",
+          valueTone === "warning" && "!text-warning",
+          valueTone === "negative" && "!text-negative",
+          valueTone === "gold" && "!text-gold",
+          valueClassName,
         )}
       >
         {value}
@@ -213,7 +236,10 @@ export function Kpi({
       {hasTooltip && open ? (
         <span
           role="tooltip"
-          className="absolute top-full left-0 z-20 mt-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case"
+          className={cn(
+            "absolute top-full z-20 mt-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg normal-case",
+            align === "center" ? "left-1/2 -translate-x-1/2" : "left-0",
+          )}
         >
           {scoreLines && scoreTotal ? (
             <>

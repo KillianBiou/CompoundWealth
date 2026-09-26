@@ -1085,7 +1085,8 @@
         "hard": "The required return is significantly above the market average: very difficult, even with good envelopes.",
         "extreme": "The required return far exceeds what the market does on average: nearly impossible — rethink the target, the deadline or the contribution."
       },
-      "shortHorizonWarning": "Short horizon (< 5 yrs): a single market crash could make you miss the goal — the long-term average won't have time to smooth it out."
+      "shortHorizonWarning": "Short horizon (< 5 yrs): a single market crash could make you miss the goal — the long-term average won't have time to smooth it out.",
+      "requiredReturnHint": "Annual return needed to reach the target by the deadline, given your current capital and contribution. The color tells you whether it is reasonable."
     },
     "combinedGoTo": "View my goals"
   }

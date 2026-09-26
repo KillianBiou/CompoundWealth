@@ -1085,7 +1085,8 @@
         "hard": "Le rendement requis est nettement supérieur à la moyenne de la bourse : très difficile, même avec de bonnes enveloppes.",
         "extreme": "Le rendement requis dépasse très largement ce que la bourse fait en moyenne : quasiment impossible — repensez la cible, l'échéance ou la contribution."
       },
-      "shortHorizonWarning": "Horizon court (< 5 ans) : un crash de marché peut suffire à faire rater l'objectif — la moyenne long terme n'aura pas le temps de lisser."
+      "shortHorizonWarning": "Horizon court (< 5 ans) : un crash de marché peut suffire à faire rater l'objectif — la moyenne long terme n'aura pas le temps de lisser.",
+      "requiredReturnHint": "Rendement annuel nécessaire pour atteindre la cible à la date voulue, avec votre capital et votre contribution actuels. La couleur indique s'il est raisonnable."
     },
     "combinedGoTo": "Voir mes buts"
   }
