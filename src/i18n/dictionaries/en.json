@@ -999,7 +999,11 @@
       "recapProgress": "Current progress",
       "recapRequiredReturn": "Required annual return",
       "recapStatus": "Projected status",
-      "notApplicable": "—"
+      "notApplicable": "—",
+      "safetyModeReserve": "Expenses × months of reserve",
+      "safetyModeAmount": "Amount to reach",
+      "safetyAmountTarget": "Safety net amount to reach",
+      "safetyAmountTargetHint": "You set the safety net target amount directly, without a calculation based on your expenses."
     },
     "edit": {
       "title": "Edit goal",

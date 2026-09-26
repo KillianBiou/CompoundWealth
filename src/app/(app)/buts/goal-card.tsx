@@ -48,24 +48,32 @@ export function GoalCard({ goal }: { goal: GoalSummary }) {
   const m = goal.metrics;
   const type = goal.type;
 
+  // matelas : mode réserve (dépenses) → mois ; mode montant → euros
+  const safetyAmountMode =
+    type === "SAFETY_NET" && m.monthsCovered === null && goal.targetAmountCents !== null;
   const currentText =
     type === "SAFETY_NET"
-      ? `${(m.monthsCovered ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ${t.goals.new.targetMonthsUnit}`
+      ? safetyAmountMode
+        ? formatEurCents(goal.linkedValueCents)
+        : `${(m.monthsCovered ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ${t.goals.new.targetMonthsUnit}`
       : type === "FIRE"
         ? `${formatEurCents(m.currentRentCents ?? 0)}`
         : formatEurCents(goal.linkedValueCents);
   const targetText =
     type === "SAFETY_NET"
-      ? `${goal.targetMonths ?? 6} ${t.goals.new.targetMonthsUnit}`
+      ? safetyAmountMode
+        ? formatEurCents(goal.targetAmountCents ?? 0)
+        : `${goal.targetMonths ?? 6} ${t.goals.new.targetMonthsUnit}`
       : type === "FIRE"
         ? formatEurCents(goal.targetRentCents ?? 0)
         : formatEurCents(goal.targetAmountCents ?? 0);
-
   const evolution =
     type === "SAFETY_NET"
-      ? t.goals.card.monthsCovered
-          .replace("{current}", (m.monthsCovered ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 }))
-          .replace("{target}", String(goal.targetMonths ?? 6))
+      ? safetyAmountMode
+        ? `${t.goals.card.contribution} · ${formatEurCents(goal.targetAmountCents ?? 0)}`
+        : t.goals.card.monthsCovered
+            .replace("{current}", (m.monthsCovered ?? 0).toLocaleString("fr-FR", { maximumFractionDigits: 1 }))
+            .replace("{target}", String(goal.targetMonths ?? 6))
       : type === "FIRE"
         ? `${t.goals.card.rent} · ${t.goals.card.rentTarget.replace("{target}", formatEurCents(goal.targetRentCents ?? 0))}`
         : `${t.goals.card.contribution} · ${formatEurCents(goal.targetAmountCents ?? 0)}`;

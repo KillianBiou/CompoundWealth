@@ -250,12 +250,20 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
   if (type === "SAFETY_NET") {
     const months = targetMonths ?? DEFAULT_SAFETY_NET_MONTHS;
     const expenses = monthlyExpensesCents ?? 0;
-    const monthsCovered = expenses > 0 ? linkedValueCents / expenses : 0;
-    const progress = months > 0 ? monthsCovered / months : 0;
+    // mode réserve : cible = dépenses × mois ; mode montant : cible = montant direct
+    const amountTarget =
+      targetAmountCents !== null && targetAmountCents !== undefined && targetAmountCents > 0
+        ? targetAmountCents
+        : null;
+    const reserveTarget = expenses > 0 ? Math.round(expenses * months) : null;
+    const target = reserveTarget ?? amountTarget;
+    const monthsCovered = expenses > 0 ? linkedValueCents / expenses : null;
+    const progress = target !== null && target > 0 ? linkedValueCents / target : 0;
     let status: GoalStatus;
-    if (monthsCovered > months * SAFETY_NET_EXCESS_FACTOR) status = "overfunded";
-    else if (monthsCovered >= months) status = "achieved";
-    else if (monthsCovered < SAFETY_NET_ALERT_MONTHS) status = "alert";
+    if (progress >= OVERFUNDED_FACTOR) status = "overfunded";
+    else if (progress >= 1) status = "achieved";
+    else if (monthsCovered !== null && monthsCovered < SAFETY_NET_ALERT_MONTHS)
+      status = "alert";
     else status = "onTrack";
     return {
       progress,
@@ -263,12 +271,12 @@ export function computeGoalMetrics(input: GoalMetricsInput): GoalMetrics {
       requiredTrajectory: trajectory,
       monthsCovered,
       currentRentCents: null,
-      capitalTargetCents: expenses > 0 ? Math.round(expenses * months) : null,
+      capitalTargetCents: target,
       requiredReturn: null,
       realisticReturn: null,
       requiredMonthlySavingsCents:
-        expenses > 0
-          ? Math.max(0, Math.ceil(expenses * months - linkedValueCents))
+        target !== null
+          ? Math.max(0, Math.ceil(target - linkedValueCents))
           : null,
       requiredMonthlySavingsAtReturnCents: null,
       status,
@@ -447,7 +455,8 @@ export function buildGoalMonthlySeries(
       linkedValueCents: valueCents,
       now,
     });
-    if (input.type === "SAFETY_NET") return metrics.monthsCovered ?? 0;
+    if (input.type === "SAFETY_NET")
+      return metrics.monthsCovered !== null ? metrics.monthsCovered : metrics.progress;
     if (input.type === "FIRE") return metrics.currentRentCents ?? 0;
     return metrics.progress;
   };

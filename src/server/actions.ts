@@ -1336,8 +1336,8 @@ export async function createGoalAction(
     monthlyContributionEur: str(formData, "monthlyContributionEur"),
     envelopeIds: formData.getAll("envelopeIds").map(String),
   };
-  const parsed = goalSchema.safeParse({
-    ...raw,
+  // les champs non renseignés sont omis (et non "" coercé en 0 par z.coerce)
+  const optional = {
     ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
     ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
     ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
@@ -1347,6 +1347,13 @@ export async function createGoalAction(
     ...(raw.monthlyContributionEur !== ""
       ? { monthlyContributionEur: raw.monthlyContributionEur }
       : {}),
+  };
+  const parsed = goalSchema.safeParse({
+    type: raw.type,
+    name: raw.name,
+    icon: raw.icon,
+    envelopeIds: raw.envelopeIds,
+    ...optional,
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
   const data = parsed.data;
@@ -1420,8 +1427,8 @@ export async function updateGoalAction(
     monthlyContributionEur: str(formData, "monthlyContributionEur"),
     envelopeIds: formData.getAll("envelopeIds").map(String),
   };
-  const parsed = goalSchema.safeParse({
-    ...raw,
+  // les champs non renseignés sont omis (et non "" coercé en 0 par z.coerce)
+  const optional = {
     ...(raw.targetAmountEur !== "" ? { targetAmountEur: raw.targetAmountEur } : {}),
     ...(raw.targetRentEur !== "" ? { targetRentEur: raw.targetRentEur } : {}),
     ...(raw.targetMonths !== "" ? { targetMonths: raw.targetMonths } : {}),
@@ -1431,6 +1438,13 @@ export async function updateGoalAction(
     ...(raw.monthlyContributionEur !== ""
       ? { monthlyContributionEur: raw.monthlyContributionEur }
       : {}),
+  };
+  const parsed = goalSchema.safeParse({
+    type: raw.type,
+    name: raw.name,
+    icon: raw.icon,
+    envelopeIds: raw.envelopeIds,
+    ...optional,
   });
   if (!parsed.success) return { errors: fieldErrors(parsed.error) };
   const data = parsed.data;

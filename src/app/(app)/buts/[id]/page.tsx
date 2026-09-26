@@ -41,8 +41,15 @@ export default async function GoalDetailPage({
   const yearsLeft = goal.targetDate ? Math.max(0, monthsBetween(now, goal.targetDate) / 12) : 0;
 
   // métrique actuelle + cible, selon le type (le « X / Y » de la demande)
+  const safetyAmountMode =
+    goal.type === "SAFETY_NET" && m.monthsCovered === null && goal.targetAmountCents !== null;
   const heroCurrent = (() => {
     if (goal.type === "SAFETY_NET") {
+      if (safetyAmountMode) {
+        return t.goals.detail.amount
+          .replace("{current}", formatEurCents(goal.linkedValueCents))
+          .replace("{target}", formatEurCents(goal.targetAmountCents ?? 0));
+      }
       return `${(m.monthsCovered ?? 0).toFixed(1)} / ${goal.targetMonths ?? 0} ${t.goals.new.targetMonthsUnit}`;
     }
     if (goal.type === "FIRE") {
@@ -56,7 +63,11 @@ export default async function GoalDetailPage({
   })();
 
   const heroTarget = (() => {
-    if (goal.type === "SAFETY_NET") return `${goal.targetMonths ?? 0} ${t.goals.new.targetMonthsUnit}`;
+    if (goal.type === "SAFETY_NET") {
+      return safetyAmountMode
+        ? formatEurCents(goal.targetAmountCents ?? 0)
+        : `${goal.targetMonths ?? 0} ${t.goals.new.targetMonthsUnit}`;
+    }
     if (goal.type === "FIRE" && m.capitalTargetCents !== null) {
       return t.goals.detail.capitalEquivalent.replace(
         "{amount}",
@@ -240,7 +251,12 @@ export default async function GoalDetailPage({
           </HintLabel>
         </div>
         {progressPoints.length > 0 ? (
-          <GoalProgressChart points={progressPoints} type={goal.type} locale={locale} />
+          <GoalProgressChart
+            points={progressPoints}
+            type={goal.type}
+            metricMode={safetyAmountMode ? "progress" : "months"}
+            locale={locale}
+          />
         ) : (
           <p className="text-sm text-text-muted">{t.goals.card.noEnvelopes}</p>
         )}

@@ -999,7 +999,11 @@
       "recapProgress": "Progression actuelle",
       "recapRequiredReturn": "Rendement annuel requis",
       "recapStatus": "Statut prévisionnel",
-      "notApplicable": "—"
+      "notApplicable": "—",
+      "safetyModeReserve": "Dépenses × mois de réserve",
+      "safetyModeAmount": "Montant à atteindre",
+      "safetyAmountTarget": "Montant du matelas à atteindre",
+      "safetyAmountTargetHint": "Vous définissez directement le montant cible du matelas, sans calcul basé sur vos dépenses."
     },
     "edit": {
       "title": "Modifier le but",

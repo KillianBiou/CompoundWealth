@@ -200,6 +200,32 @@ describe("goalSchema", () => {
     expect(r.success).toBe(true);
   });
 
+  it("matelas : montant cible seul (mode montant) → valide", () => {
+    const r = goalSchema.safeParse({
+      type: "SAFETY_NET",
+      name: "Matelas",
+      targetAmountEur: 15000,
+      envelopeIds: [],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("matelas : champs vides (chaînes vides du FormData) → pas d'erreur withdrawalRate (bug coercition)", () => {
+    // régression : withdrawalRate="" coercé en 0 rejetait la création d'un matelas
+    const r = goalSchema.safeParse({
+      type: "SAFETY_NET",
+      name: "Matelas",
+      icon: "SAFETY_NET",
+      targetMonths: "6",
+      monthlyExpensesEur: "1500",
+      envelopeIds: [],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.withdrawalRate).toBeUndefined();
+    }
+  });
+
   it("matelas sans dépenses mensuelles → erreur explicite", () => {
     const r = goalSchema.safeParse({
       type: "SAFETY_NET",
