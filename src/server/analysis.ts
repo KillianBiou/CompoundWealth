@@ -272,6 +272,7 @@ export const getPerformanceReports = cache(
     const livretFlows: { date: Date; amountCents: number }[] = [];
     const livretSeries: { date: Date; balanceCents: number }[][] = [];
     let livretBalance = 0;
+    let livretValueDate: Date | null = null;
     for (const env of livretEnvelopes) {
       const rate = env.interestRate ?? LIVRET_A_RATE;
       const events = env.deposits.map((dep) => ({
@@ -284,6 +285,11 @@ export const getPerformanceReports = cache(
         series[0] ??
         null;
       livretBalance += current ? current.balanceCents : 0;
+      // date d'observation du solde : la quinzaine du dernier point connu,
+      // c'est elle qui clôt la période de détention du livret
+      if (current && (!livretValueDate || current.date > livretValueDate)) {
+        livretValueDate = current.date;
+      }
       livretSeries.push(series);
       livretFlows.push(...events);
     }
@@ -371,6 +377,7 @@ export const getPerformanceReports = cache(
         period: key,
         periodStart,
         livretStartValueCents,
+        livretValueDate,
         now,
       });
     }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPerformanceReport, buildLevel } from "./performance-report";
+import type { CashFlow } from "./performance";
 import type { AnalysisPosition } from "./scanners";
 
 const NOW = new Date("2025-01-15T12:00:00Z");
@@ -265,6 +266,79 @@ describe("buildPerformanceReport", () => {
     expect(world.gainCents).toBe(
       world.valueCents - 102_000 - 10_000,
     );
+  });
+  it("la période se clôt à la dernière valorisation, pas à « maintenant » (off-by-one de years)", () => {
+    // versement 2025-09-25, dernière valorisation 2026-09-24, analyse lancée
+    // le 2026-09-26 : years doit être 364/365, pas 366/365
+    const position = makePosition({
+      id: "pos-obs",
+      name: "WPEA",
+      investments: [{ date: new Date("2025-09-25"), amountCents: 100_000 }],
+      investedCents: 100_000,
+      valueCents: 110_000,
+      boughtAt: new Date("2025-09-25"),
+      valuations: [
+        { date: new Date("2025-09-25"), valueCents: 100_000 },
+        { date: new Date("2026-09-24"), valueCents: 110_000 },
+      ],
+    });
+    const report = buildPerformanceReport({
+      positions: [position],
+      livretFlows: [],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      now: new Date("2026-09-26T12:00:00Z"),
+    });
+    expect(report.total.metrics?.years).toBeCloseTo(364 / 365, 6);
+    expect(report.positions[0].metrics?.years).toBeCloseTo(364 / 365, 6);
+    // le livret sans quinzaine d'observation connue n'influence pas la date
+  });
+  it("un actif né en cours de fenêtre garde le même TWR en « 1y » qu'en « all »", () => {
+    // EM-like : né en juin 2026, cutoff 1 an en septembre 2025 → la fenêtre
+    // 1y ne l'a jamais contenu : son Dietz doit être identique aux deux vues
+    const position = makePosition({
+      id: "pos-em",
+      name: "MSCI EM",
+      envelopeId: "env-cto",
+      envelopeName: "CTO",
+      envelopeType: "CTO",
+      investments: [
+        { date: new Date("2026-06-02"), amountCents: 700_000 },
+        { date: new Date("2026-07-02"), amountCents: 1_200_000 },
+        { date: new Date("2026-08-03"), amountCents: 1_200_000 },
+        { date: new Date("2026-09-02"), amountCents: 1_200_000 },
+      ],
+      investedCents: 4_300_000,
+      valueCents: 4_455_900,
+      boughtAt: new Date("2026-06-02"),
+      valuations: [
+        { date: new Date("2026-06-02"), valueCents: 700_000 },
+        { date: new Date("2026-09-24"), valueCents: 4_455_900 },
+      ],
+    });
+    const base = {
+      positions: [position],
+      livretFlows: [] as CashFlow[],
+      livretValueCents: 0,
+      savingsRate: 0.017,
+      worldEquityRate: 0.08,
+      now: new Date("2026-09-26T12:00:00Z"),
+    };
+    const all = buildPerformanceReport(base);
+    const oneYear = buildPerformanceReport({
+      ...base,
+      period: "1y",
+      periodStart: new Date("2025-09-26"),
+    });
+    expect(oneYear.positions[0].metrics?.twrCumulative).toBeCloseTo(
+      all.positions[0].metrics?.twrCumulative ?? NaN,
+      6,
+    );
+    // ≈ 6,6 % (détention réelle), pas 20,5 % (fenêtre d'affichage)
+    expect(oneYear.positions[0].metrics?.twrCumulative).toBeCloseTo(0.066, 2);
+    // le total, lui, vit sur la fenêtre complète : cutoff → fin
+    expect(oneYear.total.metrics?.twrCumulative).not.toBeNull();
   });
   it("transmet la croissance réelle du Monde sur la même période", () => {
     const report = buildPerformanceReport({
