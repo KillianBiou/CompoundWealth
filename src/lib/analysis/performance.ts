@@ -198,20 +198,25 @@ export function modifiedDietzReturn(
     .filter((f) => toUtcMidnight(f.date).getTime() <= endTime)
     .sort((a, b) => a.date.getTime() - b.date.getTime());
   const hasStart = startDate != null;
-  const start = hasStart
-    ? toUtcMidnight(startDate)
-    : sorted[0]
-      ? toUtcMidnight(sorted[0].date)
-      : null;
-  if (start === null) return null;
+  const cutoff = hasStart ? toUtcMidnight(startDate) : null;
   // sous-période : seuls les flux postérieurs au cutoff comptent, le capital
   // présent au cutoff entre au dénominateur comme V_début
-  const periodFlows = hasStart
-    ? sorted.filter((f) => f.date.getTime() > start.getTime())
+  const periodFlows = cutoff
+    ? sorted.filter((f) => toUtcMidnight(f.date).getTime() > cutoff.getTime())
     : sorted;
   const beginValue = hasStart ? Math.max(0, startValueCents) : 0;
   if (periodFlows.length === 0 && beginValue <= 0) return null;
-  const totalDays = dayDiff(start, end);
+  // fenêtre de pondération : la durée de détention PROPRE au niveau — au
+  // cutoff si du capital y était déjà présent, sinon depuis l'inception du
+  // premier flux. Un actif né en cours de fenêtre est ainsi pondéré sur sa
+  // vraie durée de vie (114 j, pas 365 j) : son TWR « 1 an » est identique à
+  // son TWR « toute la durée », pas gonflé d'un facteur 3 par des poids
+  // rapportés à une fenêtre d'affichage qui ne l'a jamais contenu.
+  const windowStart =
+    beginValue > 0 && cutoff !== null
+      ? cutoff
+      : toUtcMidnight(periodFlows[0].date);
+  const totalDays = dayDiff(windowStart, end);
   if (totalDays <= 0) return null;
 
   const netFlow = periodFlows.reduce((s, f) => s + f.amountCents, 0);
@@ -239,7 +244,7 @@ export interface PerformanceScope {
   flows: CashFlow[];
   /** valeur finale en centimes */
   finalValueCents: number;
-  /** date finale de l'analyse */
+  /** date d'observation de la valeur finale (dernière valorisation connue) */
   finalDate: Date;
   /** début de la sous-période analysée (null/absent = toute la vie du niveau) */
   startDate?: Date | null;
@@ -260,7 +265,7 @@ export interface PerformanceMetricsResult {
   gainCents: number | null;
   /** total versé, centimes */
   contributedCents: number;
-  /** durée de la période en années, null si < 1 flux */
+  /** durée de détention réelle du niveau en années (inception → date d'observation), null si < 1 flux */
   years: number | null;
 }
 
@@ -279,14 +284,22 @@ export function computePerformanceMetrics(
 
   // --- sous-période -----------------------------------------------------------
   // le capital présent au cutoff (startValueCents) joue le rôle du premier
-  // versement : flux XIRR à la date de début, V_début du Modified Dietz
+  // versement : flux XIRR à la date de début, V_début du Modified Dietz.
+  // La fenêtre du niveau est sa durée de détention réelle : au cutoff si du
+  // capital y était déjà présent, sinon depuis l'inception du premier flux
+  // de la période (un actif né en cours de fenêtre vit sur sa propre durée,
+  // pas sur la fenêtre d'affichage).
   if (scope.startDate != null) {
     const startDate = toUtcMidnight(scope.startDate);
     const startValueCents = Math.max(0, scope.startValueCents ?? 0);
     const periodFlows = flows.filter(
       (f) => f.date.getTime() > startDate.getTime(),
     );
-    const totalDays = dayDiff(startDate, finalDate);
+    const effectiveStart =
+      startValueCents > 0
+        ? startDate
+        : (periodFlows[0]?.date ?? startDate);
+    const totalDays = dayDiff(effectiveStart, finalDate);
     const contributedCents = periodFlows.reduce((s, f) => s + f.amountCents, 0);
     const gainCents = scope.finalValueCents - startValueCents - contributedCents;
     const simpleReturn =

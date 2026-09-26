@@ -265,6 +265,16 @@ describe("computePerformanceMetrics", () => {
     });
     expect(result.years).toBeCloseTo(1, 6);
   });
+  it("off-by-one corrigé : la valeur observée plus tôt que « maintenant » raccourcit la période", () => {
+    // dernière valorisation 2026-09-24 : c'est elle qui clôt la période,
+    // même si l'analyse tourne le 2026-09-26 (365 − 1 jours de détention)
+    const result = computePerformanceMetrics({
+      flows: [{ date: new Date("2025-09-25"), amountCents: 100_000 }],
+      finalValueCents: 110_000,
+      finalDate: new Date("2026-09-24"),
+    });
+    expect(result.years).toBeCloseTo(364 / 365, 6);
+  });
 
   it("ignore les flux postérieurs à la date finale", () => {
     const result = computePerformanceMetrics({
@@ -296,6 +306,55 @@ describe("computePerformanceMetrics", () => {
     expect(result.gainCents).toBe(15_000);
     expect(result.simpleReturn).toBeCloseTo(0.1, 4);
     expect(result.xirr).toBeCloseTo(0.1202, 3);
+    expect(result.twrCumulative).toBeCloseTo(0.1199, 3);
+  });
+  it("sous-période : un actif né en cours de fenêtre est pondéré sur sa propre durée de détention", () => {
+    // EM, réal : 4 versements juin–septembre 2026, valeur observée 2026-09-24.
+    // Le Dietz doit pondérer sur la détention réelle (114 j), PAS sur la
+    // fenêtre d'affichage d'1 an — sinon le TWR est gonflé d'un facteur 3
+    // (bug réel : 20,5 % affichés pour 6,6 % réels).
+    const result = computePerformanceMetrics({
+      flows: [
+        { date: new Date("2026-06-02"), amountCents: 700_000 },
+        { date: new Date("2026-07-02"), amountCents: 1_200_000 },
+        { date: new Date("2026-08-03"), amountCents: 1_200_000 },
+        { date: new Date("2026-09-02"), amountCents: 1_200_000 },
+      ],
+      finalValueCents: 4_455_900,
+      finalDate: new Date("2026-09-24"),
+      startDate: new Date("2025-09-24"),
+      startValueCents: 0, // l'actif n'existait pas au cutoff
+    });
+    // fenêtre = détention propre : inception 2026-06-02 → 2026-09-24 (114 j)
+    expect(result.twrCumulative).toBeCloseTo(0.0660, 3);
+    // le rendement de la fenêtre 1 an est LE MÊME que « toute la durée » :
+    // c'est la durée de détention réelle qui compte, pas la fenêtre d'affichage
+    const all = computePerformanceMetrics({
+      flows: [
+        { date: new Date("2026-06-02"), amountCents: 700_000 },
+        { date: new Date("2026-07-02"), amountCents: 1_200_000 },
+        { date: new Date("2026-08-03"), amountCents: 1_200_000 },
+        { date: new Date("2026-09-02"), amountCents: 1_200_000 },
+      ],
+      finalValueCents: 4_455_900,
+      finalDate: new Date("2026-09-24"),
+    });
+    expect(result.twrCumulative).toBeCloseTo(all.twrCumulative!, 6);
+    expect(result.years).toBeCloseTo(all.years!, 6);
+  });
+  it("sous-période : la fenêtre démarre au cutoff quand du capital y était déjà présent", () => {
+    // capital 100 000 € présent au cutoff, +50 000 € mi-2024, fin 165 000 € :
+    // fenêtre = cutoff → fin (366 j), V_début au dénominateur
+    const result = computePerformanceMetrics({
+      flows: [
+        { date: new Date("2024-01-15"), amountCents: 100_000 },
+        { date: new Date("2024-07-15"), amountCents: 50_000 },
+      ],
+      finalValueCents: 165_000,
+      finalDate: new Date("2025-01-15"),
+      startDate: new Date("2024-01-15"),
+      startValueCents: 100_000,
+    });
     expect(result.twrCumulative).toBeCloseTo(0.1199, 3);
   });
   it("sous-période sans flux : Dietz = rendement simple du capital initial", () => {

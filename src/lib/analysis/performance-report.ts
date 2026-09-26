@@ -176,6 +176,8 @@ export function buildPerformanceReport(params: {
   periodStart?: Date | null;
   /** valeur du livret au cutoff de la sous-période, centimes */
   livretStartValueCents?: number;
+  /** date d'observation du solde du livret (dernière quinzaine connue) */
+  livretValueDate?: Date | null;
   now?: Date;
 }): PerformanceReport {
   const now = params.now ?? new Date();
@@ -186,6 +188,41 @@ export function buildPerformanceReport(params: {
     params.periodStart != null ? toUtcMidnight(params.periodStart) : null;
   const livretStartValueCents = params.livretStartValueCents ?? 0;
   const isSubPeriod = periodStart !== null;
+
+  // --- dates d'observation ------------------------------------------------
+  // La valeur finale de chaque niveau est observée à sa dernière valorisation
+  // connue (la valeur EST ce point), pas « maintenant » : c'est elle qui clôt
+  // la période de détention. Sinon years compte un jour de trop (366/365 pour
+  // 2025-09-25 → 2026-09-25) et le TWR annualisé divise par une durée fausse.
+  const lastValuationDate = (
+    valuations: { date: Date; valueCents: number }[],
+  ): Date | null => {
+    if (valuations.length === 0) return null;
+    const latest = valuations.reduce(
+      (max, v) => (v.date.getTime() > max.getTime() ? v.date : max),
+      valuations[0].date,
+    );
+    return toUtcMidnight(latest);
+  };
+  const observationDateOf = (p: AnalysisPosition): Date =>
+    lastValuationDate(p.valuations ?? []) ?? now;
+  const positionObservations = new Map(
+    positions.map((p) => [p.id, observationDateOf(p)] as const),
+  );
+  const livretObservation = params.livretValueDate
+    ? toUtcMidnight(params.livretValueDate)
+    : null;
+  const maxDate = (dates: Date[]): Date =>
+    dates.length === 0
+      ? now
+      : dates.reduce((max, d) => (d.getTime() > max.getTime() ? d : max), dates[0]);
+  // le total vaut la somme de composants observés chacun à sa dernière
+  // valorisation : sa date d'observation est la plus récente d'entre elles —
+  // pas « maintenant », sinon years compte un jour de trop (366/365)
+  const totalObservation = maxDate([
+    ...positions.map((p) => observationDateOf(p)),
+    ...(livretObservation ? [livretObservation] : []),
+  ]);
 
   /** valeur d'un niveau au cutoff : dernière valorisation connue avant la date */
   const startValueOf = (valuations: { date: Date; valueCents: number }[]) =>
@@ -211,7 +248,7 @@ export function buildPerformanceReport(params: {
         envelopeType: p.envelopeType,
         flows: positionCashFlows(p),
         finalValueCents: p.valueCents,
-        finalDate: now,
+        finalDate: positionObservations.get(p.id) ?? now,
         startDate: periodStart,
         startValueCents: startValueOf(p.valuations ?? []),
       }),
@@ -245,7 +282,7 @@ export function buildPerformanceReport(params: {
             amountCents: f.amountCents,
           })),
           finalValueCents: livretValueCents,
-          finalDate: now,
+          finalDate: livretObservation ?? now,
           startDate: periodStart,
           startValueCents: livretStartValueCents,
         }),
@@ -266,7 +303,10 @@ export function buildPerformanceReport(params: {
         envelopeType: entry.type,
         flows,
         finalValueCents: valueCents,
-        finalDate: now,
+        finalDate:
+          entry.positions.length > 0
+            ? maxDate(entry.positions.map((p) => observationDateOf(p)))
+            : now,
         startDate: periodStart,
         startValueCents: startValueOf(envelopeValuations),
       }),
@@ -291,7 +331,7 @@ export function buildPerformanceReport(params: {
     name: "total",
     flows: allFlows,
     finalValueCents: totalValue,
-    finalDate: now,
+    finalDate: totalObservation,
     startDate: periodStart,
     startValueCents: totalStartValueCents,
   });
@@ -302,7 +342,7 @@ export function buildPerformanceReport(params: {
   const savingsReference = hasFlows
     ? buildReference(
         periodFlows,
-        now,
+        totalObservation,
         savingsRate,
         totalValue,
         totalStartValueCents,
@@ -312,7 +352,7 @@ export function buildPerformanceReport(params: {
   const worldReference = hasFlows
     ? buildReference(
         periodFlows,
-        now,
+        totalObservation,
         worldEquityRate,
         totalValue,
         totalStartValueCents,
