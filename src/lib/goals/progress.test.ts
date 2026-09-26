@@ -11,6 +11,7 @@ import {
   requiredMonthlySavings,
   requiredTrajectoryAt,
   buildGoalMonthlySeries,
+  safetyNetLevel,
   DEFAULT_SAFETY_NET_MONTHS,
   DEFAULT_WITHDRAWAL_RATE,
   SAFETY_NET_ALERT_MONTHS,
@@ -284,9 +285,10 @@ describe("machine à statuts", () => {
     expect(["onTrack", "surplus"]).toContain(m.status);
   });
 
-  it("rendement requis > seuil réaliste → compromis", () => {
-    // 100 000 € actuels, cible 1 M€ dans 10 ans, sans contribution :
-    // r = 10^(1/10)−1 ≈ 25,9 % ≫ réaliste → compromis
+  it("rendement requis > réaliste avec date cible → en retard (même sémantique que FIRE)", () => {
+    // 100 000 € actuels, cible 1 M€ dans ~10 ans, sans contribution :
+    // r ≈ 23,2 % ≫ réaliste — la projection à 8 % ne tient pas
+    // la date cible → « late » (actionnable), pas « compromis »
     const m = computeGoalMetrics({
       type: "RETIREMENT",
       linkedValueCents: 10_000_000,
@@ -299,7 +301,7 @@ describe("machine à statuts", () => {
     });
     expect(m.requiredReturn).not.toBeNull();
     expect(m.requiredReturn!).toBeGreaterThan(m.realisticReturn!);
-    expect(m.status).toBe("compromised");
+    expect(m.status).toBe("late");
   });
 
   it("cible inatteignable même à 30 %/an → compromis (requiredReturn null)", () => {
@@ -315,7 +317,7 @@ describe("machine à statuts", () => {
       now: NOW,
     });
     expect(m.requiredReturn).toBeNull();
-    expect(m.status).toBe("compromised");
+    expect(m.status).toBe("late");
   });
 
   it("rendement requis réaliste → bonne voie", () => {
@@ -742,5 +744,91 @@ describe("FIRE : rendement requis", () => {
     expect(m.requiredReturn).not.toBeNull();
     expect(m.requiredReturn!).toBeGreaterThan(0.03);
     expect(m.requiredReturn!).toBeLessThan(0.05);
+  });
+});
+
+describe("safetyNetLevel — échelle de précaution (matelas)", () => {
+  it("mode réserve : < 1 mois couvert → très précaire", () => {
+    expect(safetyNetLevel(0.5, 6, 0.08)).toBe("critical");
+    expect(safetyNetLevel(0, 6, 0)).toBe("critical");
+  });
+  it("mode réserve : 1 à < 3 mois (zone d'alerte) → précaire", () => {
+    expect(safetyNetLevel(1, 6, 0.17)).toBe("fragile");
+    expect(safetyNetLevel(2.9, 6, 0.48)).toBe("fragile");
+  });
+  it("mode réserve : ≥ 3 mois mais < 50 % de la cible → partielle", () => {
+    // cible 12 mois : 3 mois couverts = 25 % de la cible, zone « partielle »
+    expect(safetyNetLevel(3, 12, 0.25)).toBe("partial");
+    expect(safetyNetLevel(2.9, 12, 0.24)).not.toBe("partial"); // garde-fou : 2,9 est fragile
+  });
+  it("mode réserve : ≥ 50 % de la cible → en construction", () => {
+    expect(safetyNetLevel(3.1, 6, 0.52)).toBe("building");
+    expect(safetyNetLevel(5.9, 6, 0.98)).toBe("building");
+  });
+  it("mode réserve : cible atteinte → solide", () => {
+    expect(safetyNetLevel(6, 6, 1)).toBe("robust");
+    expect(safetyNetLevel(8.9, 6, 1.48)).toBe("robust");
+  });
+  it("mode réserve : > cible × 1,5 → excessive (liquidité dormante)", () => {
+    expect(safetyNetLevel(9.1, 6, 1.52)).toBe("excess");
+    expect(safetyNetLevel(12, 6, 2)).toBe("excess");
+  });
+  it("mode montant (pas de dépenses) : l'échelle retombe sur la progression", () => {
+    expect(safetyNetLevel(null, null, 0.05)).toBe("critical");
+    expect(safetyNetLevel(null, null, 0.15)).toBe("fragile");
+    expect(safetyNetLevel(null, null, 0.3)).toBe("partial");
+    expect(safetyNetLevel(null, null, 0.6)).toBe("building");
+    expect(safetyNetLevel(null, null, 1)).toBe("robust");
+    expect(safetyNetLevel(null, null, 1.6)).toBe("excess");
+  });
+  it("mode montant avec cible en mois mais pas de dépenses : progression seule", () => {
+    expect(safetyNetLevel(null, 6, 0.3)).toBe("partial");
+  });
+});
+
+describe("buts capitalisés : échéance anticipée (même sémantique que FIRE)", () => {
+  it("retraite : projection à 8 % qui ne tient pas la date → late", () => {
+    // 25 000 € actuels, 500 €/mois, cible 300 000 € dans ~10,3 ans :
+    // projection ≈ 130 k€ ≪ 300 k€
+    const m = computeGoalMetrics({
+      type: "RETIREMENT",
+      linkedValueCents: 2_500_000,
+      targetAmountCents: 30_000_000,
+      monthlyContributionCents: 50_000,
+      createdAt: new Date(2026, 8, 26),
+      targetDate: new Date(2036, 0, 1),
+      expectedReturn: 0.08,
+      now: new Date(2026, 8, 26),
+    });
+    expect(m.status).toBe("late");
+  });
+  it("apport immobilier : projection qui tient la date → onTrack", () => {
+    // 65 000 € + 400 €/mois à 8 % pendant ~4,3 ans → ~115 k€ ≥ 100 k€,
+    // rendement requis ~4,2 % < réaliste (6 %) → ni compromis ni en retard
+    const m = computeGoalMetrics({
+      type: "DOWN_PAYMENT",
+      linkedValueCents: 6_500_000,
+      targetAmountCents: 10_000_000,
+      monthlyContributionCents: 40_000,
+      createdAt: new Date(2026, 8, 26),
+      targetDate: new Date(2031, 0, 1),
+      expectedReturn: 0.08,
+      now: new Date(2026, 8, 26),
+    });
+    expect(m.status).toBe("onTrack");
+  });
+  it("sans contribution ni rendement : pas de late automatique (rien à projeter)", () => {
+    const m = computeGoalMetrics({
+      type: "CUSTOM",
+      linkedValueCents: 1_000_000,
+      targetAmountCents: 10_000_000,
+      monthlyContributionCents: 0,
+      createdAt: new Date(2026, 8, 26),
+      targetDate: new Date(2030, 0, 1),
+      expectedReturn: 0,
+      now: new Date(2026, 8, 26),
+    });
+    // rendement requis null (inatteignable), pas de projection possible → compromis
+    expect(m.status).toBe("compromised");
   });
 });

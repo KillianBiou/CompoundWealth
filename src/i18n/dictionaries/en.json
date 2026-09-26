@@ -1087,7 +1087,27 @@
         "extreme": "The required return far exceeds what the market does on average: nearly impossible — rethink the target, the deadline or the contribution."
       },
       "shortHorizonWarning": "Short horizon (< 5 yrs): a single market crash could make you miss the goal — the long-term average won't have time to smooth it out.",
-      "requiredReturnHint": "Annual return needed to reach the target by the deadline, given your current capital and contribution. The color tells you whether it is reasonable."
+      "requiredReturnHint": "Annual return needed to reach the target by the deadline, given your current capital and contribution. The color tells you whether it is reasonable.",
+      "coverage": "Current coverage",
+      "coverageHint": "Months of expenses covered by your precautionary savings.",
+      "cashRate": "Weighted savings rate",
+      "cashRateHint": "Rate of the linked liquid envelopes, weighted by their value.",
+      "safetyScale": {
+        "critical": "Very precarious savings",
+        "fragile": "Precarious savings",
+        "partial": "Partial reserve",
+        "building": "Reserve under construction",
+        "robust": "Solid reserve",
+        "excess": "Excessive reserve"
+      },
+      "safetyScaleExplain": {
+        "critical": "Less than one month of expenses covered: any setback could force you to sell in a hurry. Absolute priority before any investing.",
+        "fragile": "1 to 3 months of expenses covered: the safety-net alert zone. A serious setback (job, health, car) would drain the reserve.",
+        "partial": "At least 3 months covered but under half the target: the safety base is there, keep the regular effort.",
+        "building": "More than half the target reached: the hardest part is done, steady discipline does the rest.",
+        "robust": "Target reached: your expenses are covered for the planned duration. The reserve fully plays its shock-absorber role.",
+        "excess": "More than 1.5× the target: money is sleeping at low return — the excess could feed other goals."
+      }
     },
     "combinedGoTo": "View my goals"
   }

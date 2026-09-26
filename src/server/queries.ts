@@ -415,6 +415,8 @@ export interface GoalSummary {
   linkedPastReturn: number | null;
   /** hypothèse de rendement utilisée pour les projections (moyenne bourse) */
   expectedReturn: number;
+  /** rendement livret pondéré (matelas : hypothèse de la projection dorée) */
+  cashReturn: number | null;
   /** série mensuelle de la métrique du but */
   monthlySeries: { date: Date; valueCents: number; metric: number }[];
   /** série agrégée des enveloppes liées (graphique valeur) */
@@ -541,6 +543,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
             0,
           ) / cashValueTotal
         : null;
+    const metricsCashReturn = cashReturn ?? 0;
 
     const metrics = computeGoalMetrics({
       type: goal.type,
@@ -554,7 +557,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
       targetDate: goal.targetDate,
       createdAt: goal.createdAt,
       expectedReturn,
-      cashReturn,
+      cashReturn: metricsCashReturn,
       now,
     });
 
@@ -599,6 +602,7 @@ export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
       metrics,
       linkedPastReturn,
       expectedReturn,
+      cashReturn,
       monthlySeries,
       linkedSeries,
     };

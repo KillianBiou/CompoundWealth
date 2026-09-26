@@ -10,6 +10,7 @@ import {
   projectCapital,
   requiredMonthlySavings,
   requiredTrajectoryAt,
+  safetyNetLevel,
   DEFAULT_WITHDRAWAL_RATE,
 } from "@/lib/goals/progress";
 import { formatEurCents, formatPercent } from "@/lib/money";
@@ -99,9 +100,10 @@ export default async function GoalDetailPage({
   const needsAdjust = ["compromised", "underfunded", "late"].includes(m.status);
 
   // faisabilité du but : rendement requis vs moyenne bourse vs passé lié
+  // (jamais pour le matelas — l'analyse de précaution la remplace)
   const feasibility = goalFeasibility(
     goal.type === "SAFETY_NET" ? null : m.requiredReturn,
-    goal.linkedPastReturn,
+    goal.type === "SAFETY_NET" ? null : goal.linkedPastReturn,
     expectedReturn,
   );
   const shortHorizon = isShortHorizonConcern(feasibility, yearsLeft);
@@ -121,6 +123,25 @@ export default async function GoalDetailPage({
     extreme: "border-negative/30 bg-negative/10",
   };
 
+  // matelas : analyse de précaution dédiée — l'échelle parle en mois de
+  // couverture, jamais en rendement
+  const safetyLevel =
+    goal.type === "SAFETY_NET"
+      ? safetyNetLevel(
+          m.monthsCovered,
+          goal.targetMonths,
+          m.progress,
+        )
+      : null;
+  const safetyTone: Record<string, string> = {
+    critical: "border-negative/40 bg-negative/10",
+    fragile: "border-negative/30 bg-negative/10",
+    partial: "border-warning/30 bg-warning/10",
+    building: "border-accent-500/30 bg-accent-500/10",
+    robust: "border-positive/30 bg-positive/10",
+    excess: "border-gold/40 bg-gold/10",
+  };
+
   // graphique 1 : évolution de la métrique du but par mois + trajectoire requise
   const progressPoints = goal.monthlySeries.map((p) => ({
     date: p.date.getTime(),
@@ -138,15 +159,18 @@ export default async function GoalDetailPage({
           ? m.capitalTargetCents
           : goal.targetAmountCents;
     if (target === null || target <= goal.linkedValueCents) return [];
-    if (goal.effectiveMonthlyContributionCents <= 0 && expectedReturn <= 0) return [];
+    // matelas : projection au taux livret pondéré (précaution ≠ marché actions)
+    const projectionRate =
+      goal.type === "SAFETY_NET" ? (goal.cashReturn ?? 0) : expectedReturn;
+    if (goal.effectiveMonthlyContributionCents <= 0 && projectionRate <= 0) return [];
     const months = monthsToFillGoal(
       goal.linkedValueCents,
       target,
       goal.effectiveMonthlyContributionCents,
-      expectedReturn,
+      projectionRate,
     );
     if (months === null) return [];
-    const monthlyRate = Math.pow(1 + expectedReturn, 1 / 12) - 1;
+    const monthlyRate = Math.pow(1 + projectionRate, 1 / 12) - 1;
     const points: {
       date: number;
       metric: number;
@@ -163,7 +187,9 @@ export default async function GoalDetailPage({
         goal.type === "SAFETY_NET"
           ? goal.monthlyExpensesCents && goal.monthlyExpensesCents > 0
             ? value / goal.monthlyExpensesCents
-            : null
+            : target > 0
+              ? value / target
+              : null
           : goal.type === "FIRE"
             ? Math.round((value * (goal.withdrawalRate ?? DEFAULT_WITHDRAWAL_RATE)) / 12)
             : target > 0
@@ -284,10 +310,21 @@ export default async function GoalDetailPage({
             align="center"
           />
         </div>
-        {/* groupe 2 : rendements — requis vs hypothèse vs passé */}
-        <div className="grid grid-cols-1 gap-6 border-t border-border-cw pt-6 sm:grid-cols-3 xl:flex-1 xl:border-t-0 xl:pt-0 xl:pl-8 xl:pr-8">
-          {goal.type === "SAFETY_NET" ? (
-            /* matelas : pas de rendement requis — le remplissage au DCA actuel */
+        {goal.type === "SAFETY_NET" ? (
+          /* matelas : épargne de précaution — parler rendement est hors sujet.
+             On montre la couverture, le remplissage au DCA actuel et le taux
+             livret (seul « rendement » pertinent pour de la précaution). */
+          <div className="grid grid-cols-1 gap-6 border-t border-border-cw pt-6 sm:grid-cols-3 xl:flex-1 xl:border-t-0 xl:pt-0 xl:pl-8 xl:pr-8">
+            <Kpi
+              label={t.goals.detail.coverage}
+              value={
+                m.monthsCovered !== null
+                  ? `${m.monthsCovered.toFixed(1)} ${t.goals.detail.monthsUnit}`
+                  : "—"
+              }
+              hint={t.goals.detail.coverageHint}
+              align="center"
+            />
             <Kpi
               label={t.goals.detail.monthsToFill}
               value={
@@ -298,7 +335,16 @@ export default async function GoalDetailPage({
               hint={t.goals.detail.monthsToFillHint}
               align="center"
             />
-          ) : (
+            <Kpi
+              label={t.goals.detail.cashRate}
+              value={goal.cashReturn !== null ? formatPercent(goal.cashReturn) : "—"}
+              hint={t.goals.detail.cashRateHint}
+              align="center"
+            />
+          </div>
+        ) : (
+          /* autres buts : rendements — requis vs hypothèse vs passé */
+          <div className="grid grid-cols-1 gap-6 border-t border-border-cw pt-6 sm:grid-cols-3 xl:flex-1 xl:border-t-0 xl:pt-0 xl:pl-8 xl:pr-8">
             <Kpi
               label={t.goals.detail.requiredReturn}
               value={m.requiredReturn !== null ? formatPercent(m.requiredReturn) : "—"}
@@ -306,33 +352,33 @@ export default async function GoalDetailPage({
               hint={t.goals.detail.requiredReturnHint}
               align="center"
             />
-          )}
-          {/*
-            Rendement moyen de la bourse : hypothèse long terme des projections.
-            PAS UNE PROMESSE — c'est la moyenne historique du marché actions.
-          */}
-          <Kpi
-            label={t.goals.detail.expectedReturn}
-            value={formatPercent(expectedReturn)}
-            hint={t.goals.detail.expectedReturnHint}
-            align="center"
-          />
-          {/*
-            Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
-            pondérées par leur capital (et son évolution via les DCA/versements).
-            LE PASSÉ NE PRÉSAGE PAS DU FUTUR.
-          */}
-          <Kpi
-            label={t.goals.detail.pastReturn}
-            value={
-              goal.linkedPastReturn !== null
-                ? formatPercent(goal.linkedPastReturn)
-                : "—"
-            }
-            hint={t.goals.detail.pastReturnHint}
-            align="center"
-          />
-        </div>
+            {/*
+              Rendement moyen de la bourse : hypothèse long terme des projections.
+              PAS UNE PROMESSE — c'est la moyenne historique du marché actions.
+            */}
+            <Kpi
+              label={t.goals.detail.expectedReturn}
+              value={formatPercent(expectedReturn)}
+              hint={t.goals.detail.expectedReturnHint}
+              align="center"
+            />
+            {/*
+              Rendement passé annualisé : SEULEMENT les enveloppes liées à ce but,
+              pondérées par leur capital (et son évolution via les DCA/versements).
+              LE PASSÉ NE PRÉSAGE PAS DU FUTUR.
+            */}
+            <Kpi
+              label={t.goals.detail.pastReturn}
+              value={
+                goal.linkedPastReturn !== null
+                  ? formatPercent(goal.linkedPastReturn)
+                  : "—"
+              }
+              hint={t.goals.detail.pastReturnHint}
+              align="center"
+            />
+          </div>
+        )}
         {/* groupe 3 : échéance — remplissage ou mois restants (buts datés) */}
         {goal.type !== "SAFETY_NET" ? (
           <div className="grid shrink-0 grid-cols-1 gap-6 border-t border-border-cw pt-6 xl:border-t-0 xl:pt-0 xl:pl-8">
@@ -390,8 +436,40 @@ export default async function GoalDetailPage({
         </Card>
       ) : null}
 
-      {/* estimation du but : niveau de difficulté coloré (spec §3.3.6) */}
-      {feasibility !== null ? (
+      {/* matelas : analyse de précaution — échelle spécialisée, pas de rendement */}
+      {safetyLevel !== null ? (
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border p-4",
+            safetyTone[safetyLevel],
+          )}
+        >
+          <span className="font-heading text-sm font-semibold">
+            {t.goals.detail.safetyScale[safetyLevel]}
+          </span>
+          <span className="text-sm text-text-secondary">
+            {t.goals.detail.safetyScaleExplain[safetyLevel]}
+          </span>
+          <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-text-muted">
+            <span>
+              {t.goals.detail.coverage} :{" "}
+              {m.monthsCovered !== null
+                ? `${m.monthsCovered.toFixed(1)} ${t.goals.detail.monthsUnit}`
+                : "—"}
+            </span>
+            <span>
+              {t.goals.detail.monthsToFill} :{" "}
+              {m.monthsToFill !== null
+                ? `${m.monthsToFill} ${t.goals.detail.monthsUnit}`
+                : "—"}
+            </span>
+          </span>
+        </div>
+      ) : null}
+
+      {/* estimation du but : niveau de difficulté coloré (spec §3.3.6)
+          (buts datés uniquement — le matelas a son encadré de précaution) */}
+      {feasibility !== null && goal.type !== "SAFETY_NET" ? (
         <div
           className={cn(
             "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border p-4",

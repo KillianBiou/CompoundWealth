@@ -43,6 +43,7 @@ function makeGoal(overrides: Partial<GoalSummary> = {}): GoalSummary {
     effectiveMonthlyContributionCents: 60_000,
     linkedPastReturn: null,
     expectedReturn: 0.08,
+    cashReturn: null,
     metrics: {
       progress: 1_820_000 / 6_000_000,
       displayProgress: 1_820_000 / 6_000_000,
