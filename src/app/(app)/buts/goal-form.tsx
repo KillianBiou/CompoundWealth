@@ -84,6 +84,7 @@ export function GoalForm({
 
   const [type, setType] = useState<GoalType>(initial.type);
   const [name, setName] = useState(initial.name);
+  const [nameEdited, setNameEdited] = useState(Boolean(initial.name));
   const [iconKey, setIconKey] = useState(initial.icon || "target");
   const [targetAmountEur, setTargetAmountEur] = useState(initial.targetAmountEur ?? "");
   const [targetRentEur, setTargetRentEur] = useState(initial.targetRentEur ?? "");
@@ -99,6 +100,9 @@ export function GoalForm({
     initial.monthlyContributionEur ?? "",
   );
   const [selected, setSelected] = useState<string[]>(initial.envelopeIds);
+  const [safetyMode, setSafetyMode] = useState<"RESERVE" | "AMOUNT">(
+    initial.targetAmountEur ? "AMOUNT" : "RESERVE",
+  );
 
   const toggleEnvelope = (id: string) => {
     setSelected((prev) =>
@@ -162,7 +166,13 @@ export function GoalForm({
                 onClick={() => {
                   setType(typeOfTemplate(tpl));
                   setIconKey(tpl.iconKey);
-                  if (!name) setName(t.goals.new.templates[tpl.iconKey as keyof typeof t.goals.new.templates] ?? "");
+                  if (!nameEdited) {
+                    setName(
+                      t.goals.new.templates[
+                        tpl.iconKey as keyof typeof t.goals.new.templates
+                      ] ?? "",
+                    );
+                  }
                 }}
                 className={cn(
                   "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors",
@@ -192,51 +202,108 @@ export function GoalForm({
           required
           maxLength={80}
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setNameEdited(true);
+          }}
           placeholder={t.goals.new.namePlaceholder}
         />
       </Field>
 
       {type === "SAFETY_NET" ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label={t.goals.new.monthlyExpenses}
-            htmlFor="monthlyExpensesEur"
-            error={state?.errors?.monthlyExpensesEur}
-            hint={t.goals.new.monthlyExpensesHint}
-          >
-            <Input
-              id="monthlyExpensesEur"
-              name="monthlyExpensesEur"
-              type="number"
-              step="0.01"
-              min="1"
-              inputMode="decimal"
-              required
-              value={monthlyExpensesEur}
-              onChange={(e) => setMonthlyExpensesEur(e.target.value)}
-              placeholder="1 500,00"
-            />
-          </Field>
-          <Field
-            label={t.goals.new.targetMonths}
-            htmlFor="targetMonths"
-            error={state?.errors?.targetMonths}
-          >
-            <Select
-              id="targetMonths"
-              name="targetMonths"
-              required
-              value={targetMonths}
-              onChange={(e) => setTargetMonths(e.target.value)}
+        <div className="space-y-4">
+          <div className="flex gap-2" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={safetyMode === "RESERVE"}
+              onClick={() => setSafetyMode("RESERVE")}
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                safetyMode === "RESERVE"
+                  ? "border-accent-500 bg-accent-100/40 font-medium"
+                  : "border-border-cw bg-bg-elevated hover:border-accent-500/40",
+              )}
             >
-              {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
-                <option key={m} value={m}>
-                  {m} {t.goals.new.targetMonthsUnit}
-                </option>
-              ))}
-            </Select>
-          </Field>
+              {t.goals.new.safetyModeReserve}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={safetyMode === "AMOUNT"}
+              onClick={() => setSafetyMode("AMOUNT")}
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-sm transition-colors",
+                safetyMode === "AMOUNT"
+                  ? "border-accent-500 bg-accent-100/40 font-medium"
+                  : "border-border-cw bg-bg-elevated hover:border-accent-500/40",
+              )}
+            >
+              {t.goals.new.safetyModeAmount}
+            </button>
+          </div>
+          {safetyMode === "RESERVE" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label={t.goals.new.monthlyExpenses}
+                htmlFor="monthlyExpensesEur"
+                error={state?.errors?.monthlyExpensesEur}
+                hint={t.goals.new.monthlyExpensesHint}
+              >
+                <Input
+                  id="monthlyExpensesEur"
+                  name="monthlyExpensesEur"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  inputMode="decimal"
+                  required
+                  value={monthlyExpensesEur}
+                  onChange={(e) => setMonthlyExpensesEur(e.target.value)}
+                  placeholder="1 500,00"
+                />
+              </Field>
+              <Field
+                label={t.goals.new.targetMonths}
+                htmlFor="targetMonths"
+                error={state?.errors?.targetMonths}
+              >
+                <Select
+                  id="targetMonths"
+                  name="targetMonths"
+                  required
+                  value={targetMonths}
+                  onChange={(e) => setTargetMonths(e.target.value)}
+                >
+                  {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+                    <option key={m} value={m}>
+                      {m} {t.goals.new.targetMonthsUnit}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          ) : (
+            <Field
+              label={t.goals.new.safetyAmountTarget}
+              htmlFor="targetAmountEur"
+              error={state?.errors?.targetAmountEur}
+              hint={t.goals.new.safetyAmountTargetHint}
+            >
+              <Input
+                id="targetAmountEur"
+                name="targetAmountEur"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                required
+                value={targetAmountEur}
+                onChange={(e) => setTargetAmountEur(e.target.value)}
+                placeholder="15 000,00"
+              />
+            </Field>
+          )}
         </div>
       ) : type === "FIRE" ? (
         <div className="grid gap-4 sm:grid-cols-2">

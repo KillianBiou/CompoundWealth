@@ -39,6 +39,39 @@ describe("progression par type de but", () => {
     expect(m.capitalTargetCents).toBe(900_000);
   });
 
+  it("matelas mode montant : cible 15 000 € directe, sans dépenses", () => {
+    const m = computeGoalMetrics({
+      type: "SAFETY_NET",
+      linkedValueCents: 6_000_000 / 10,
+      targetAmountCents: 1_500_000,
+      createdAt: new Date(2025, 0, 1),
+      now: NOW,
+    });
+    expect(m.monthsCovered).toBeNull();
+    expect(m.capitalTargetCents).toBe(1_500_000);
+    expect(m.progress).toBeCloseTo(0.4, 10);
+    expect(m.status).toBe("onTrack");
+  });
+
+  it("matelas mode montant : atteint et surfinancé fonctionnent", () => {
+    const achieved = computeGoalMetrics({
+      type: "SAFETY_NET",
+      linkedValueCents: 1_500_000,
+      targetAmountCents: 1_500_000,
+      createdAt: new Date(2025, 0, 1),
+      now: NOW,
+    });
+    expect(achieved.status).toBe("achieved");
+    const over = computeGoalMetrics({
+      type: "SAFETY_NET",
+      linkedValueCents: 2_400_000,
+      targetAmountCents: 1_500_000,
+      createdAt: new Date(2025, 0, 1),
+      now: NOW,
+    });
+    expect(over.status).toBe("overfunded");
+  });
+
   it("matelas : cible par défaut 6 mois si targetMonths absent", () => {
     const m = computeGoalMetrics({
       type: "SAFETY_NET",

@@ -27,20 +27,29 @@ export interface GoalProgressPointView {
 export function GoalProgressChart({
   points,
   type,
+  metricMode,
   locale,
 }: {
   points: GoalProgressPointView[];
   type: GoalType;
+  /** matelas : "months" (mode réserve) ou "progress" (mode montant) */
+  metricMode?: "months" | "progress" | "rent";
   locale: NumberLocale;
 }) {
   const { t } = useI18n();
-  const metricLabel =
+  const effectiveMode: "months" | "progress" | "rent" =
     type === "SAFETY_NET"
-      ? t.goals.detail.metricMonths
+      ? (metricMode ?? "months")
       : type === "FIRE"
+        ? "rent"
+        : "progress";
+  const metricLabel =
+    effectiveMode === "months"
+      ? t.goals.detail.metricMonths
+      : effectiveMode === "rent"
         ? t.goals.detail.metricRent
         : t.goals.detail.metricProgress;
-  const isPercent = type !== "SAFETY_NET" && type !== "FIRE";
+  const isPercent = effectiveMode === "progress";
 
   const data = points.map((p) => ({
     date: p.date,
@@ -51,7 +60,7 @@ export function GoalProgressChart({
   const fmt = (v: number) =>
     isPercent
       ? `${v.toFixed(0)} %`
-      : type === "SAFETY_NET"
+      : effectiveMode === "months"
         ? `${v.toFixed(1)}`
         : formatEurCents(Math.round(v));
 

@@ -223,11 +223,18 @@ export const goalSchema = z
     const addIssue = (path: string, message: string) =>
       ctx.addIssue({ code: "custom", path: [path], message });
     if (data.type === "SAFETY_NET") {
-      if (data.targetMonths === undefined) {
-        addIssue("targetMonths", "Choisissez une durée de couverture");
-      }
-      if (data.monthlyExpensesEur === undefined) {
-        addIssue("monthlyExpensesEur", "Indiquez vos dépenses mensuelles");
+      // deux modes : montant cible direct, ou dépenses × mois de réserve
+      const hasAmount = data.targetAmountEur !== undefined && data.targetAmountEur > 0;
+      const hasReserve =
+        data.targetMonths !== undefined && data.monthlyExpensesEur !== undefined;
+      if (!hasAmount && !hasReserve) {
+        if (data.targetMonths === undefined && data.monthlyExpensesEur === undefined) {
+          addIssue("targetAmountEur", "Indiquez un montant cible ou vos dépenses et la durée de réserve");
+        } else if (data.targetMonths === undefined) {
+          addIssue("targetMonths", "Choisissez une durée de couverture");
+        } else {
+          addIssue("monthlyExpensesEur", "Indiquez vos dépenses mensuelles");
+        }
       }
     } else if (data.type === "FIRE") {
       if (data.targetRentEur === undefined || data.targetRentEur <= 0) {
