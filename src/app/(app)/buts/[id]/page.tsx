@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser, getGoal, getGoalExpectedReturn } from "@/server/queries";
 import {
   goalFeasibility,
+  isShortHorizonConcern,
   isCapitalizedGoal,
   monthsBetween,
   monthsToFillGoal,
@@ -97,17 +98,19 @@ export default async function GoalDetailPage({
       : null;
   const needsAdjust = ["compromised", "underfunded", "late"].includes(m.status);
 
-  // faisabilité du but : rendement requis vs rendement passé des enveloppes liées
+  // faisabilité du but : rendement requis vs moyenne bourse vs passé lié
   const feasibility = goalFeasibility(
     goal.type === "SAFETY_NET" ? null : m.requiredReturn,
     goal.linkedPastReturn,
     expectedReturn,
   );
+  const shortHorizon = isShortHorizonConcern(feasibility, yearsLeft);
   const feasibilityTone: Record<string, string> = {
     comfortable: "border-positive/30 bg-positive/10",
     achievable: "border-positive/30 bg-positive/10",
+    achievableWithPast: "border-warning/30 bg-warning/10",
     demanding: "border-warning/30 bg-warning/10",
-    hard: "border-warning/30 bg-warning/10",
+    hard: "border-negative/30 bg-negative/10",
     extreme: "border-negative/30 bg-negative/10",
   };
 
@@ -384,6 +387,11 @@ export default async function GoalDetailPage({
           <span className="text-sm text-text-secondary">
             {t.goals.detail.feasibilityExplain[feasibility]}
           </span>
+          {shortHorizon ? (
+            <span className="text-sm font-medium text-warning">
+              {t.goals.detail.shortHorizonWarning}
+            </span>
+          ) : null}
           <span className="ml-auto flex flex-wrap items-center gap-x-3 text-xs text-text-muted">
             <span>
               {t.goals.detail.requiredReturn} :{" "}

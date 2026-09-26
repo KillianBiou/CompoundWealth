@@ -1071,18 +1071,21 @@
       "capitalLabel": "Capital",
       "feasibility": {
         "comfortable": "Objectif confortable",
-        "achievable": "Objectif réaliste et atteignable",
-        "demanding": "Objectif difficile",
+        "achievable": "Objectif atteignable",
+        "achievableWithPast": "Objectif atteignable difficilement — performances passées encourageantes",
+        "demanding": "Objectif exigeant",
         "hard": "Objectif très difficile",
         "extreme": "Objectif quasiment impossible"
       },
       "feasibilityExplain": {
-        "comfortable": "Le rendement requis est bien couvert par le rendement de vos enveloppes : large marge de sécurité.",
-        "achievable": "Le rendement requis est couvert par le rendement de vos enveloppes liées : objectif réaliste.",
-        "demanding": "Le rendement requis dépasse le rendement passé de vos enveloppes : envisageable, mais il faudra soit plus de temps, soit plus d'effort d'épargne.",
-        "hard": "Le rendement requis est nettement supérieur au rendement de vos enveloppes : très difficile, même avec de bonnes enveloppes.",
-        "extreme": "Le rendement requis dépasse très largement ce que vos enveloppes font : quasiment impossible — repensez la cible, l'échéance ou la contribution."
-      }
+        "comfortable": "Le rendement requis est bien couvert par la moyenne de la bourse : large marge de sécurité, atteignable même avec un rendement médiocre.",
+        "achievable": "Le rendement requis est dans la moyenne de la bourse (~8 %/an) : objectif atteignable au rythme moyen du marché.",
+        "achievableWithPast": "Le rendement requis dépasse la moyenne de la bourse, mais vos enveloppes liées ont fait mieux par le passé. Possible SI ces performances se maintiennent — rien ne le garantit.",
+        "demanding": "Le rendement requis dépasse même vos performances passées : il faudrait battre durablement votre propre historique.",
+        "hard": "Le rendement requis est nettement supérieur à la moyenne de la bourse : très difficile, même avec de bonnes enveloppes.",
+        "extreme": "Le rendement requis dépasse très largement ce que la bourse fait en moyenne : quasiment impossible — repensez la cible, l'échéance ou la contribution."
+      },
+      "shortHorizonWarning": "Horizon court (< 5 ans) : un crash de marché peut suffire à faire rater l'objectif — la moyenne long terme n'aura pas le temps de lisser."
     },
     "combinedGoTo": "Voir mes buts"
   }

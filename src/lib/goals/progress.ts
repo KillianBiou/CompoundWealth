@@ -173,22 +173,33 @@ export function requiredAnnualReturn(
 }
 
 /**
- * Niveau de faisabilité du but, en comparant le rendement annuel requis
- * au rendement que les enveloppes liées font réellement (passé annualisé,
- * neutralisé des versements) :
- * - "comfortable" : requis ≤ 50 % du rendement réel → large marge ;
- * - "achievable"  : requis ≤ rendement réel → objectif réaliste et atteignable ;
- * - "demanding"   : requis ≤ 1,5 × rendement réel → difficile mais envisageable
- *   si le rendement passé se maintient ;
- * - "hard"        : requis ≤ 2 × rendement réel → très difficile ;
- * - "extreme"     : au-delà — quasiment impossible, même avec de bonnes
- *   enveloppes (ex. 25 % requis contre 12 % réels).
- * referenceReturn sert de comparaison quand le passé est indisponible
- * (historique trop court) : on retombe sur la moyenne bourse.
+ * Niveau de faisabilité du but — grille de scénarios croisant le rendement
+ * annuel requis, la moyenne long terme de la bourse (référence) et le
+ * rendement passé réel des enveloppes liées :
+ *
+ * 1. "comfortable"        : requis nul (l'épargne seule suffit) ou ≤ moitié
+ *    de la moyenne bourse → large marge, atteignable même avec un
+ *    rendement médiocre ;
+ * 2. "achievable"          : requis ≤ moyenne bourse (8 %) → atteignable au
+ *    rythme moyen du marché ; sur un horizon court, sensible à un crash ;
+ * 3. "achievableWithPast"  : requis > moyenne bourse mais couvert par le
+ *    rendement passé des enveloppes → possible SI les performances passées
+ *    se maintiennent (rien ne le garantit) — cas mitigé ;
+ * 4. "demanding"           : requis > rendement passé mais ≤ 1,25 × ce passé
+ *    → il faudrait battre durablement son propre historique ;
+ * 5. "hard"                : requis au-delà du passé et ≤ 2 × la moyenne
+ *    bourse → très difficile, même avec de bonnes enveloppes ;
+ * 6. "extreme"             : au-delà de 2 × la moyenne bourse → quasiment
+ *    impossible (ex. 25 % requis).
+ *
+ * Le passé indisponible (historique trop court) retombe sur la moyenne
+ * bourse. L'avertissement « horizon court » est porté par
+ * isShortHorizonConcern (sensibilité aux crashes si < 5 ans).
  */
 export type GoalFeasibility =
   | "comfortable"
   | "achievable"
+  | "achievableWithPast"
   | "demanding"
   | "hard"
   | "extreme";
@@ -199,13 +210,50 @@ export function goalFeasibility(
   referenceReturn: number = EXPECTED_EQUITY_RETURN,
 ): GoalFeasibility | null {
   if (requiredReturn === null || requiredReturn <= 0) return "comfortable";
-  const benchmark = portfolioPastReturn ?? referenceReturn;
-  if (benchmark <= 0) return null;
-  if (requiredReturn <= benchmark * 0.5) return "comfortable";
-  if (requiredReturn <= benchmark) return "achievable";
-  if (requiredReturn <= benchmark * 1.5) return "demanding";
-  if (requiredReturn <= benchmark * 2) return "hard";
+  if (referenceReturn <= 0) return null;
+  if (requiredReturn <= referenceReturn * 0.5) return "comfortable";
+  if (requiredReturn <= referenceReturn) return "achievable";
+  if (
+    portfolioPastReturn !== null &&
+    portfolioPastReturn > 0 &&
+    requiredReturn <= portfolioPastReturn
+  ) {
+    return "achievableWithPast";
+  }
+  if (
+    portfolioPastReturn !== null &&
+    portfolioPastReturn > 0 &&
+    requiredReturn <= portfolioPastReturn * 1.25
+  ) {
+    return "demanding";
+  }
+  if (requiredReturn <= referenceReturn * 2) return "hard";
   return "extreme";
+}
+
+/**
+ * Horizon considéré comme « court » pour l'avertissement de sensibilité aux
+ * crashes : en dessous, la moyenne long terme n'a pas le temps de lisser
+ * une mauvaise année.
+ */
+export const SHORT_HORIZON_YEARS = 5;
+
+/** L'avertissement « horizon court » s'applique-t-il à ce niveau ? */
+export function isShortHorizonConcern(
+  feasibility: GoalFeasibility | null,
+  yearsLeft: number | null | undefined,
+): boolean {
+  if (feasibility === null || yearsLeft === null || yearsLeft === undefined) {
+    return false;
+  }
+  if (
+    feasibility !== "achievable" &&
+    feasibility !== "achievableWithPast" &&
+    feasibility !== "demanding"
+  ) {
+    return false;
+  }
+  return yearsLeft < SHORT_HORIZON_YEARS;
 }
 
 /**
