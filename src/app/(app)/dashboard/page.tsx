@@ -1,5 +1,5 @@
-import { Plus } from "lucide-react";
-import { getEnvelopeSummaries } from "@/server/queries";
+import { Plus, Target } from "lucide-react";
+import { getEnvelopeSummaries, getGoalsCombinedStatus } from "@/server/queries";
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { aggregateSeries, periodPerformance } from "@/lib/portfolio/series";
 import { ButtonLink, Card, Kpi } from "@/components/ui";
@@ -18,6 +18,7 @@ function periodChange(
 
 export default async function DashboardPage() {
   const envelopes = await getEnvelopeSummaries();
+  const goals = await getGoalsCombinedStatus();
   const t = getDictionary(await getLocaleFromCookies());
   const totalInvested = envelopes.reduce((s, e) => s + e.investedCents, 0);
   const totalValue = envelopes.reduce((s, e) => s + e.valueCents, 0);
@@ -71,6 +72,22 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-3">
+          <Target className="h-5 w-5 text-accent-500" aria-hidden />
+          <div>
+            <p className="text-sm font-medium">{t.goals.title}</p>
+            <p className="text-xs text-text-secondary">
+              {t.goals.combined
+                .replace("{on}", String(goals.onTrack))
+                .replace("{attention}", String(goals.needsAttention))}
+            </p>
+          </div>
+        </div>
+        <ButtonLink href="/buts" variant="secondary">
+          {t.goals.combinedGoTo}
+        </ButtonLink>
+      </Card>
       <Card className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <Kpi
           label={t.dashboard.totalInvested}
