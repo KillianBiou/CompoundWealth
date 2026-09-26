@@ -6,7 +6,9 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -71,6 +73,8 @@ export function GoalProgressChart({
   locale,
   capitalAvailable,
   labels,
+  targetDate,
+  targetMissed,
 }: {
   points: GoalProgressPointView[];
   /** matelas : "months" (mode réserve) ou "progress" (mode montant) */
@@ -79,6 +83,10 @@ export function GoalProgressChart({
   /** le mode capital n'est proposé que si les données de valeur existent */
   capitalAvailable?: boolean;
   labels?: { metric?: string; capital?: string } | null;
+  /** date cible du but : ligne rouge verticale */
+  targetDate?: number | null;
+  /** la projection dépasse la date cible → zone hachurée rouge au-delà */
+  targetMissed?: boolean;
 }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<"metric" | "capital">("metric");
@@ -170,6 +178,18 @@ export function GoalProgressChart({
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 8 }}>
+            {/* dépassement de la date cible : zone hachurée rouge au-delà de la ligne */}
+            {targetDate && targetMissed ? (
+              <ReferenceArea
+                x1={targetDate}
+                x2={Math.max(targetDate, data[data.length - 1]?.date ?? targetDate)}
+                fill="var(--negative)"
+                fillOpacity={0.06}
+                stroke="var(--negative)"
+                strokeOpacity={0.25}
+                strokeDasharray="4 4"
+              />
+            ) : null}
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-cw)" />
             <XAxis
               dataKey="date"
@@ -279,6 +299,21 @@ export function GoalProgressChart({
                 dot={false}
                 connectNulls
                 isAnimationActive={false}
+              />
+            ) : null}
+            {/* date cible : barre verticale rouge */}
+            {targetDate ? (
+              <ReferenceLine
+                x={targetDate}
+                stroke="var(--negative)"
+                strokeWidth={1.5}
+                strokeDasharray="6 3"
+                label={{
+                  value: t.goals.detail.targetDateLabel,
+                  position: "insideTopRight",
+                  fill: "var(--negative)",
+                  fontSize: 10,
+                }}
               />
             ) : null}
             {reachPoint ? (

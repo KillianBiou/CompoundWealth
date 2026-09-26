@@ -946,7 +946,7 @@
       "overfunded": "Votre progression dépasse largement la cible (×1,5) : le surplus peut alimenter d'autres buts.",
       "achieved": "Votre valeur actuelle atteint ou dépasse la cible. Bravo !",
       "underfunded": "Votre progression est en dessous de la trajectoire requise : augmenter votre contribution peut aider.",
-      "late": "La date cible est dépassée et le but n'est pas atteint — à revoir.",
+      "late": "Au rythme actuel (contribution + rendement attendu), le but ne sera pas atteint à la date cible — augmentez l'épargne, repoussez l'échéance ou revoyez la cible.",
       "alert": "Moins de 3 mois de dépenses couverts : la zone d'alerte du matelas de sécurité."
     },
     "combined": "{on} sur la bonne voie · {attention} à revoir",

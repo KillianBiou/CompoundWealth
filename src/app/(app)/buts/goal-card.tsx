@@ -66,12 +66,17 @@ export function GoalCard({ goal }: { goal: GoalSummary }) {
             : "group-hover:border-accent-500/50",
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate font-medium text-text-primary group-hover:text-accent-500">
-              {goal.name}
-            </p>
-            <p className="mt-0.5 text-xs text-text-muted">
+        {/* ligne : identité | actuel→cible | progression */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+          {/* identité */}
+          <div className="min-w-0 shrink-0 lg:w-56">
+            <div className="flex items-center gap-2">
+              <p className="truncate font-medium text-text-primary group-hover:text-accent-500">
+                {goal.name}
+              </p>
+              <GoalStatusBadge status={m.status} />
+            </div>
+            <p className="mt-0.5 truncate text-xs text-text-muted">
               {t.goals.categories[type]}
               {goal.targetDate
                 ? ` · ${t.goals.card.targetDate.replace(
@@ -80,62 +85,59 @@ export function GoalCard({ goal }: { goal: GoalSummary }) {
                   )}`
                 : ""}
             </p>
+            <p className="mt-0.5 text-xs text-text-muted">
+              {goal.envelopes.length === 0
+                ? t.goals.card.noEnvelopes
+                : t.goals.card.envelopesCount
+                    .replace("{count}", String(goal.envelopes.length))
+                    .replace(/{s}/g, goal.envelopes.length > 1 ? "s" : "")}
+              {" · "}
+              <span className="font-medium transition-colors group-hover:text-accent-500">
+                {t.goals.card.details}
+              </span>
+            </p>
           </div>
-          <GoalStatusBadge status={m.status} />
-        </div>
 
-        <div className="mt-4 flex items-end justify-between gap-4">
-          <div className="min-w-0">
+          {/* actuel → cible */}
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
               {t.goals.detail.current} → {t.goals.detail.target}
             </p>
-            <p className="mt-0.5 font-heading text-2xl font-semibold tabular-nums text-text-primary">
+            <p className="mt-0.5 truncate font-heading text-2xl font-semibold tabular-nums text-text-primary">
               {currentText}
               <span className="mx-1.5 text-text-muted">→</span>
               <span className="text-text-secondary">{targetText}</span>
             </p>
-            <p className="mt-1 text-xs text-text-secondary">
+            <p className="mt-1 truncate text-xs text-text-secondary">
               {evolution}
               {type === "FIRE" && m.capitalTargetCents
                 ? ` · ${t.goals.detail.capitalEquivalent.replace("{amount}", formatEurCents(m.capitalTargetCents))}`
                 : ""}
             </p>
           </div>
-        </div>
 
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-text-muted">
-            <span>{t.goals.detail.progressLabel}</span>
-            <span className="tabular-nums">{progressPct} %</span>
-          </div>
-          <div
-            className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle"
-            role="progressbar"
-            aria-valuenow={progressPct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
+          {/* progression */}
+          <div className="shrink-0 lg:w-48">
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>{t.goals.detail.progressLabel}</span>
+              <span className="tabular-nums">{progressPct} %</span>
+            </div>
             <div
-              className={cn(
-                "h-full rounded-full",
-                m.status === "achieved" ? "bg-gold" : "bg-accent-500",
-              )}
-              style={{ width: `${Math.min(100, progressPct)}%` }}
-            />
+              className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-bg-subtle"
+              role="progressbar"
+              aria-valuenow={progressPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  m.status === "achieved" ? "bg-gold" : "bg-accent-500",
+                )}
+                style={{ width: `${Math.min(100, progressPct)}%` }}
+              />
+            </div>
           </div>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between border-t border-border-cw/60 pt-3">
-          <p className="text-xs text-text-muted">
-            {goal.envelopes.length === 0
-              ? t.goals.card.noEnvelopes
-              : t.goals.card.envelopesCount
-                  .replace("{count}", String(goal.envelopes.length))
-                  .replace(/{s}/g, goal.envelopes.length > 1 ? "s" : "")}
-          </p>
-          <p className="text-xs font-medium text-text-muted transition-colors group-hover:text-accent-500">
-            {t.goals.card.details}
-          </p>
         </div>
       </Card>
     </Link>
