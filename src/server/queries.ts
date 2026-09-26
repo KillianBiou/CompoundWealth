@@ -357,3 +357,239 @@ export const getEnvelopeClipboardData = cache(async (): Promise<
     };
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/*                                  Buts                                       */
+/* -------------------------------------------------------------------------- */
+
+import {
+  buildGoalMonthlySeries,
+  computeGoalMetrics,
+  type GoalStatus,
+  type GoalType,
+  type GoalMetrics,
+} from "@/lib/goals/progress";
+import { aggregateSeries } from "@/lib/portfolio/series";
+import {
+  DEFAULT_EQUITY_RETURN,
+  historicalCagr,
+} from "@/lib/analysis/scanners";
+
+export interface GoalEnvelopeSummary {
+  id: string;
+  name: string;
+  type: "PEA" | "CTO" | "LIVRET_A" | "PRIV";
+  broker: string | null;
+  /** valeur actuelle — STRICTEMENT identique à EnvelopeSummary.valueCents */
+  valueCents: number;
+  /** série de valorisation (interpolation plate) */
+  series: { date: Date; valueCents: number }[];
+  /** DCA mensuel actif en centimes (préfill de contribution) */
+  dcaMonthlyCents: number;
+  closedAt: Date | null;
+}
+
+export interface GoalSummary {
+  id: string;
+  type: GoalType;
+  name: string;
+  icon: string;
+  targetAmountCents: number | null;
+  targetRentCents: number | null;
+  targetMonths: number | null;
+  targetDate: Date | null;
+  withdrawalRate: number | null;
+  monthlyExpensesCents: number | null;
+  monthlyContributionCents: number | null;
+  createdAt: Date;
+  envelopes: GoalEnvelopeSummary[];
+  /** valeur actuelle des enveloppes liées ouvertes */
+  linkedValueCents: number;
+  /** contribution mensuelle totale (déclarée + DCA des enveloppes liées) */
+  effectiveMonthlyContributionCents: number;
+  metrics: GoalMetrics;
+  /** série mensuelle de la métrique du but */
+  monthlySeries: { date: Date; valueCents: number; metric: number }[];
+  /** série agrégée des enveloppes liées (graphique valeur) */
+  linkedSeries: { date: Date; valueCents: number }[];
+}
+
+/** Catégories d'affichage de la liste des buts. */
+export const GOAL_CATEGORY_ORDER: Record<GoalType, number> = {
+  SAFETY_NET: 0,
+  FIRE: 1,
+  RETIREMENT: 2,
+  DOWN_PAYMENT: 3,
+  CUSTOM_LIFEVENT: 4,
+  CUSTOM: 5,
+};
+
+export const getGoalSummaries = cache(async (): Promise<GoalSummary[]> => {
+  const userId = await requireUserId();
+  const goals = await prisma.goal.findMany({
+    where: { userId },
+    include: {
+      envelopes: {
+        where: { closedAt: null },
+        include: {
+          positions: {
+            select: {
+              investedCents: true,
+              boughtAt: true,
+              valuations: { orderBy: { date: "asc" } },
+              investments: { orderBy: { date: "asc" } },
+            },
+          },
+          deposits: { orderBy: { date: "asc" } },
+          dcaPlans: { include: { lines: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (goals.length === 0) return [];
+
+  // rendement attendu du portefeuille global (historique si assez de données)
+  const summaries = await getEnvelopeSummaries();
+  const wealthSeries = aggregateSeries(summaries.map((e) => e.series));
+  const investedSeriesAgg = aggregateSeries(summaries.map((e) => e.investedSeries));
+  const historicalReturn = historicalCagr(wealthSeries, investedSeriesAgg);
+  const expectedReturn = historicalReturn ?? DEFAULT_EQUITY_RETURN;
+
+  return goals.map((goal) => {
+    const now = new Date();
+    const envelopes: GoalEnvelopeSummary[] = goal.envelopes.map((e) => {
+      // même chaîne de valorisation que getEnvelopeSummaries — invariant strict
+      const positionsValue = e.positions.reduce(
+        (s, p) =>
+          s +
+          currentValueCents(p.valuations, p.investedCents ?? 0),
+        0,
+      );
+      const valuations = buildEnvelopeValuations(e.positions);
+      const isLivret = e.type === "LIVRET_A";
+      const livretRate = e.interestRate ?? LIVRET_A_RATE;
+      const livretSeries = isLivret
+        ? buildLivretBalanceSeries(
+            e.deposits.map((d) => ({ date: d.date, amountCents: d.amountCents })),
+            livretRate,
+          )
+        : [];
+      const nowTime = now.getTime();
+      const livretPoint = isLivret
+        ? [...livretSeries].reverse().find((p) => p.date.getTime() <= nowTime) ??
+          livretSeries[0] ??
+          null
+        : null;
+      const valueCents = isLivret
+        ? (livretPoint?.balanceCents ?? 0)
+        : valuations.length > 0
+          ? valuations[valuations.length - 1].valueCents
+          : positionsValue;
+      const series = isLivret
+        ? livretSeries
+            .filter((p) => p.date.getTime() <= nowTime)
+            .map((p) => ({ date: p.date, valueCents: p.balanceCents }))
+        : valuations;
+      const dcaMonthly = e.dcaPlans
+        .filter((p) => p.active)
+        .reduce((s, p) => s + p.lines.reduce((ls, l) => ls + l.maxAmountCents, 0), 0);
+      return {
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        broker: e.broker,
+        valueCents,
+        series,
+        dcaMonthlyCents: dcaMonthly,
+        closedAt: e.closedAt,
+      };
+    });
+
+    const linkedValueCents = envelopes.reduce((s, e) => s + e.valueCents, 0);
+    const dcaTotal = envelopes.reduce((s, e) => s + e.dcaMonthlyCents, 0);
+    const contribution = (goal.monthlyContributionCents ?? 0) + dcaTotal;
+
+    const metrics = computeGoalMetrics({
+      type: goal.type,
+      linkedValueCents,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      withdrawalRate: goal.withdrawalRate,
+      monthlyContributionCents: contribution,
+      targetDate: goal.targetDate,
+      createdAt: goal.createdAt,
+      expectedReturn,
+      now,
+    });
+
+    const linkedSeries = aggregateSeries(envelopes.map((e) => e.series));
+
+    const monthlySeries = buildGoalMonthlySeries({
+      type: goal.type,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      withdrawalRate: goal.withdrawalRate,
+      createdAt: goal.createdAt,
+      series: linkedSeries,
+      now,
+    });
+
+    return {
+      id: goal.id,
+      type: goal.type,
+      name: goal.name,
+      icon: goal.icon,
+      targetAmountCents: goal.targetAmountCents,
+      targetRentCents: goal.targetRentCents,
+      targetMonths: goal.targetMonths,
+      targetDate: goal.targetDate,
+      withdrawalRate: goal.withdrawalRate,
+      monthlyExpensesCents: goal.monthlyExpensesCents,
+      monthlyContributionCents: goal.monthlyContributionCents,
+      createdAt: goal.createdAt,
+      envelopes,
+      linkedValueCents,
+      effectiveMonthlyContributionCents: contribution,
+      metrics,
+      monthlySeries,
+      linkedSeries,
+    };
+  });
+});
+
+/** Un seul but par id (détail). */
+export const getGoal = cache(async (goalId: string): Promise<GoalSummary | null> => {
+  const summaries = await getGoalSummaries();
+  return summaries.find((g) => g.id === goalId) ?? null;
+});
+
+/** Enveloppes disponibles pour lier à un but : ouvertes, non clôturées. */
+export const getLinkableEnvelopes = cache(async () => {
+  const userId = await requireUserId();
+  const envelopes = await prisma.envelope.findMany({
+    where: { userId, closedAt: null },
+    select: { id: true, name: true, type: true, broker: true, goalId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return envelopes;
+});
+
+/** Statut combiné pour la carte dashboard (léger, sans séries). */
+export const getGoalsCombinedStatus = cache(
+  async (): Promise<{ total: number; onTrack: number; needsAttention: number }> => {
+    const summaries = await getGoalSummaries();
+    const needsAttention = summaries.filter((g) =>
+      ["compromised", "underfunded", "late", "alert"].includes(g.metrics.status),
+    ).length;
+    return {
+      total: summaries.length,
+      onTrack: summaries.length - needsAttention,
+      needsAttention,
+    };
+  },
+);

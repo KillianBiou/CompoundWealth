@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  goalSchema,
   createDcaSchema,
   createLivretDcaSchema,
   livretSettingsSchema,
@@ -180,5 +181,188 @@ describe("livretSettingsSchema", () => {
       inflationRate: 2,
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*                                  goalSchema                                 */
+/* -------------------------------------------------------------------------- */
+
+describe("goalSchema", () => {
+  it("accepte un matelas complet (durée + dépenses)", () => {
+    const r = goalSchema.safeParse({
+      type: "SAFETY_NET",
+      name: "Matelas de sécurité",
+      targetMonths: 6,
+      monthlyExpensesEur: 1500,
+      envelopeIds: ["env1"],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("matelas sans dépenses mensuelles → erreur explicite", () => {
+    const r = goalSchema.safeParse({
+      type: "SAFETY_NET",
+      name: "Matelas",
+      targetMonths: 6,
+      envelopeIds: [],
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.some((i) => i.path[0] === "monthlyExpensesEur")).toBe(true);
+    }
+  });
+
+  it("matelas : durée hors bornes 3-12 mois → erreur", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "SAFETY_NET",
+        name: "M",
+        targetMonths: 2,
+        monthlyExpensesEur: 1000,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      goalSchema.safeParse({
+        type: "SAFETY_NET",
+        name: "M",
+        targetMonths: 13,
+        monthlyExpensesEur: 1000,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("FIRE exige rente + date cible", () => {
+    const ok = goalSchema.safeParse({
+      type: "FIRE",
+      name: "Rente",
+      targetRentEur: 850,
+      targetDate: "2046-09-01",
+      withdrawalRate: 0.04,
+      envelopeIds: ["e1"],
+    });
+    expect(ok.success).toBe(true);
+    const noRent = goalSchema.safeParse({
+      type: "FIRE",
+      name: "Rente",
+      targetDate: "2046-09-01",
+      envelopeIds: [],
+    });
+    expect(noRent.success).toBe(false);
+    const pastDate = goalSchema.safeParse({
+      type: "FIRE",
+      name: "Rente",
+      targetRentEur: 850,
+      targetDate: "2020-01-01",
+      envelopeIds: [],
+    });
+    expect(pastDate.success).toBe(false);
+  });
+
+  it("taux de retrait hors 2-10 % → erreur", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "FIRE",
+        name: "R",
+        targetRentEur: 850,
+        targetDate: "2046-09-01",
+        withdrawalRate: 0.01,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      goalSchema.safeParse({
+        type: "FIRE",
+        name: "R",
+        targetRentEur: 850,
+        targetDate: "2046-09-01",
+        withdrawalRate: 0.15,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("DOWN_PAYMENT exige montant + date", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "DOWN_PAYMENT",
+        name: "Apport",
+        targetAmountEur: 60000,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      goalSchema.safeParse({
+        type: "DOWN_PAYMENT",
+        name: "Apport",
+        targetAmountEur: 60000,
+        targetDate: "2029-06-01",
+        envelopeIds: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("CUSTOM accepte un montant sans date", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "CUSTOM",
+        name: "Personnel",
+        targetAmountEur: 10000,
+        envelopeIds: [],
+      }).success,
+    ).toBe(true);
+  });
+
+  it("nom vide ou trop long → erreur", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "CUSTOM",
+        name: "   ",
+        targetAmountEur: 100,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      goalSchema.safeParse({
+        type: "CUSTOM",
+        name: "x".repeat(81),
+        targetAmountEur: 100,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("type inconnu → erreur", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "INVALID",
+        name: "X",
+        targetAmountEur: 100,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("contribution mensuelle négative → erreur, zéro accepté", () => {
+    expect(
+      goalSchema.safeParse({
+        type: "CUSTOM",
+        name: "X",
+        targetAmountEur: 100,
+        monthlyContributionEur: -5,
+        envelopeIds: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      goalSchema.safeParse({
+        type: "CUSTOM",
+        name: "X",
+        targetAmountEur: 100,
+        monthlyContributionEur: 0,
+        envelopeIds: [],
+      }).success,
+    ).toBe(true);
   });
 });
