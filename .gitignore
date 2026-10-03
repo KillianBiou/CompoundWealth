@@ -49,3 +49,7 @@ prisma/db/*.db-journal
 run.sh
 prisma/dev.db
 prisma/dev.db-journal
+
+# personal data exports (never commit real broker statements)
+example/TradeRepublicExport*.csv
+example/*Export*.csv
