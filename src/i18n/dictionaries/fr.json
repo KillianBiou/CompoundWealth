@@ -278,6 +278,7 @@
         "OTHER": "Autre"
       },
       "statement": "état des lieux",
+      "investedHint": "{quantity} parts × {price} = {value} (valeur actuelle, dernier cours connu)",
       "viewEtfDetail": "Voir le détail de l'ETF",
       "viewActionDetail": "Voir le détail de l'action",
       "sources": {

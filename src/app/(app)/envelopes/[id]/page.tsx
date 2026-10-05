@@ -270,6 +270,7 @@ export default async function EnvelopePage({ params }: { params: Promise<{ id: s
             p.valuations.length > 0
               ? p.valuations[p.valuations.length - 1].valueCents
               : (p.investedCents ?? null),
+          quantity: p.quantity,
           boughtAt: p.boughtAt,
           valuationDate: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].date : null,
           valuationSource: p.valuations.length > 0 ? p.valuations[p.valuations.length - 1].source : null,

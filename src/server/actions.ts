@@ -300,10 +300,7 @@ async function createPrivatePosition({
   });
   if (existing) {
     const totalQuantity = (existing.quantity ?? 0) + quantity;
-    const totalInvested =
-      (existing.investedCents ?? 0) +
-      existing.investments.reduce((s, inv) => s + inv.amountCents, 0) +
-      amountCents;
+    const totalInvested = (existing.investedCents ?? 0) + amountCents;
     await prisma.$transaction([
       prisma.positionInvestment.create({
         data: { positionId: existing.id, date, amountCents },
@@ -439,10 +436,7 @@ export async function createPositionAction(
 
   if (existing) {
     const totalQuantity = (existing.quantity ?? 0) + quantity;
-    const totalInvested =
-      (existing.investedCents ?? 0) +
-      existing.investments.reduce((s, inv) => s + inv.amountCents, 0) +
-      amountCents;
+    const totalInvested = (existing.investedCents ?? 0) + amountCents;
     await prisma.$transaction([
       prisma.positionInvestment.create({
         data: { positionId: existing.id, date, amountCents },

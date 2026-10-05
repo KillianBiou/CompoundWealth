@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { formatEurCents, formatPercent } from "@/lib/money";
 import { Badge, Card } from "@/components/ui";
 import { AddPositionRow } from "./add-position-row";
@@ -15,9 +17,69 @@ export interface PositionRow {
   category: string;
   investedCents: number | null;
   currentValueCents: number | null;
+  /** nombre de parts détenues, null si position « état des lieux » sans parts */
+  quantity: number | null;
   boughtAt: Date;
   valuationDate: Date | null;
   valuationSource: string | null;
+}
+
+/**
+ * Cellule « Investi » : au survol, détaille la composition de la valeur —
+ * nombre de parts × prix unitaire actuel (dernière valorisation connue),
+ * sur le même principe que les bulles des KPI de l'onglet Analyse.
+ */
+function InvestedCell({
+  position,
+  statementLabel,
+  hintTemplate,
+}: {
+  position: PositionRow;
+  statementLabel: string;
+  hintTemplate: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasQuantity = position.quantity !== null && position.quantity > 0;
+  const unitPriceCents =
+    hasQuantity && position.currentValueCents !== null
+      ? Math.round(position.currentValueCents / (position.quantity as number))
+      : null;
+  const hint =
+    hasQuantity && unitPriceCents !== null
+      ? hintTemplate
+          .replace("{quantity}", formatQuantity(position.quantity as number))
+          .replace("{price}", formatEurCents(unitPriceCents))
+          .replace("{value}", formatEurCents(position.currentValueCents as number))
+      : null;
+
+  if (position.investedCents === null) {
+    return <span className="italic text-text-muted">{statementLabel}</span>;
+  }
+
+  return (
+    <span
+      className="relative inline-block cursor-help font-semibold text-text-secondary"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      tabIndex={0}
+    >
+      {formatEurCents(position.investedCents)}
+      {open && hint ? (
+        <span
+          role="tooltip"
+          className="absolute bottom-full right-0 z-20 mb-1 w-56 rounded-md border border-border-cw bg-bg-elevated p-2.5 text-xs font-normal leading-relaxed text-text-secondary shadow-lg"
+        >
+          {hint}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function formatQuantity(quantity: number): string {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 }).format(quantity);
 }
 
 export function PositionsTable({
@@ -102,13 +164,11 @@ export function PositionsTable({
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {p.investedCents !== null ? (
-                      <span className="font-semibold text-text-secondary">
-                        {formatEurCents(p.investedCents)}
-                      </span>
-                    ) : (
-                      <span className="italic text-text-muted">{t.envelopes.positions.statement}</span>
-                    )}
+                    <InvestedCell
+                      position={p}
+                      statementLabel={t.envelopes.positions.statement}
+                      hintTemplate={t.envelopes.positions.investedHint}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {(() => {
