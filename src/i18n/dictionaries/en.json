@@ -278,6 +278,7 @@
         "OTHER": "Other"
       },
       "statement": "statement",
+      "investedHint": "{quantity} shares × {price} = {value} (current value, latest known price)",
       "viewEtfDetail": "View ETF details",
       "viewActionDetail": "View stock details",
       "sources": {

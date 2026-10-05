@@ -18,6 +18,7 @@ const base = {
   symbol: "CW8",
   isin: null as string | null,
   category: "ETF",
+  quantity: 12 as number | null,
   boughtAt: new Date("2026-01-15"),
   valuationDate: new Date("2026-09-20"),
   valuationSource: "yahoo",
@@ -26,6 +27,38 @@ const base = {
 function row(investedCents: number | null, currentValueCents: number | null) {
   return { ...base, investedCents, currentValueCents };
 }
+
+//
+describe("PositionsTable — bulle \u00ab investi \u00bb", () => {
+  it("affiche parts \u00d7 prix unitaire au survol du montant investi", () => {
+    renderWithToast(
+      <PositionsTable
+        envelopeId="env-1"
+        positions={[{ ...base, investedCents: 100_000, currentValueCents: 120_000, quantity: 4 }]}
+      />,
+    );
+    const invested = screen.getByText(/1[\s\u00a0\u202f]000,00[\s\u00a0\u202f]\u20ac/);
+    fireEvent.mouseEnter(invested);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.textContent).toContain("4");
+    expect(tooltip.textContent).toContain("300,00");
+    expect(tooltip.textContent).toContain("1\u202f200,00");
+    fireEvent.mouseLeave(invested);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("n'affiche pas de bulle pour une position sans parts", () => {
+    renderWithToast(
+      <PositionsTable
+        envelopeId="env-1"
+        positions={[{ ...base, investedCents: 100_000, currentValueCents: 120_000, quantity: null }]}
+      />,
+    );
+    const invested = screen.getByText(/1[\s\u00a0\u202f]000,00[\s\u00a0\u202f]\u20ac/);
+    fireEvent.mouseEnter(invested);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+});
 
 describe("PositionsTable", () => {
   it("colore la valeur actuelle en vert avec le % de bénéfice", () => {
